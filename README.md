@@ -11,3 +11,5 @@ https://industrial-predictive-genrator-maintenance-ai-m7drtvpc3rkxdzky.streamlit
 
 **Technologies**
 * Python, Pandas, NumPy, Scikit-Learn
+README.md
+​"© 2026 Osman Adam Addoma. All Rights Reserved. Unauthorized copying, modification, or distribution of this code or project structure is strictly prohibited
