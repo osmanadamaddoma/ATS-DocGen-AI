@@ -1,7 +1,12 @@
+import os
 import streamlit as st
 from datetime import datetime
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_pinecone import PineconeVectorStore
+
+# ربط أسرار Streamlit بمتغيرات النظام لكي تتعرف عليها مكتبات Pinecone و Google
+os.environ["PINECONE_API_KEY"] = st.secrets["PINECONE_API_KEY"]
+os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 
 # تهيئة شاشة التطبيق والتنسيق
 st.set_page_config(
