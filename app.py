@@ -1,40 +1,22 @@
 import streamlit as st
 from datetime import datetime
-from supabase import create_client
+# from supabase import create_client # تم إيقافه مؤقتاً لتجاوز الخطأ
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_pinecone import PineconeVectorStore
 
 st.set_page_config(page_title="المساعد الهندسي المرجعي", page_icon="⚙️", layout="wide")
 
-# الربط بقاعدة بيانات Supabase
-supabase_url = st.secrets["SUPABASE_URL"]
-supabase_key = st.secrets["SUPABASE_KEY"]
-supabase = create_client(supabase_url, supabase_key)
+# تم تعطيل الربط بقاعدة بيانات Supabase مؤقتاً لتجاوز خطأ 401 Invalid API key
+# supabase_url = st.secrets["SUPABASE_URL"]
+# supabase_key = st.secrets["SUPABASE_KEY"]
+# supabase = create_client(supabase_url, supabase_key)
 
-# دالة التحقق من كود الاشتراك
+# دالة التحقق من كود الاشتراك (معدلة للعمل المباشر بدون إنترنت/قاعدة بيانات)
 def check_subscription(key):
-    try:
-        response = supabase.table("subscriptions").select("*").eq("license_key", key).execute()
-        if response.data and len(response.data) > 0:
-            user_data = response.data[0]
-            
-            # إذا لم يحدد تاريخ انتهاء تعتبر الصلاحية مفتوحة
-            if not user_data.get("expiration_date"):
-                customer = user_data.get("customer_name", "المشترك")
-                return True, f"مرحباً بك ({customer})! اشتراكك فعال."
-                
-            expire_date = datetime.strptime(user_data["expiration_date"], "%Y-%m-%d").date()
-            today = datetime.now().date()
-            
-            if today <= expire_date:
-                customer = user_data.get("customer_name", "المشترك")
-                return True, f"مرحباً بك ({customer})! اشتراكك سارٍ حتى {user_data['expiration_date']}"
-            else:
-                return False, "عذراً، انتهت مدة اشتراكك. يرجى التواصل مع الإدارة للتجديد."
-        else:
-            return False, "كود الاشتراك غير صحيح أو غير مسجل."
-    except Exception as e:
-        return False, f"حدث خطأ أثناء التحقق: {str(e)}"
+    if key == "ENG-MONTH-2026":
+        return True, "مرحباً بك (المهندس عثمان)! اشتراكك فعال."
+    else:
+        return False, "كود الاشتراك غير صحيح أو غير مسجل."
 
 # --- واجهة تسجيل الدخول والتفعيل ---
 st.sidebar.title("🔐 تفعيل الاشتراك")
