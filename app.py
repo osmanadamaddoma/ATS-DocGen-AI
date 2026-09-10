@@ -1,49 +1,50 @@
 import streamlit as st
 from datetime import datetime
-# from supabase import create_client # تم إيقافه مؤقتاً لتجاوز الخطأ
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_pinecone import PineconeVectorStore
 
-st.set_page_config(page_title="المساعد الهندسي المرجعي", page_icon="⚙️", layout="wide")
+# تهيئة شاشة التطبيق والتنسيق
+st.set_page_config(
+    page_title="المساعد الهندسي المرجعي", 
+    page_icon="⚙️", 
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# تم تعطيل الربط بقاعدة بيانات Supabase مؤقتاً لتجاوز خطأ 401 Invalid API key
-# supabase_url = st.secrets["SUPABASE_URL"]
-# supabase_key = st.secrets["SUPABASE_KEY"]
-# supabase = create_client(supabase_url, supabase_key)
-
-# دالة التحقق من كود الاشتراك (معدلة للعمل المباشر بدون إنترنت/قاعدة بيانات)
+# دالة التحقق المؤقتة من كود الاشتراك
 def check_subscription(key):
     if key == "ENG-MONTH-2026":
         return True, "مرحباً بك (المهندس عثمان)! اشتراكك فعال."
     else:
         return False, "كود الاشتراك غير صحيح أو غير مسجل."
 
-# --- واجهة تسجيل الدخول والتفعيل ---
+# --- القائمة الجانبية للتفعيل ---
 st.sidebar.title("🔐 تفعيل الاشتراك")
 user_license = st.sidebar.text_input("أدخل كود الاشتراك الخاص بك:", type="password")
 
-# التحقق الإجباري
 if not user_license:
-    st.title("🔒 نظام المساعد الهندسي المغلق")
+    st.subheader("🔒 نظام المساعد الهندسي المغلق")
     st.warning("⚠️ يتطلب استخدام هذا التطبيق اشتراكاً فعالاً.")
     st.info("👈 يرجى إدخال كود الاشتراك الخاص بك في القائمة الجانبية لتأكيد الهوية وفتح الصلاحيات.")
-    st.stop()  # إيقاف تنفيذ باقي الكود حتى يتم إدخال الكود
+    st.stop()
 
 is_valid, msg = check_subscription(user_license)
 
 if not is_valid:
     st.sidebar.error(msg)
-    st.title("🔒 الوصول محظور")
+    st.subheader("🔒 الوصول محظور")
     st.error(msg)
-    st.stop()  # إيقاف التنفيذ في حال كان الكود غير صحيح أو منتهي الصلاحية
+    st.stop()
 
-# --- عند إدخال كود صحيح يتم الترحيب ويفتح التطبيق بالكامل ---
 st.sidebar.success(msg)
 
-st.title("⚙️ المكتبة الهندسية السحابية والمساعد الذكي")
+# --- الواجهة الرئيسية للتطبيق ---
+st.title("⚙️ المساعد الهندسي المرجعي")
+st.markdown("##### المكتبة السحابية الذكية لصيانة المولدات وأنظمة التحكم")
+
 index_name = "generator-manuals"
 
-user_question = st.text_input("أدخل العطل، كود الخطأ، أو الاستفسار الهندسي:")
+user_question = st.text_input("أدخل العطل، كود الخطأ، أو الاستفسار الهندسي:", placeholder="مثال: طريقة ضبط DSE 8610 أو عطل ارتفاع الحرارة")
 
 if user_question:
     with st.spinner("جاري البحث في الأرشيف الهندسي السحابي..."):
@@ -67,5 +68,6 @@ if user_question:
         model = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.2)
         response = model.invoke(prompt)
         
-        st.write("### 🛠️ التشخيص والحل الهندسي:")
+        st.markdown("---")
+        st.subheader("🛠️ التشخيص والحل الهندسي:")
         st.info(response.content)
