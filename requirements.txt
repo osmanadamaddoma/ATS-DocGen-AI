@@ -3,3 +3,5 @@ numpy
 pandas
 scikit-learn
 supabase
+langchain-google-genai
+langchain-pinecone
