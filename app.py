@@ -132,30 +132,64 @@ for alert in climate_alerts:
 
 st.divider()
 
-# جدول تتبع الصيانة الدورية وقطع الغيار مع الإدخال والتعديل اليدوي الكامل للساعات المنقضية
-st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة (قابل للتعديل اليدوي)")
-st.info("💡 يمكنك النقر المباشر على أي خلايا في جدول (الساعات المنقضية) أو (العمر الافتراضي) لتحديثها يدوياً، أو إضافة صفوف جديدة.")
-
+# تهيئة بيانات الجدول في الذاكرة المؤقتة (Session State)
 if "maintenance_df" not in st.session_state:
     initial_data = [
-        {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر زيت (Oil Filter)", "العمر الافتراضي (Hours)": 250, "الساعات المنقضية (Hours Used)": 210},
-        {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر وقود - أولي (Primary Fuel Filter)", "العمر الافتراضي (Hours)": 500, "الساعات المنقضية (Hours Used)": 430},
-        {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر وقود - ثانوي (Secondary Fuel Filter)", "العمر الافتراضي (Hours)": 500, "الساعات المنقضية (Hours Used)": 455},
-        {"تصنيف القطعة": "نظام الهواء (Air System)", "اسم قطعة الغيار (Spare Part)": "فلتر هواء (Air Filter)", "العمر الافتراضي (Hours)": 1000, "الساعات المنقضية (Hours Used)": 860},
-        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "قشاط المروحة (Fan Belt)", "العمر الافتراضي (Hours)": 2000, "الساعات المنقضية (Hours Used)": 1550},
-        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "سائل تبريد (Coolant ELC)", "العمر الافتراضي (Hours)": 3000, "الساعات المنقضية (Hours Used)": 2200},
-        {"تصنيف القطعة": "نظام الوقود (Fuel System)", "اسم قطعة الغيار (Spare Part)": "بخاخات الوقود (Injectors Check)", "العمر الافتراضي (Hours)": 5000, "الساعات المنقضية (Hours Used)": 4400},
-        {"تصنيف القطعة": "النظام الكهربائي (Electrical)", "اسم قطعة الغيار (Spare Part)": "بطاريات (Batteries)", "العمر الافتراضي (Hours)": 8000, "الساعات المنقضية (Hours Used)": 6100},
-        {"تصنيف القطعة": "النظام الكهربائي (Electrical)", "اسم قطعة الغيار (Spare Part)": "دينامو الشحن (Charging Alternator)", "العمر الافتراضي (Hours)": 10000, "الساعات المنقضية (Hours Used)": 8900},
-        {"تصنيف القطعة": "المحرك - ميكانيك (Motor)", "اسم قطعة الغيار (Spare Part)": "طقم عمرة رأس (Top Overhaul)", "العمر الافتراضي (Hours)": 10000, "الساعات المنقضية (Hours Used)": 9100},
-        {"تصنيف القطعة": "المحرك - ميكانيك (Motor)", "اسم قطعة الغيار (Spare Part)": "عمرة كاملة (Major Overhaul)", "العمر الافتراضي (Hours)": 20000, "الساعات المنقضية (Hours Used)": 15000},
-        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "مبرد الزيت (Oil Cooler Clean)", "العمر الافتراضي (Hours)": 5000, "الساعات المنقضية (Hours Used)": 3800},
-        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "مضخة الماء (Water Pump)", "العمر الافتراضي (Hours)": 6000, "الساعات المنقضية (Hours Used)": 5200},
-        {"تصنيف القطعة": "نظام الهواء (Air System)", "اسم قطعة الغيار (Spare Part)": "تيربو (Turbocharger Check)", "العمر الافتراضي (Hours)": 8000, "الساعات المنقضية (Hours Used)": 7100}
+        {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر زيت (Oil Filter)", "العمر الافتراضي (Hours)": 250.0, "الساعات المنقضية (Hours Used)": 210.0},
+        {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر وقود - أولي (Primary Fuel Filter)", "العمر الافتراضي (Hours)": 500.0, "الساعات المنقضية (Hours Used)": 430.0},
+        {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر وقود - ثانوي (Secondary Fuel Filter)", "العمر الافتراضي (Hours)": 500.0, "الساعات المنقضية (Hours Used)": 455.0},
+        {"تصنيف القطعة": "نظام الهواء (Air System)", "اسم قطعة الغيار (Spare Part)": "فلتر هواء (Air Filter)", "العمر الافتراضي (Hours)": 1000.0, "الساعات المنقضية (Hours Used)": 860.0},
+        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "قشاط المروحة (Fan Belt)", "العمر الافتراضي (Hours)": 2000.0, "الساعات المنقضية (Hours Used)": 1550.0},
+        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "سائل تبريد (Coolant ELC)", "العمر الافتراضي (Hours)": 3000.0, "الساعات المنقضية (Hours Used)": 2200.0},
+        {"تصنيف القطعة": "نظام الوقود (Fuel System)", "اسم قطعة الغيار (Spare Part)": "بخاخات الوقود (Injectors Check)", "العمر الافتراضي (Hours)": 5000.0, "الساعات المنقضية (Hours Used)": 4400.0},
+        {"تصنيف القطعة": "النظام الكهربائي (Electrical)", "اسم قطعة الغيار (Spare Part)": "بطاريات (Batteries)", "العمر الافتراضي (Hours)": 8000.0, "الساعات المنقضية (Hours Used)": 6100.0},
+        {"تصنيف القطعة": "النظام الكهربائي (Electrical)", "اسم قطعة الغيار (Spare Part)": "دينامو الشحن (Charging Alternator)", "العمر الافتراضي (Hours)": 10000.0, "الساعات المنقضية (Hours Used)": 8900.0},
+        {"تصنيف القطعة": "المحرك - ميكانيك (Motor)", "اسم قطعة الغيار (Spare Part)": "طقم عمرة رأس (Top Overhaul)", "العمر الافتراضي (Hours)": 10000.0, "الساعات المنقضية (Hours Used)": 9100.0},
+        {"تصنيف القطعة": "المحرك - ميكانيك (Motor)", "اسم قطعة الغيار (Spare Part)": "عمرة كاملة (Major Overhaul)", "العمر الافتراضي (Hours)": 20000.0, "الساعات المنقضية (Hours Used)": 15000.0},
+        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "مبرد الزيت (Oil Cooler Clean)", "العمر الافتراضي (Hours)": 5000.0, "الساعات المنقضية (Hours Used)": 3800.0},
+        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "مضخة الماء (Water Pump)", "العمر الافتراضي (Hours)": 6000.0, "الساعات المنقضية (Hours Used)": 5200.0},
+        {"تصنيف القطعة": "نظام الهواء (Air System)", "اسم قطعة الغيار (Spare Part)": "تيربو (Turbocharger Check)", "العمر الافتراضي (Hours)": 8000.0, "الساعات المنقضية (Hours Used)": 7100.0}
     ]
     st.session_state.maintenance_df = pd.DataFrame(initial_data)
 
-# محرر البيانات يتيح تعديل وإدخال الساعات المنقضية يدوياً
+st.subheader("✍️ لوحة الإدخال والكتابة اليدوية لقطعة غيار أو تحديث ساعات التشغيل")
+with st.form("manual_add_update_form"):
+    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+    with col_f1:
+        new_cat = st.selectbox("تصنيف القطعة", ["الصيانة الدورية (Service)", "نظام الهواء (Air System)", "نظام التبريد (Cooling System)", "نظام الوقود (Fuel System)", "النظام الكهربائي (Electrical)", "المحرك - ميكانيك (Motor)"])
+    with col_f2:
+        new_part_name = st.text_input("اسم قطعة الغيار (كتابة يدوية)", value="فلتر زيت جديد")
+    with col_f3:
+        new_lifespan = st.number_input("العمر الافتراضي (ساعات)", min_value=1.0, value=250.0, step=50.0)
+    with col_f4:
+        new_used_hours = st.number_input("ساعات التشغيل المستخدمة يدوياً", min_value=0.0, value=0.0, step=10.0)
+        
+    submit_manual = st.form_submit_button("➕ إضافة أو تحديث القطعة في الجدول الدوري")
+    if submit_manual:
+        # التحقق إذا كانت القطعة موجودة مسبقاً يتم تحديث ساعاتها، وإلا يتم إضافتها
+        df_curr = st.session_state.maintenance_df
+        match_idx = df_curr[df_curr["اسم قطعة الغيار (Spare Part)"] == new_part_name].index
+        if len(match_idx) > 0:
+            df_curr.loc[match_idx, "الساعات المنقضية (Hours Used)"] = new_used_hours
+            df_curr.loc[match_idx, "العمر الافتراضي (Hours)"] = new_lifespan
+            df_curr.loc[match_idx, "تصنيف القطعة"] = new_cat
+            st.success(f"✅ تم تحديث بيانات القطعة ({new_part_name}) بنجاح!")
+        else:
+            new_row = pd.DataFrame([{
+                "تصنيف القطعة": new_cat,
+                "اسم قطعة الغيار (Spare Part)": new_part_name,
+                "العمر الافتراضي (Hours)": new_lifespan,
+                "الساعات المنقضية (Hours Used)": new_used_hours
+            }])
+            st.session_state.maintenance_df = pd.concat([df_curr, new_row], ignore_index=True)
+            st.success(f"✅ تمت إضافة القطعة الجديدة ({new_part_name}) وساعات تشغيلها بنجاح!")
+
+st.divider()
+
+st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة (قابل للتعديل والكتابة المباشرة)")
+st.info("💡 يمكنك أيضاً النقر المباشر على أي خلية في الجدول أدناه لتعديل النصوص أو الأرقام، أو إضافة صفوف جديدة.")
+
+# محرر البيانات التفاعلي المباشر
 edited_table = st.data_editor(
     st.session_state.maintenance_df,
     num_rows="dynamic",
@@ -163,10 +197,9 @@ edited_table = st.data_editor(
     key="maintenance_manual_editor"
 )
 
-# حفظ التعديلات في الجلسة
 st.session_state.maintenance_df = edited_table
 
-# معالجة وحساب النسب والعمر المتبقي بناءً على المدخلات اليدوية
+# معالجة وحساب النسب والعمر المتبقي وحالة التنبيه
 processed_rows = []
 for index, row in edited_table.iterrows():
     category = row.get("تصنيف القطعة", "أخرى")
@@ -208,7 +241,7 @@ for index, row in edited_table.iterrows():
         "حالة التنبيه (Alert Status)": status
     })
 
-st.subheader("📋 تقرير الحالة الفنية والنسب المحسوبة بناءً على المدخلات اليدوية")
+st.subheader("📋 تقرير الحالة الفنية والنسب المحسوبة بدقة")
 df_result = pd.DataFrame(processed_rows)
 st.dataframe(df_result, use_container_width=True)
 
