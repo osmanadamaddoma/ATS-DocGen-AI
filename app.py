@@ -132,31 +132,49 @@ for alert in climate_alerts:
 
 st.divider()
 
-# جدول تتبع الصيانة الدورية وقطع الغيار (Lifespan Tracker المطابق للصورة)
-st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة (Lifespan Tracker)")
+# جدول تتبع الصيانة الدورية التفاعلي (إضافة وتعديل القطع مباشرة)
+st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة (تفاعلي - قابل للإضافة والتعديل)")
 
-# قاعدة بيانات قطع الغيار والأعمار الافتراضية المستخرجة من جدولك
-maintenance_items = [
-    {"category": "الصيانة الدورية (Service)", "part": "فلتر زيت (Oil Filter)", "lifespan": 250},
-    {"category": "الصيانة الدورية (Service)", "part": "فلتر وقود - أولي (Primary Fuel Filter)", "lifespan": 500},
-    {"category": "الصيانة الدورية (Service)", "part": "فلتر وقود - ثانوي (Secondary Fuel Filter)", "lifespan": 500},
-    {"category": "نظام الهواء (Air System)", "part": "فلتر هواء (Air Filter)", "lifespan": 1000},
-    {"category": "نظام التبريد (Cooling System)", "part": "قشاط المروحة (Fan Belt)", "lifespan": 2000},
-    {"category": "نظام التبريد (Cooling System)", "part": "سائل تبريد (Coolant ELC)", "lifespan": 3000},
-    {"category": "نظام الوقود (Fuel System)", "part": "بخاخات الوقود (Injectors Check)", "lifespan": 5000},
-    {"category": "النظام الكهربائي (Electrical)", "part": "بطاريات (Batteries)", "lifespan": 8000},
-    {"category": "النظام الكهربائي (Electrical)", "part": "دينامو الشحن (Charging Alternator)", "lifespan": 10000},
-    {"category": "المحرك - ميكانيك (Motor - Mechanical)", "part": "طقم عمرة رأس (Top Overhaul)", "lifespan": 10000},
-    {"category": "المحرك - ميكانيك (Motor - Mechanical)", "part": "عمرة كاملة (Major Overhaul)", "lifespan": 20000},
-    {"category": "نظام التبريد (Cooling System)", "part": "مبرد الزيت (Oil Cooler Clean)", "lifespan": 5000},
-    {"category": "نظام التبريد (Cooling System)", "part": "مضخة الماء (Water Pump)", "lifespan": 6000},
-    {"category": "نظام الهواء (Air System)", "part": "تيربو (Turbocharger Check)", "lifespan": 8000}
-]
+# تهيئة قاعدة البيانات في الذاكرة المؤقتة (Session State) لتسمح بالإضافة والتعديل
+if "maintenance_data" not in st.session_state:
+    st.session_state.maintenance_data = pd.DataFrame([
+        {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر زيت (Oil Filter)", "العمر الافتراضي (Hours)": 250},
+        {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر وقود - أولي (Primary Fuel Filter)", "العمر الافتراضي (Hours)": 500},
+        {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر وقود - ثانوي (Secondary Fuel Filter)", "العمر الافتراضي (Hours)": 500},
+        {"تصنيف القطعة": "نظام الهواء (Air System)", "اسم قطعة الغيار (Spare Part)": "فلتر هواء (Air Filter)", "العمر الافتراضي (Hours)": 1000},
+        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "قشاط المروحة (Fan Belt)", "العمر الافتراضي (Hours)": 2000},
+        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "سائل تبريد (Coolant ELC)", "العمر الافتراضي (Hours)": 3000},
+        {"تصنيف القطعة": "نظام الوقود (Fuel System)", "اسم قطعة الغيار (Spare Part)": "بخاخات الوقود (Injectors Check)", "العمر الافتراضي (Hours)": 5000},
+        {"تصنيف القطعة": "النظام الكهربائي (Electrical)", "اسم قطعة الغيار (Spare Part)": "بطاريات (Batteries)", "العمر الافتراضي (Hours)": 8000},
+        {"تصنيف القطعة": "النظام الكهربائي (Electrical)", "اسم قطعة الغيار (Spare Part)": "دينامو الشحن (Charging Alternator)", "العمر الافتراضي (Hours)": 10000},
+        {"تصنيف القطعة": "المحرك - ميكانيك (Motor)", "اسم قطعة الغيار (Spare Part)": "طقم عمرة رأس (Top Overhaul)", "العمر الافتراضي (Hours)": 10000},
+        {"تصنيف القطعة": "المحرك - ميكانيك (Motor)", "اسم قطعة الغيار (Spare Part)": "عمرة كاملة (Major Overhaul)", "العمر الافتراضي (Hours)": 20000},
+    ])
 
+# استخدام st.data_editor للسماح للمستخدم بإضافة صفوف جديدة أو تعديل الأعمار الافتراضية
+edited_df = st.data_editor(
+    st.session_state.maintenance_data,
+    num_rows="dynamic",
+    use_container_width=True,
+    key="maintenance_editor"
+)
+
+# تحديث البيانات في الجلسة
+st.session_state.maintenance_data = edited_df
+
+# حساب الساعات المنقضية وحالة التنبيه بناءً على الجدول المحدث وساعات المولد (Run Hours)
 table_rows = []
-for item in maintenance_items:
-    lifespan = item["lifespan"]
-    # حساب الساعات المنقضية اعتماداً على دورة التشغيل (Run Hours)
+for index, row in edited_df.iterrows():
+    category = row["تصنيف القطعة"]
+    part = row["اسم قطعة الغيار (Spare Part)"]
+    try:
+        lifespan = float(row["العمر الافتراضي (Hours)"])
+    except:
+        lifespan = 250.0
+        
+    if lifespan <= 0:
+        lifespan = 1.0
+
     used_hours = run_hours % lifespan
     if used_hours == 0 and run_hours > 0:
         used_hours = lifespan
@@ -164,7 +182,6 @@ for item in maintenance_items:
     usage_pct = (used_hours / lifespan) * 100
     remaining_hours = lifespan - used_hours
     
-    # تحديد حالة التنبيه مطابقة للجدول
     if usage_pct >= 90:
         status = "تغيير فوري (خطر) 🔴"
     elif usage_pct >= 80:
@@ -175,8 +192,8 @@ for item in maintenance_items:
         status = "حالة جيدة 🟢"
         
     table_rows.append({
-        "تصنيف القطعة": item["category"],
-        "اسم قطعة الغيار (Spare Part)": item["part"],
+        "تصنيف القطعة": category,
+        "اسم قطعة الغيار (Spare Part)": part,
         "العمر الافتراضي (Hours)": lifespan,
         "الساعات المنقضية (Hours Used)": round(used_hours, 1),
         "نسبة الاستهلاك (%)": f"{usage_pct:.1f}%",
@@ -184,8 +201,8 @@ for item in maintenance_items:
         "حالة التنبيه (Alert Status)": status
     })
 
-df_tracker = pd.DataFrame(table_rows)
-st.dataframe(df_tracker, use_container_width=True)
+st.markdown("### 📋 النتائج الحسابية للاستهلاك بناءً على ساعات التشغيل الحالية:")
+st.dataframe(pd.DataFrame(table_rows), use_container_width=True)
 
 # التحليلات التنبؤية المتقدمة للعملاء المفعلين فقط
 if is_pro:
