@@ -152,44 +152,10 @@ if "maintenance_df" not in st.session_state:
     ]
     st.session_state.maintenance_df = pd.DataFrame(initial_data)
 
-st.subheader("✍️ لوحة الإدخال والكتابة اليدوية لقطعة غيار أو تحديث ساعات التشغيل")
-with st.form("manual_add_update_form"):
-    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
-    with col_f1:
-        new_cat = st.selectbox("تصنيف القطعة", ["الصيانة الدورية (Service)", "نظام الهواء (Air System)", "نظام التبريد (Cooling System)", "نظام الوقود (Fuel System)", "النظام الكهربائي (Electrical)", "المحرك - ميكانيك (Motor)"])
-    with col_f2:
-        new_part_name = st.text_input("اسم قطعة الغيار (كتابة يدوية)", value="فلتر زيت جديد")
-    with col_f3:
-        new_lifespan = st.number_input("العمر الافتراضي (ساعات)", min_value=1.0, value=250.0, step=50.0)
-    with col_f4:
-        new_used_hours = st.number_input("ساعات التشغيل المستخدمة يدوياً", min_value=0.0, value=0.0, step=10.0)
-        
-    submit_manual = st.form_submit_button("➕ إضافة أو تحديث القطعة في الجدول الدوري")
-    if submit_manual:
-        # التحقق إذا كانت القطعة موجودة مسبقاً يتم تحديث ساعاتها، وإلا يتم إضافتها
-        df_curr = st.session_state.maintenance_df
-        match_idx = df_curr[df_curr["اسم قطعة الغيار (Spare Part)"] == new_part_name].index
-        if len(match_idx) > 0:
-            df_curr.loc[match_idx, "الساعات المنقضية (Hours Used)"] = new_used_hours
-            df_curr.loc[match_idx, "العمر الافتراضي (Hours)"] = new_lifespan
-            df_curr.loc[match_idx, "تصنيف القطعة"] = new_cat
-            st.success(f"✅ تم تحديث بيانات القطعة ({new_part_name}) بنجاح!")
-        else:
-            new_row = pd.DataFrame([{
-                "تصنيف القطعة": new_cat,
-                "اسم قطعة الغيار (Spare Part)": new_part_name,
-                "العمر الافتراضي (Hours)": new_lifespan,
-                "الساعات المنقضية (Hours Used)": new_used_hours
-            }])
-            st.session_state.maintenance_df = pd.concat([df_curr, new_row], ignore_index=True)
-            st.success(f"✅ تمت إضافة القطعة الجديدة ({new_part_name}) وساعات تشغيلها بنجاح!")
+st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة (الإدخال والتعديل اليدوي المباشر)")
+st.info("💡 **ملاحظة هامة:** عند تعديل أو كتابة أي رقم في خانة (الساعات المنقضية) أو (العمر الافتراضي) داخل الجدول أدناه، يرجى **الضغط على زر Enter** أو **النقر في أي مكان خارج الخلية** ليتم تحديث الحسابات فوراً.")
 
-st.divider()
-
-st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة (قابل للتعديل والكتابة المباشرة)")
-st.info("💡 يمكنك أيضاً النقر المباشر على أي خلية في الجدول أدناه لتعديل النصوص أو الأرقام، أو إضافة صفوف جديدة.")
-
-# محرر البيانات التفاعلي المباشر
+# محرر البيانات التفاعلي المباشر (Data Editor)
 edited_table = st.data_editor(
     st.session_state.maintenance_df,
     num_rows="dynamic",
@@ -197,31 +163,28 @@ edited_table = st.data_editor(
     key="maintenance_manual_editor"
 )
 
+# تحديث الجلسة بالبيانات الجديدة المعدلة مباشرة
 st.session_state.maintenance_df = edited_table
 
-# معالجة وحساب النسب والعمر المتبقي وحالة التنبيه
+# معالجة وحساب النسب والعمر المتبقي وحالة التنبيه بناءً على القيم المدخلة يدوياً
 processed_rows = []
 for index, row in edited_table.iterrows():
-    category = row.get("تصنيف القطعة", "أخرى")
-    part_name = row.get("اسم قطعة الغيار (Spare Part)", "قطعة جديدة")
+    category = str(row.get("تصنيف القطعة", "أخرى"))
+    part_name = str(row.get("اسم قطعة الغيار (Spare Part)", "قطعة جديدة"))
     
-    try:
-        lifespan = float(row.get("العمر الافتراضي (Hours)", 250))
-    except:
+    # استخدام pd.to_numeric لضمان قراءة الأرقام بدقة تامة وبدون أخطاء
+    lifespan = pd.to_numeric(row.get("العمر الافتراضي (Hours)", 250), errors='coerce')
+    used_hours = pd.to_numeric(row.get("الساعات المنقضية (Hours Used)", 0), errors='coerce')
+    
+    if pd.isna(lifespan) or lifespan <= 0:
         lifespan = 250.0
-        
-    try:
-        used_hours = float(row.get("الساعات المنقضية (Hours Used)", 0))
-    except:
+    if pd.isna(used_hours):
         used_hours = 0.0
-
-    if lifespan <= 0:
-        lifespan = 1.0
 
     usage_pct = (used_hours / lifespan) * 100
     remaining_hours = lifespan - used_hours
     
-    # تحديد حالة التنبيه
+    # تحديد حالة التنبيه بدقة
     if usage_pct >= 90:
         status = "تغيير فوري (خطر) 🔴"
     elif usage_pct >= 80:
@@ -241,7 +204,7 @@ for index, row in edited_table.iterrows():
         "حالة التنبيه (Alert Status)": status
     })
 
-st.subheader("📋 تقرير الحالة الفنية والنسب المحسوبة بدقة")
+st.subheader("📋 تقرير الحالة الفنية والنسب المحسوبة فوراً")
 df_result = pd.DataFrame(processed_rows)
 st.dataframe(df_result, use_container_width=True)
 
