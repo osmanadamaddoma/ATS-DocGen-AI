@@ -53,7 +53,8 @@ col1.metric("درجة الحرارة", f"{temp} °C", "حرج" if temp >= 95 els
 col2.metric("ضغط الزيت", f"{oil_press} Bar", "منخفض" if oil_press < 2.5 else "مستقر")
 col3.metric("مستوى الاهتزاز", f"{vibration} mm/s" if is_pro else "🔒 مقفل (يتطلب ترقية)")
 
-col4, col5, col6, col7 = st.4_columns(4) if '4_columns' in dir(st) else st.columns(4)
+# تعديل السطر المصحح
+col4, col5, col6, col7 = st.columns(4)
 col4.metric("الجهد", f"{voltage} V")
 col5.metric("التردد", f"{freq} Hz")
 col6.metric("التيار", f"{current} A")
