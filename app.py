@@ -1,55 +1,59 @@
 import streamlit as st
 
-st.set_page_config(
-    page_title="Industrial Generator Predictive Maintenance Monitor",
-    layout="wide"
-)
+st.set_page_config(page_title="Industrial Generator Monitor", layout="wide")
 
-# الشريط الجانبي لإدارة الباقات والتفعيل
-st.sidebar.header("🔐 لوحة التحكم وإدارة الباقات")
-activation_code = st.sidebar.text_input("أدخل كود الاشتراك (لفتح الميزات المتقدمة):", type="password")
+st.title("⚙️ نظام مراقبة وإدخال قراءات المولد الصناعي")
 
-# التحقق من حالة كود التفعيل
-is_pro_unlocked = False
-if activation_code == "ADDOMA2026" or activation_code == "PRO_ENG":
-    is_pro_unlocked = True
-    st.sidebar.success("✅ تم تفعيل الباقة الاحترافية للأسطول بنجاح")
-elif activation_code != "":
-    st.sidebar.error("❌ كود الاشتراك غير صحيح")
-else:
-    st.sidebar.info("💡 الوضع الحالي: مراقبة الوحدة الأساسية (Single-Unit Mode).")
+# 1. قائمة إدخال البيانات في الشريط الجانبي
+st.sidebar.header("📥 إدخال القراءات التشغيلية")
 
-# العنوان الرئيسي للمنصة الصناعية
-st.title("⚙️ نظام مراقبة الصيانة التنبؤية للمولدات الصناعية")
-st.markdown("مراقبة حية لمؤشرات الأداء، درجات الحرارة، ضغوط الزيت، والتنبؤ بالأعطال لمولدات (Perkins & Cummins).")
+with st.sidebar.form("generator_input_form"):
+    st.subheader("المؤشرات الميكانيكية")
+    temp = st.number_input("درجة الحرارة Coolant Temp (°C)", min_value=0.0, max_value=150.0, value=85.0, step=1.0)
+    vibration = st.number_input("مستوى الاهتزاز Vibration (mm/s)", min_value=0.0, max_value=50.0, value=2.5, step=0.1)
+    oil_press = st.number_input("ضغط الزيت Oil Pressure (Bar)", min_value=0.0, max_value=10.0, value=4.5, step=0.1)
 
-st.divider()
+    st.subheader("المؤشرات الكهربائية")
+    voltage = st.number_input("الجهد الكهربائي Voltage (V)", min_value=0.0, max_value=600.0, value=400.0, step=1.0)
+    freq = st.number_input("التردد Frequency (Hz)", min_value=0.0, max_value=70.0, value=50.0, step=0.1)
+    current = st.number_input("التيار Amperes (A)", min_value=0.0, max_value=2000.0, value=350.0, step=5.0)
+    pf = st.number_input("معامل القدرة Power Factor (PF)", min_value=0.0, max_value=1.0, value=0.85, step=0.01)
 
-# قسم مؤشرات التشغيل الحية (المتاح للجميع)
-st.subheader("📊 المؤشرات الحية للوحدة النشطة")
+    submit_button = st.form_submit_button("تحديث وتحليل البيانات")
+
+# 2. عرض القراءات على لوحة المراقبة الرئيسية
+st.subheader("📊 لوحة المؤشرات المباشرة (Live Readings)")
+
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("حالة المولد", "متصل وجاهز", "Online")
-col2.metric("ساعات التشغيل", "1,850 ساعة", "+8h اليوم")
-col3.metric("حرارة سائل التبريد", "83 °C", "طبيعي")
-col4.metric("ضغط الزيت (Oil Pressure)", "4.2 بار", "مستقر")
+col1.metric("الحرارة", f"{temp} °C", "حرج" if temp >= 95 else "طبيعي")
+col2.metric("الاهتزاز", f"{vibration} mm/s", "مرتفع" if vibration > 4.5 else "سليم")
+col3.metric("ضغط الزيت", f"{oil_press} Bar", "منخفض" if oil_press < 2.5 else "طبيعي")
+col4.metric("معامل القدرة (PF)", f"{pf}", "منخفض" if pf < 0.8 else "ممتاز")
 
+col5, col6, col7 = st.columns(3)
+col5.metric("الجهد (Voltage)", f"{voltage} V")
+col6.metric("التردد (Frequency)", f"{freq} Hz")
+col7.metric("التيار (Amperes)", f"{current} A")
+
+# 3. التحليل التنبؤي الذكي بناءً على القيم المدخلة
 st.divider()
+st.subheader("🔍 التقييم التنبؤي وحالة التشغيل")
 
-# قسم الميزات المتقدمة والتنبؤ بالأعطال (يفتح باستخدام كود الباقة)
-if is_pro_unlocked:
-    st.subheader("🔮 تحليلات التنبؤ بالأعطال وذكاء الأسطول (Advanced Predictive Diagnostics)")
-    st.success("🌟 صلاحيات الأسطول الكامل وميزات التنبؤ الذكي مفعلة.")
-    
-    # عرض بيانات تنبؤية متقدمة
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.markdown("**حالة نظام الحقن وقود (Fuel System):**")
-        st.progress(92, text="كفاءة المضخة: 92% (مستقرة)")
-    with col_b:
-        st.markdown("**توقع الصيانة القادمة:**")
-        st.info("🔧 موعد تغيير الفلاتر القادم خلال: 150 ساعة تشغيل.")
-        
-    st.code("MODBUS / DSE 8610 MKII: Sync & Load Sharing Status -> Optimal", language="text")
+alerts = []
 
+if temp >= 95:
+    alerts.append("⚠️ **تحذير حرارة:** ارتفعت حرارة السائل المحرك عن 95°C — افحص مروحة التبريد، انسداد الرديتر، أو مستوى السائل.")
+if oil_press < 2.5:
+    alerts.append("🚨 **خطر ضغط الزيت:** انخفاض ضغط الزيت عن 2.5 Bar — افحص فلتر الزيت أو مضخة الزيت فوراً لمنع تلف المحرك.")
+if vibration > 4.5:
+    alerts.append("⚠️ **تحذير اهتزاز:** مستوى الاهتزاز يتجاوز الحدود الآمنة — تحقق من كراسي المحرك (Engine Mounts) وتوازن المحور.")
+if pf < 0.8:
+    alerts.append("💡 **كفاءة القدرة:** معامل القدرة أقل من 0.8 — يوصى بتفعيل لوحة تحسين معامل القدرة (PFC Panel) لتقليل الحمل الضائع.")
+if freq < 48.5 or freq > 51.5:
+    alerts.append("⚙️ **استقرار التردد:** تذبذب التردد بعيداً عن 50Hz — افحص منظم السرعة (Governor) ومضخة الوقود.")
+
+if alerts:
+    for alert in alerts:
+        st.warning(alert)
 else:
-    st.warning("🔒 ميزات التنبؤ المتقدم وتحليل الأكواد الاحترافي مقفلة. يرجى إدخال كود التفعيل الخاص بباقات المؤسسات في الشريط الجانبي لفتحها.")
+    st.success("✅ جميع القراءات الميكانيكية والكهربائية ضمن الحدود التشغيلية الآمنة ولا توجد مؤشرات أعطال وشيكة.")
