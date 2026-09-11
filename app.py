@@ -98,7 +98,7 @@ col8.metric("التيار / معامل القدرة", f"{amperes}A | {pf}" if is
 
 st.divider()
 
-# التقييم المناخي وتوصيات الزيوت والأحمال حسب الشروط المطلوبة
+# التقييم المناخي وتوصيات الزيوت والأحمال
 st.subheader("🌡️ التقييم المناخي وتوصيات الزيوت والأحمال القصوى")
 
 recommended_oil = "15W40 (الوضع القياسي)"
@@ -157,7 +157,6 @@ if "maintenance_df" not in st.session_state:
 st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة (الإدخال والتعديل اليدوي المباشر)")
 st.info("💡 **ملاحظة هامة:** عند تعديل أو كتابة أي رقم في خانة (الساعات المنقضية) أو (العمر الافتراضي) داخل الجدول أدناه، يرجى **الضغط على زر Enter** أو **النقر في أي مكان خارج الخلية** ليتم تحديث الحسابات فوراً.")
 
-# محرر البيانات التفاعلي المباشر (Data Editor)
 edited_table = st.data_editor(
     st.session_state.maintenance_df,
     num_rows="dynamic",
@@ -167,7 +166,6 @@ edited_table = st.data_editor(
 
 st.session_state.maintenance_df = edited_table
 
-# معالجة وحساب النسب والعمر المتبقي وحالة التنبيه بناءً على القيم المدخلة يدوياً
 processed_rows = []
 for index, row in edited_table.iterrows():
     category = str(row.get("تصنيف القطعة", "أخرى"))
@@ -207,7 +205,7 @@ st.subheader("📋 تقرير الحالة الفنية والنسب المحس�
 df_result = pd.DataFrame(processed_rows)
 st.dataframe(df_result, use_container_width=True)
 
-# التحليلات التنبؤية المتقدمة للعملاء المفعلين فقط
+# التحليلات التنبؤية المتقدمة
 advanced_alerts = []
 if is_pro:
     st.divider()
@@ -246,31 +244,35 @@ with col_exp1:
     st.download_button(
         label="📊 تنزيل التقرير بصيغة إكسل (Excel .xlsx)",
         data=excel_data,
-        file_name=f"Generator_Maintenance_Report_{datetime.now().strftime('%Y%m%m_%H%M')}.xlsx",
+        file_name=f"Generator_Maintenance_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
 
-# 2. إعداد وتنزيل ملف PDF للهندسة والصيانة
-def generate_pdf_report(df, client_name, run_hours, gen_kw, load_kw, ambient_temp, oil_rec, alerts):
+# 2. إعداد وتنزيل ملف PDF آمن برمجياً
+def generate_pdf_report(df, client_name, run_hours, gen_kw, load_kw, ambient_temp):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", 'B', 16)
     
     # العنوان الرئيسي
-    pdf.cell(0, 10, "Industrial Generator Maintenance & Lifespan Report", ln=True, align='C')
+    pdf.cell(0, 10, "Industrial Generator Maintenance Report", ln=True, align='C')
     pdf.set_font("Helvetica", '', 10)
     pdf.cell(0, 8, f"Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align='C')
     pdf.ln(5)
     
-    # معلومات العميل والتشغيل
+    # معالجة اسم العميل لتفادي ترميز الأحرف غير اللاتينية
+    safe_client_name = client_name.encode('latin-1', 'ignore').decode('latin-1')
+    if not safe_client_name.strip():
+        safe_client_name = "Authorized Client / User"
+        
     pdf.set_font("Helvetica", 'B', 12)
-    pdf.cell(0, 8, "1. System & Client Summary", ln=True)
+    pdf.cell(0, 8, "1. System & Operational Summary", ln=True)
     pdf.set_font("Helvetica", '', 10)
-    pdf.cell(0, 6, f"Client: {client_name}", ln=True)
+    pdf.cell(0, 6, f"Client Profile: {safe_client_name}", ln=True)
     pdf.cell(0, 6, f"Total Run Hours: {run_hours} hrs | Generator Capacity: {gen_kw} kW", ln=True)
     pdf.cell(0, 6, f"Current Active Load: {load_kw} kW ({((load_kw/gen_kw)*100 if gen_kw>0 else 0):.1f}%)", ln=True)
-    pdf.cell(0, 6, f"Ambient Temperature: {ambient_temp} C | Recommended Oil: {oil_rec}", ln=True)
+    pdf.cell(0, 6, f"Ambient Temperature: {ambient_temp} C", ln=True)
     pdf.ln(5)
     
     # جدول الصيانة
@@ -279,25 +281,33 @@ def generate_pdf_report(df, client_name, run_hours, gen_kw, load_kw, ambient_tem
     pdf.set_font("Helvetica", 'B', 9)
     
     # عناوين أعمدة الجدول
-    pdf.cell(50, 7, "Spare Part", border=1)
-    pdf.cell(35, 7, "Lifespan (hrs)", border=1)
-    pdf.cell(35, 7, "Used Hours", border=1)
-    pdf.cell(35, 7, "Usage (%)", border=1)
+    pdf.cell(55, 7, "Spare Part", border=1)
+    pdf.cell(32, 7, "Lifespan (hrs)", border=1)
+    pdf.cell(32, 7, "Used Hours", border=1)
+    pdf.cell(32, 7, "Usage (%)", border=1)
     pdf.cell(35, 7, "Remaining (hrs)", border=1)
     pdf.ln()
     
     pdf.set_font("Helvetica", '', 8)
     for idx, row in df.iterrows():
-        part = str(row["اسم قطعة الغيار (Spare Part)"])[:25] # اختصار الاسم ليلائم العرض
+        raw_part = str(row["اسم قطعة الغيار (Spare Part)"])
+        # استخراج المسمى الإنجليزي من بين الأقواس لتأمين طباعة الـ PDF
+        if "(" in raw_part and ")" in raw_part:
+            part_eng = raw_part.split("(")[1].split(")")[0]
+        else:
+            part_eng = raw_part.encode('latin-1', 'ignore').decode('latin-1')
+            if not part_eng.strip():
+                part_eng = f"Component #{idx+1}"
+                
         lifespan = str(row["العمر الافتراضي (Hours)"])
         used = str(row["الساعات المنقضية (Hours Used)"])
         usage = str(row["نسبة الاستهلاك (%)"])
         remaining = str(row["العمر المتبقي (Remaining)"])
         
-        pdf.cell(50, 6, part, border=1)
-        pdf.cell(35, 6, lifespan, border=1)
-        pdf.cell(35, 6, used, border=1)
-        pdf.cell(35, 6, usage, border=1)
+        pdf.cell(55, 6, part_eng[:28], border=1)
+        pdf.cell(32, 6, lifespan, border=1)
+        pdf.cell(32, 6, used, border=1)
+        pdf.cell(32, 6, usage, border=1)
         pdf.cell(35, 6, remaining, border=1)
         pdf.ln()
         
@@ -306,7 +316,7 @@ def generate_pdf_report(df, client_name, run_hours, gen_kw, load_kw, ambient_tem
 with col_exp2:
     try:
         pdf_bytes = generate_pdf_report(
-            df_result, client_name, run_hours, gen_kw, load_kw, ambient_temp, recommended_oil, advanced_alerts
+            df_result, client_name, run_hours, gen_kw, load_kw, ambient_temp
         )
         st.download_button(
             label="📄 تنزيل التقرير بصيغة PDF (Technical Report)",
