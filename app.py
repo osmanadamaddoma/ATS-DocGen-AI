@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
+import io
 import pandas as pd
 import streamlit as st
+from fpdf import FPDF
 
 st.set_page_config(
     page_title="Industrial Generator & Lifespan Maintenance Tracker",
@@ -163,7 +165,6 @@ edited_table = st.data_editor(
     key="maintenance_manual_editor"
 )
 
-# تحديث الجلسة بالبيانات الجديدة المعدلة مباشرة
 st.session_state.maintenance_df = edited_table
 
 # معالجة وحساب النسب والعمر المتبقي وحالة التنبيه بناءً على القيم المدخلة يدوياً
@@ -172,7 +173,6 @@ for index, row in edited_table.iterrows():
     category = str(row.get("تصنيف القطعة", "أخرى"))
     part_name = str(row.get("اسم قطعة الغيار (Spare Part)", "قطعة جديدة"))
     
-    # استخدام pd.to_numeric لضمان قراءة الأرقام بدقة تامة وبدون أخطاء
     lifespan = pd.to_numeric(row.get("العمر الافتراضي (Hours)", 250), errors='coerce')
     used_hours = pd.to_numeric(row.get("الساعات المنقضية (Hours Used)", 0), errors='coerce')
     
@@ -184,7 +184,6 @@ for index, row in edited_table.iterrows():
     usage_pct = (used_hours / lifespan) * 100
     remaining_hours = lifespan - used_hours
     
-    # تحديد حالة التنبيه بدقة
     if usage_pct >= 90:
         status = "تغيير فوري (خطر) 🔴"
     elif usage_pct >= 80:
@@ -209,11 +208,11 @@ df_result = pd.DataFrame(processed_rows)
 st.dataframe(df_result, use_container_width=True)
 
 # التحليلات التنبؤية المتقدمة للعملاء المفعلين فقط
+advanced_alerts = []
 if is_pro:
     st.divider()
     st.subheader("🔍 تحليلات التنبؤ بالأعطال المتقدمة (AI Diagnostics)")
     
-    advanced_alerts = []
     if vibration > 4.0:
         advanced_alerts.append("⚠️ **تحذير اهتزاز عالي:** يشير إلى عدم توازن المحور أو تآكل كراسي المحرك.")
     if pf < 0.8:
@@ -228,3 +227,93 @@ if is_pro:
         st.success("🌟 كافة مؤشرات الاهتزاز ومعامل القدرة ضمن النطاق المثالي الآمن.")
 else:
     st.info("ℹ️ للوصول إلى تحليلات الاهتزاز ومعامل القدرة المتقدمة، يرجى تفعيل كود العميل في الشريط الجانبي.")
+
+# ---------------------------------------------------------
+# 📥 قسم تصدير التقارير (Excel & PDF)
+# ---------------------------------------------------------
+st.divider()
+st.subheader("📥 تصدير التقارير والبيانات (Excel & PDF Export)")
+
+col_exp1, col_exp2 = st.columns(2)
+
+# 1. إعداد وتنزيل ملف إكسل Excel
+with col_exp1:
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+        df_result.to_excel(writer, index=False, sheet_name='Lifespan_Report')
+    excel_data = excel_buffer.getvalue()
+    
+    st.download_button(
+        label="📊 تنزيل التقرير بصيغة إكسل (Excel .xlsx)",
+        data=excel_data,
+        file_name=f"Generator_Maintenance_Report_{datetime.now().strftime('%Y%m%m_%H%M')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+
+# 2. إعداد وتنزيل ملف PDF للهندسة والصيانة
+def generate_pdf_report(df, client_name, run_hours, gen_kw, load_kw, ambient_temp, oil_rec, alerts):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", 'B', 16)
+    
+    # العنوان الرئيسي
+    pdf.cell(0, 10, "Industrial Generator Maintenance & Lifespan Report", ln=True, align='C')
+    pdf.set_font("Helvetica", '', 10)
+    pdf.cell(0, 8, f"Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align='C')
+    pdf.ln(5)
+    
+    # معلومات العميل والتشغيل
+    pdf.set_font("Helvetica", 'B', 12)
+    pdf.cell(0, 8, "1. System & Client Summary", ln=True)
+    pdf.set_font("Helvetica", '', 10)
+    pdf.cell(0, 6, f"Client: {client_name}", ln=True)
+    pdf.cell(0, 6, f"Total Run Hours: {run_hours} hrs | Generator Capacity: {gen_kw} kW", ln=True)
+    pdf.cell(0, 6, f"Current Active Load: {load_kw} kW ({((load_kw/gen_kw)*100 if gen_kw>0 else 0):.1f}%)", ln=True)
+    pdf.cell(0, 6, f"Ambient Temperature: {ambient_temp} C | Recommended Oil: {oil_rec}", ln=True)
+    pdf.ln(5)
+    
+    # جدول الصيانة
+    pdf.set_font("Helvetica", 'B', 12)
+    pdf.cell(0, 8, "2. Spare Parts & Maintenance Status", ln=True)
+    pdf.set_font("Helvetica", 'B', 9)
+    
+    # عناوين أعمدة الجدول
+    pdf.cell(50, 7, "Spare Part", border=1)
+    pdf.cell(35, 7, "Lifespan (hrs)", border=1)
+    pdf.cell(35, 7, "Used Hours", border=1)
+    pdf.cell(35, 7, "Usage (%)", border=1)
+    pdf.cell(35, 7, "Remaining (hrs)", border=1)
+    pdf.ln()
+    
+    pdf.set_font("Helvetica", '', 8)
+    for idx, row in df.iterrows():
+        part = str(row["اسم قطعة الغيار (Spare Part)"])[:25] # اختصار الاسم ليلائم العرض
+        lifespan = str(row["العمر الافتراضي (Hours)"])
+        used = str(row["الساعات المنقضية (Hours Used)"])
+        usage = str(row["نسبة الاستهلاك (%)"])
+        remaining = str(row["العمر المتبقي (Remaining)"])
+        
+        pdf.cell(50, 6, part, border=1)
+        pdf.cell(35, 6, lifespan, border=1)
+        pdf.cell(35, 6, used, border=1)
+        pdf.cell(35, 6, usage, border=1)
+        pdf.cell(35, 6, remaining, border=1)
+        pdf.ln()
+        
+    return pdf.output()
+
+with col_exp2:
+    try:
+        pdf_bytes = generate_pdf_report(
+            df_result, client_name, run_hours, gen_kw, load_kw, ambient_temp, recommended_oil, advanced_alerts
+        )
+        st.download_button(
+            label="📄 تنزيل التقرير بصيغة PDF (Technical Report)",
+            data=bytes(pdf_bytes),
+            file_name=f"Generator_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+    except Exception as e:
+        st.error(f"تعذر إنشاء ملف PDF: {e}")
