@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta
+import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="Industrial Generator Predictive Maintenance & Climate Monitor",
+    page_title="Industrial Generator & Lifespan Maintenance Tracker",
     layout="wide"
 )
 
-st.title("⚙️ نظام الصيانة التنبؤية وإدارة الأسطول الصناعي للمولدات")
+st.title("⚙️ نظام الصيانة التنبؤية وإدارة قطع الغيار والتشغيل الصناعي")
 
 # قاعدة بيانات العملاء وأكواد التفعيل الفردية
 CLIENTS_DATABASE = {
@@ -24,7 +25,7 @@ CLIENTS_DATABASE = {
     },
 }
 
-# الشريط الجانبي: بوابة تفعيل العميل
+# الشريط الجانبي: بوابة تفعيل العميل والصلاحيات
 st.sidebar.header("🔐 بوابة تفعيل العميل والصلاحيات")
 input_code = st.sidebar.text_input("أدخل كود التفعيل الخاص بالعميل:", type="password")
 
@@ -56,7 +57,7 @@ st.sidebar.header("📥 لوحة إدخال البيانات والتشغيل")
 
 with st.sidebar.form("generator_comprehensive_form"):
     st.subheader("ساعات التشغيل وسعات المولد")
-    run_hours = st.number_input("ساعات التشغيل التراكمية (Run Hours)", min_value=0.0, max_value=50000.0, value=1250.0, step.0 if 'step' in dir() else 10.0)
+    run_hours = st.number_input("ساعات التشغيل التراكمية (Run Hours)", min_value=0.0, max_value=50000.0, value=1250.0, step=10.0)
     gen_kw = st.number_input("سعة المولد الكلية (Generator kW)", min_value=5.0, max_value=3000.0, value=250.0, step=10.0)
     load_kw = st.number_input("حجم الحمولة الحالية (Load kW)", min_value=0.0, max_value=3000.0, value=150.0, step=10.0)
     ambient_temp = st.number_input("درجة الحرارة المحيطة / المناخ (°C)", min_value=10.0, max_value=60.0, value=43.0, step=1.0)
@@ -95,7 +96,7 @@ col8.metric("التيار / معامل القدرة", f"{amperes}A | {pf}" if is
 
 st.divider()
 
-# التقييم المناخي وتوصيات الزيوت والأحمال
+# التقييم المناخي وتوصيات الزيوت والأحمال حسب الشروط المطلوبة
 st.subheader("🌡️ التقييم المناخي وتوصيات الزيوت والأحمال القصوى")
 
 recommended_oil = "15W40 (الوضع القياسي)"
@@ -131,45 +132,62 @@ for alert in climate_alerts:
 
 st.divider()
 
-# نظام الصيانة الدورية وقطع الغيار بناءً على Run Hours
-st.subheader("🔧 جداول الصيانة الدورية وتغيير الفلاتر والزيوت (بناءً على Run Hours)")
+# جدول تتبع الصيانة الدورية وقطع الغيار (Lifespan Tracker المطابق للصورة)
+st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة (Lifespan Tracker)")
 
-# حساب الساعات المتبقية للصيانة بناءً على دورات قياسية
-oil_interval = 250      # تغيير الزيت والفلتر الأولي كل 250 ساعة
-air_fuel_interval = 500 # فلاتر الهواء والوقود كل 500 ساعة
-major_interval = 1000   # الصيانة الشاملة والفحص العميق كل 1000 ساعة
+# قاعدة بيانات قطع الغيار والأعمار الافتراضية المستخرجة من جدولك
+maintenance_items = [
+    {"category": "الصيانة الدورية (Service)", "part": "فلتر زيت (Oil Filter)", "lifespan": 250},
+    {"category": "الصيانة الدورية (Service)", "part": "فلتر وقود - أولي (Primary Fuel Filter)", "lifespan": 500},
+    {"category": "الصيانة الدورية (Service)", "part": "فلتر وقود - ثانوي (Secondary Fuel Filter)", "lifespan": 500},
+    {"category": "نظام الهواء (Air System)", "part": "فلتر هواء (Air Filter)", "lifespan": 1000},
+    {"category": "نظام التبريد (Cooling System)", "part": "قشاط المروحة (Fan Belt)", "lifespan": 2000},
+    {"category": "نظام التبريد (Cooling System)", "part": "سائل تبريد (Coolant ELC)", "lifespan": 3000},
+    {"category": "نظام الوقود (Fuel System)", "part": "بخاخات الوقود (Injectors Check)", "lifespan": 5000},
+    {"category": "النظام الكهربائي (Electrical)", "part": "بطاريات (Batteries)", "lifespan": 8000},
+    {"category": "النظام الكهربائي (Electrical)", "part": "دينامو الشحن (Charging Alternator)", "lifespan": 10000},
+    {"category": "المحرك - ميكانيك (Motor - Mechanical)", "part": "طقم عمرة رأس (Top Overhaul)", "lifespan": 10000},
+    {"category": "المحرك - ميكانيك (Motor - Mechanical)", "part": "عمرة كاملة (Major Overhaul)", "lifespan": 20000},
+    {"category": "نظام التبريد (Cooling System)", "part": "مبرد الزيت (Oil Cooler Clean)", "lifespan": 5000},
+    {"category": "نظام التبريد (Cooling System)", "part": "مضخة الماء (Water Pump)", "lifespan": 6000},
+    {"category": "نظام الهواء (Air System)", "part": "تيربو (Turbocharger Check)", "lifespan": 8000}
+]
 
-oil_remaining = oil_interval - (run_hours % oil_interval)
-air_fuel_remaining = air_fuel_interval - (run_hours % air_fuel_interval)
-major_remaining = major_interval - (run_hours % major_interval)
-
-col_m1, col_m2, col_m3 = st.columns(3)
-
-with col_m1:
-    st.markdown("### 🛢️ تغيير الزيت والفلتر")
-    st.metric("الفترة المعتادة", f"كل {oil_interval} ساعة")
-    if oil_remaining <= 25:
-        st.error(f"⚠️ موعد الصيانة وشيك! متبقي {oil_remaining} ساعة فقط.")
+table_rows = []
+for item in maintenance_items:
+    lifespan = item["lifespan"]
+    # حساب الساعات المنقضية اعتماداً على دورة التشغيل (Run Hours)
+    used_hours = run_hours % lifespan
+    if used_hours == 0 and run_hours > 0:
+        used_hours = lifespan
+        
+    usage_pct = (used_hours / lifespan) * 100
+    remaining_hours = lifespan - used_hours
+    
+    # تحديد حالة التنبيه مطابقة للجدول
+    if usage_pct >= 90:
+        status = "تغيير فوري (خطر) 🔴"
+    elif usage_pct >= 80:
+        status = "قرب الخدمة 🟡"
+    elif usage_pct >= 70:
+        status = "تنبيه (استعداد) 🟠"
     else:
-        st.success(f"✅ متبقي {oil_remaining} ساعة للتغيير القادم.")
+        status = "حالة جيدة 🟢"
+        
+    table_rows.append({
+        "تصنيف القطعة": item["category"],
+        "اسم قطعة الغيار (Spare Part)": item["part"],
+        "العمر الافتراضي (Hours)": lifespan,
+        "الساعات المنقضية (Hours Used)": round(used_hours, 1),
+        "نسبة الاستهلاك (%)": f"{usage_pct:.1f}%",
+        "العمر المتبقي (Remaining)": round(remaining_hours, 1),
+        "حالة التنبيه (Alert Status)": status
+    })
 
-with col_m2:
-    st.markdown("### ⛽ فلاتر الهواء والوقود")
-    st.metric("الفترة المعتادة", f"كل {air_fuel_interval} ساعة")
-    if air_fuel_remaining <= 50:
-        st.warning(f"⚠️ اقترب موعد تغيير الفلاتر (متبقي {air_fuel_remaining} ساعة).")
-    else:
-        st.success(f"✅ متبقي {air_fuel_remaining} ساعة.")
+df_tracker = pd.DataFrame(table_rows)
+st.dataframe(df_tracker, use_container_width=True)
 
-with col_m3:
-    st.markdown("### ⚙️ الصيانة الشاملة (Major Service)")
-    st.metric("الفترة المعتادة", f"كل {major_interval} ساعة")
-    if major_remaining <= 100:
-        st.warning(f"⚠️ اقترب موعد الفحص الشامل (متبقي {major_remaining} ساعة).")
-    else:
-        st.success(f"✅ متبقي {major_remaining} ساعة للفحص الشامل.")
-
-# التنبؤ بالأعطال المتقدمة للعملاء المفعلين
+# التحليلات التنبؤية المتقدمة للعملاء المفعلين فقط
 if is_pro:
     st.divider()
     st.subheader("🔍 تحليلات التنبؤ بالأعطال المتقدمة (AI Diagnostics)")
