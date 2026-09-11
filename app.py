@@ -1,74 +1,76 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import streamlit as st
 
-# 1. إعداد الصفحة
 st.set_page_config(
-    page_title="Industrial Generator Monitor & Client Subscriptions",
+    page_title="Industrial Generator Monitor & Subscriptions",
     layout="wide",
 )
 
-st.title("⚙️ نظام مراقبة وصيانة المولدات الصناعية - إدارة العملاء")
+st.title("⚙️ نظام مراقبة المولدات الصناعية - إدارة الاشتراكات الفردية")
 
-# 2. قاعدة بيانات العملاء وأكواد التفعيل (شهري أو سنوي مع اسم العميل)
+# قاعدة بيانات العملاء: كل عميل له كود فريد، اسم، نوع الاشتراك، وتاريخ البدء
 CLIENTS_DATABASE = {
-    "ADDOMA2026": {
-        "client_name": "عثمان آدم (Addoma Trading Services)",
-        "sub_type": "سنوي (Yearly Subscription)",
-        "expiry_date": "2026-12-31",
+    "ADDOMA-2026-PRO": {
+        "name": "عثمان آدم (Addoma Trading Services)",
+        "plan": "سنوي (Yearly)",
+        "start_date": "2026-01-01",
+        "duration_days": 365,
     },
-    "CLI-M-101": {
-        "client_name": "شركة النيل للصناعات الهندسية",
-        "sub_type": "شهري (Monthly Subscription)",
-        "expiry_date": "2026-10-15",
+    "CLIENT-M-881": {
+        "name": "شركة النيل للصناعات الهندسية",
+        "plan": "شهري (Monthly)",
+        "start_date": "2026-09-01",
+        "duration_days": 30,
     },
-    "CLI-Y-202": {
-        "client_name": "مصانع الحديد والصلب الوطنية",
-        "sub_type": "سنوي (Yearly Subscription)",
-        "expiry_date": "2027-06-30",
+    "CLIENT-Y-992": {
+        "name": "مصانع الحديد والصلب الوطنية",
+        "plan": "سنوي (Yearly)",
+        "start_date": "2026-03-15",
+        "duration_days": 365,
     },
 }
 
-# 3. الشريط الجانبي لإدخال كود التفعيل والتحقق من اسم العميل
-st.sidebar.header("🔐 بوابة تفعيل حساب العملاء")
-
-user_code = st.sidebar.text_input("أدخل كود التفعيل الخاص بالعميل:", type="password")
+# الشريط الجانبي لتسجيل وتفعيل العملاء
+st.sidebar.header("🔐 بوابة تفعيل أكواد العملاء")
+input_code = st.sidebar.text_input("أدخل كود التفعيل الخاص بالعميل:", type="password")
 
 is_pro = False
-current_client_name = "زیر (Visitor / Free)"
-sub_info = "غير متصل"
+client_name = "زائر (Visitor / Free)"
+plan_type = "غير مفعل"
+expiry_dt = None
+days_left = 0
 
-if user_code in CLIENTS_DATABASE:
-  client_data = CLIENTS_DATABASE[user_code]
-  expiry_str = client_data["expiry_date"]
-  expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
+if input_code in CLIENTS_DATABASE:
+  data = CLIENTS_DATABASE[input_code]
+  client_name = data["name"]
+  plan_type = data["plan"]
+
+  start_dt = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
+  expiry_dt = start_dt + timedelta(days=data["duration_days"])
   today = datetime.now().date()
 
-  if today <= expiry_date:
+  if today <= expiry_dt:
     is_pro = True
-    current_client_name = client_data["client_name"]
-    sub_type = client_data["sub_type"]
-    days_left = (expiry_date - today).days
-
-    st.sidebar.success(f"✅ تم التحقق بنجاح!")
-    st.sidebar.markdown(f"**👤 اسم العميل:** {current_client_name}")
-    st.sidebar.markdown(f"**📦 نوع الاشتراك:** {sub_type}")
+    days_left = (expiry_dt - today).days
+    st.sidebar.success("✅ تم التحقق من الاشتراك بنجاح!")
+    st.sidebar.markdown(f"**👤 اسم العميل:** {client_name}")
+    st.sidebar.markdown(f"**📦 نوع الباقة:** {plan_type}")
     st.sidebar.markdown(
-        f"⏳ **المتبقي لانتهاء الصلاحية:** {days_left} يوم (ينتهي في {expiry_str})"
+        f"⏳ **المدة المتبقية:** {days_left} يوم (تاريخ الانتهاء: {expiry_dt})"
     )
   else:
     st.sidebar.error(
-        f"❌ انتهت صلاحية اشتراك هذا العميل بتاريخ ({expiry_str}). يرجى تجديد الاشتراك."
+        f"❌ انتهت صلاحية اشتراك هذا العميل بتاريخ ({expiry_dt}). يرجى تجديد"
+        " الاشتراك."
     )
-elif user_code != "":
-  st.sidebar.error(
-      "❌ كود التفعيل غير صحيح. تأكد من الكود المخصص لاسم العميل."
-  )
+elif input_code != "":
+  st.sidebar.error("❌ كود التفعيل غير صحيح أو غير مسجل في النظام.")
 else:
-  st.sidebar.info("💡 أدخل كود التفعيل لعرض بيانات العميل وفتح ميزات المراقبة.")
+  st.sidebar.info("💡 أدخل الكود المخصص لعرض تفاصيل العميل وفتح الميزات.")
 
 st.sidebar.divider()
 
-# 4. نموذج إدخال القراءات التشغيلية للمولد
+# نموذج إدخال القراءات التشغيلية للمولد
 st.sidebar.header("📥 إدخال القراءات الحية")
 
 with st.sidebar.form("generator_data_form"):
@@ -107,9 +109,9 @@ with st.sidebar.form("generator_data_form"):
 
   submit_btn = st.form_submit_button("تحليـل القراءات")
 
-# 5. عرض لوحة المؤشرات الرئيسية ومعلومات العميل النشط
-st.subheader("📊 لوحة المراقبة التشغيلية للعميل")
-st.info(f"🔹 **العميل الحالي المسجل بالجلسة:** {current_client_name}")
+# عرض لوحة المؤشرات الرئيسية وبيانات العميل النشط
+st.subheader("📊 لوحة المراقبة التشغيلية")
+st.info(f"🔹 **العميل الحالي بالجلسة:** {client_name} | **الباقة:** {plan_type}")
 
 col1, col2, col3 = st.columns(3)
 col1.metric("درجة الحرارة", f"{temp} °C", "حرج" if temp >= 95 else "طبيعي")
@@ -126,14 +128,14 @@ col7.metric(
     "معامل القدرة (PF)", f"{pf}" if is_pro else "🔒 مقفل (يتطلب تفعيل)"
 )
 
-# 6. التنبؤ بالأعطال والتحليل الذكي للعميل
+# تقرير التنبؤ بالأعطال والتحليل الذكي
 st.divider()
 st.subheader("🔍 تقرير التنبؤ بالأعطال (AI Diagnostics)")
 
 if is_pro:
   st.success(
-      f"🌟 حساب العميل (**{current_client_name}**) مفعل بنجاح. يتم تحليل كافة"
-      " المعلمات بدقة."
+      f"🌟 حساب العميل (**{client_name}**) مفعل بنجاح وفق باقة {plan_type}."
+      " يتم تحليل كافة المعلمات بدمج الاهتزاز ومعامل القدرة."
   )
 
   alerts = []
@@ -160,10 +162,10 @@ else:
   if temp >= 95 or oil_press < 2.5:
     st.warning(
         "⚠️ تم رصد مؤشرات حرجة أساسية. يرجى إدخال كود العميل المخصص للحصول على"
-        " تقرير التنبؤ الكامل."
+        " تفاصيل التنبؤ."
     )
   else:
     st.info(
-        "ℹ️ النظام يعمل في وضع الزائر. أدخل كود التفعيل الخاص بك في الشريط"
-        " الجانبي لعرض اسم العميل وحالة الاشتراك (شهري/سنوي)."
+        "ℹ️ النظام يعمل في وضع الزائر. قم بإدخال كود التفعيل الخاص بالعميل في"
+        " الشريط الجانبي لفتح صلاحيات المراقبة والتحليل."
     )
