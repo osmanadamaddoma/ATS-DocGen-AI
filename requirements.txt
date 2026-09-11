@@ -5,3 +5,7 @@ scikit-learn
 supabase
 langchain-google-genai
 langchain-pinecone
+streamlit
+pandas
+openpyxl
+fpdf2
