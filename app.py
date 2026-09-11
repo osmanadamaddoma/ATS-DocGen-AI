@@ -132,12 +132,13 @@ for alert in climate_alerts:
 
 st.divider()
 
-# جدول تتبع الصيانة الدورية التفاعلي (إضافة وتعديل القطع مباشرة)
-st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة (تفاعلي - قابل للإضافة والتعديل)")
+# جدول تتبع الصيانة الدورية وقطع الغيار (مع إمكانية التعديل والإضافة اليدوية)
+st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة (قابل للتعديل والإضافة يدوياً)")
+st.info("💡 يمكنك النقر داخل الجدول لتعديل أسماء القطع، أو الأعمار الافتراضية، أو إضافة صف جديد باستخدام زر الإضافة في الجدول.")
 
-# تهيئة قاعدة البيانات في الذاكرة المؤقتة (Session State) لتسمح بالإضافة والتعديل
-if "maintenance_data" not in st.session_state:
-    st.session_state.maintenance_data = pd.DataFrame([
+# تهيئة بيانات الجدول الافتراضية في الذاكرة المؤقتة (Session State)
+if "maintenance_df" not in st.session_state:
+    initial_data = [
         {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر زيت (Oil Filter)", "العمر الافتراضي (Hours)": 250},
         {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر وقود - أولي (Primary Fuel Filter)", "العمر الافتراضي (Hours)": 500},
         {"تصنيف القطعة": "الصيانة الدورية (Service)", "اسم قطعة الغيار (Spare Part)": "فلتر وقود - ثانوي (Secondary Fuel Filter)", "العمر الافتراضي (Hours)": 500},
@@ -149,26 +150,28 @@ if "maintenance_data" not in st.session_state:
         {"تصنيف القطعة": "النظام الكهربائي (Electrical)", "اسم قطعة الغيار (Spare Part)": "دينامو الشحن (Charging Alternator)", "العمر الافتراضي (Hours)": 10000},
         {"تصنيف القطعة": "المحرك - ميكانيك (Motor)", "اسم قطعة الغيار (Spare Part)": "طقم عمرة رأس (Top Overhaul)", "العمر الافتراضي (Hours)": 10000},
         {"تصنيف القطعة": "المحرك - ميكانيك (Motor)", "اسم قطعة الغيار (Spare Part)": "عمرة كاملة (Major Overhaul)", "العمر الافتراضي (Hours)": 20000},
-    ])
+        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "مبرد الزيت (Oil Cooler Clean)", "العمر الافتراضي (Hours)": 5000},
+        {"تصنيف القطعة": "نظام التبريد (Cooling System)", "اسم قطعة الغيار (Spare Part)": "مضخة الماء (Water Pump)", "العمر الافتراضي (Hours)": 6000},
+        {"تصنيف القطعة": "نظام الهواء (Air System)", "اسم قطعة الغيار (Spare Part)": "تيربو (Turbocharger Check)", "العمر الافتراضي (Hours)": 8000}
+    ]
+    st.session_state.maintenance_df = pd.DataFrame(initial_data)
 
-# استخدام st.data_editor للسماح للمستخدم بإضافة صفوف جديدة أو تعديل الأعمار الافتراضية
-edited_df = st.data_editor(
-    st.session_state.maintenance_data,
+# استخدام محرر البيانات المباشر (Data Editor) للسماح بالإضافة والتعديل اليدوي
+edited_table = st.data_editor(
+    st.session_state.maintenance_df,
     num_rows="dynamic",
     use_container_width=True,
     key="maintenance_editor"
 )
 
-# تحديث البيانات في الجلسة
-st.session_state.maintenance_data = edited_df
-
-# حساب الساعات المنقضية وحالة التنبيه بناءً على الجدول المحدث وساعات المولد (Run Hours)
-table_rows = []
-for index, row in edited_df.iterrows():
-    category = row["تصنيف القطعة"]
-    part = row["اسم قطعة الغيار (Spare Part)"]
+# تحديث الجدول الحسابي بناءً على المدخلات اليدوية وساعات المولد (Run Hours)
+processed_rows = []
+for index, row in edited_table.iterrows():
+    category = row.get("تصنيف القطعة", "أخرى")
+    part_name = row.get("اسم قطعة الغيار (Spare Part)", "قطعة جديدة")
+    
     try:
-        lifespan = float(row["العمر الافتراضي (Hours)"])
+        lifespan = float(row.get("العمر الافتراضي (Hours)", 250))
     except:
         lifespan = 250.0
         
@@ -191,9 +194,9 @@ for index, row in edited_df.iterrows():
     else:
         status = "حالة جيدة 🟢"
         
-    table_rows.append({
+    processed_rows.append({
         "تصنيف القطعة": category,
-        "اسم قطعة الغيار (Spare Part)": part,
+        "اسم قطعة الغيار (Spare Part)": part_name,
         "العمر الافتراضي (Hours)": lifespan,
         "الساعات المنقضية (Hours Used)": round(used_hours, 1),
         "نسبة الاستهلاك (%)": f"{usage_pct:.1f}%",
@@ -201,8 +204,9 @@ for index, row in edited_df.iterrows():
         "حالة التنبيه (Alert Status)": status
     })
 
-st.markdown("### 📋 النتائج الحسابية للاستهلاك بناءً على ساعات التشغيل الحالية:")
-st.dataframe(pd.DataFrame(table_rows), use_container_width=True)
+st.subheader("📋 تقرير الاستهلاك الآلي بناءً على التعديلات والتشغيل")
+df_result = pd.DataFrame(processed_rows)
+st.dataframe(df_result, use_container_width=True)
 
 # التحليلات التنبؤية المتقدمة للعملاء المفعلين فقط
 if is_pro:
