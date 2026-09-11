@@ -12,9 +12,9 @@ st.title("⚙️ نظام مراقبة المولدات الصناعية - إد�
 CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
         "name": "عثمان آدم (Addoma Trading Services)",
-        "plan": "سنوي (Yearly)",
-        "start_date": "2026-01-01",
-        "duration_days": 365,
+        "plan": "سنوي (Month)",
+        "start_date": "2026-09-11",
+        "duration_days": 30,
     },
     "CLIENT-M-881": {
         "name": "شركة النيل للصناعات الهندسية",
