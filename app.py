@@ -54,6 +54,24 @@ else:
 
 st.sidebar.divider()
 
+# ⚙️ ضبط حدود ومعايير الإنذار (Ranges & Thresholds)
+st.sidebar.header("🎯 ضبط معايير الحدود والإنذارات (Thresholds Setting)")
+st.sidebar.caption("حدد النطاقات الآمنة يدوياً ليقوم النظام بالتنبيه باللون الأحمر عند تجاوزها:")
+
+col_v1, col_v2 = st.sidebar.columns(2)
+v_min = col_v1.number_input("أدنى جهد مسموح (V Min)", value=380.0, step=5.0)
+v_max = col_v2.number_input("أقصى جهد مسموح (V Max)", value=420.0, step=5.0)
+
+col_f1, col_f2 = st.sidebar.columns(2)
+f_min = col_f1.number_input("أدنى تردد مسموح (Hz Min)", value=48.0, step=0.5)
+f_max = col_f2.number_input("أقصى تردد مسموح (Hz Max)", value=52.0, step=0.5)
+
+col_t1, col_amp = st.sidebar.columns(2)
+temp_max_limit = col_t1.number_input("أقصى حرارة مسموحة (°C)", value=90.0, step=1.0)
+amp_max_limit = col_amp.number_input("أقصى تيار مسموح (A Max)", value=400.0, step=10.0)
+
+st.sidebar.divider()
+
 # إدخال البيانات التشغيلية والمناخية وساعات المولد العامة
 st.sidebar.header("📥 لوحة إدخال البيانات والتشغيل العامة")
 
@@ -95,6 +113,38 @@ col5.metric("حرارة المحرك", f"{coolant_temp} °C")
 col6.metric("ضغط الزيت", f"{oil_press} Bar")
 col7.metric("الجهد / التردد", f"{voltage}V | {freq}Hz")
 col8.metric("التيار / معامل القدرة", f"{amperes}A | {pf}" if is_pro else f"{amperes}A | 🔒")
+
+# 🔴 قسم إنذارات تجاوز الحدود الكهربائية والحرارية المحددة يدوياً
+st.divider()
+st.subheader("🚨 إنذارات وتنبيهات تجاوز المعايير التشغيلية (Threshold Alarms)")
+
+range_alarms = []
+
+# 1. إنذار الجهد (Voltage Range)
+if voltage < v_min:
+    range_alarms.append(f"🔴 **إنذار انخفاض الجهد (Under Voltage):** الجهد الحالي ({voltage}V) أقل من الحد الأدنى المحدد ({v_min}V).")
+elif voltage > v_max:
+    range_alarms.append(f"🔴 **إنذار ارتفاع الجهد (Over Voltage):** الجهد الحالي ({voltage}V) يتجاوز الحد الأقصى المحدد ({v_max}V).")
+
+# 2. إنذار التردد (Frequency Range)
+if freq < f_min:
+    range_alarms.append(f"🔴 **إنذار انخفاض التردد (Under Frequency):** التردد الحالي ({freq} Hz) أقل من الحد الأدنى المحدد ({f_min} Hz).")
+elif freq > f_max:
+    range_alarms.append(f"🔴 **إنذار ارتفاع التردد (Over Frequency):** التردد الحالي ({freq} Hz) يتجاوز الحد الأقصى المحدد ({f_max} Hz).")
+
+# 3. إنذار الحرارة (Coolant Temperature Limit)
+if coolant_temp > temp_max_limit:
+    range_alarms.append(f"🔴 **إنذار ارتفاع حرارة المحرك (High Engine Temp):** الحرارة الحالية ({coolant_temp}°C) تتجاوز الحد الأقصى المسموح ({temp_max_limit}°C).")
+
+# 4. إنذار التيار / الأحمال الزائدة (Overcurrent Limit)
+if amperes > amp_max_limit:
+    range_alarms.append(f"🔴 **إنذار التيار الزائد (Overcurrent Alarm):** التيار الحالي ({amperes} A) يتجاوز الحد الأقصى المسموح ({amp_max_limit} A).")
+
+if range_alarms:
+    for alarm in range_alarms:
+        st.error(alarm)
+else:
+    st.success("🟢 جميع قراءات الجهد، التردد، الحرارة، والتيار ضمن المعايير الآمنة المحددة.")
 
 st.divider()
 
@@ -249,19 +299,17 @@ with col_exp1:
         use_container_width=True
     )
 
-# 2. إعداد وتنزيل ملف PDF آمن برمجياً
+# 2. إعداد وتنزيل ملف PDF
 def generate_pdf_report(df, client_name, run_hours, gen_kw, load_kw, ambient_temp):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", 'B', 16)
     
-    # العنوان الرئيسي
     pdf.cell(0, 10, "Industrial Generator Maintenance Report", ln=True, align='C')
     pdf.set_font("Helvetica", '', 10)
     pdf.cell(0, 8, f"Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align='C')
     pdf.ln(5)
     
-    # معالجة اسم العميل لتفادي ترميز الأحرف غير اللاتينية
     safe_client_name = client_name.encode('latin-1', 'ignore').decode('latin-1')
     if not safe_client_name.strip():
         safe_client_name = "Authorized Client / User"
@@ -275,12 +323,10 @@ def generate_pdf_report(df, client_name, run_hours, gen_kw, load_kw, ambient_tem
     pdf.cell(0, 6, f"Ambient Temperature: {ambient_temp} C", ln=True)
     pdf.ln(5)
     
-    # جدول الصيانة
     pdf.set_font("Helvetica", 'B', 12)
     pdf.cell(0, 8, "2. Spare Parts & Maintenance Status", ln=True)
     pdf.set_font("Helvetica", 'B', 9)
     
-    # عناوين أعمدة الجدول
     pdf.cell(55, 7, "Spare Part", border=1)
     pdf.cell(32, 7, "Lifespan (hrs)", border=1)
     pdf.cell(32, 7, "Used Hours", border=1)
@@ -291,7 +337,6 @@ def generate_pdf_report(df, client_name, run_hours, gen_kw, load_kw, ambient_tem
     pdf.set_font("Helvetica", '', 8)
     for idx, row in df.iterrows():
         raw_part = str(row["اسم قطعة الغيار (Spare Part)"])
-        # استخراج المسمى الإنجليزي من بين الأقواس لتأمين طباعة الـ PDF
         if "(" in raw_part and ")" in raw_part:
             part_eng = raw_part.split("(")[1].split(")")[0]
         else:
