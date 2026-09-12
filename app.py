@@ -55,7 +55,6 @@ elif input_code != "":
 else:
     st.sidebar.warning("⚠️ أدخل كود التفعيل في الشريط الجانبي للوصول إلى النظام.")
 
-# قفل النظام بالكامل في حال عدم التفعيل
 if not is_authenticated:
     st.error("🔒 **النظام مقفل:** يرجى إدخال كود تفعيل صحيح في الشريط الجانبي لفتح لوحة التحكم والتعديل وطباعة التقارير.")
     st.info("💡 للوصول والتجربة، يمكنك استخدام الكود الخاص بك: `ADDOMA-2026-PRO`")
@@ -124,11 +123,8 @@ load_percentage = (load_kw / gen_kw) * 100 if gen_kw > 0 else 0
 
 st.success(f"🔓 **العميل المفعل:** {client_name} | **نوع الاشتراك:** {plan_type} | **طراز المولد:** {gen_model}")
 
-col_img, col_metrics = st.columns([1, 2]) if uploaded_image else (None, st.container())
-
 if uploaded_image:
-    with col_img:
-        st.image(uploaded_image, caption=f"صورة المولد: {gen_model}", use_container_width=True)
+    st.image(uploaded_image, caption=f"صورة المولد: {gen_model}", width=300)
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("إجمالي التشغيل", f"{run_hours} hrs")
@@ -142,7 +138,6 @@ col6.metric("ضغط الزيت", f"{oil_press} Bar")
 col7.metric("الجهد / التردد", f"{voltage}V | {freq}Hz")
 col8.metric("التيار / معامل القدرة", f"{amperes}A | {pf}")
 
-# إنذارات الحدود التشغيلية
 st.divider()
 st.subheader("🚨 إنذارات وتنبيهات تجاوز المعايير التشغيلية (Threshold Alarms)")
 
@@ -170,9 +165,9 @@ st.subheader("🛢️ جدول الخدمة وتغيير زيت المحرك (Oi
 hours_since_oil_change = run_hours - last_oil_change_hours
 hours_until_next_oil_change = oil_change_interval - hours_since_oil_change
 
-recommended_oil = "15W40 (قياسي)"
-if ambient_temp >= 45.0: recommended_oil = "20W50 (موصى به للمناخ الصحراوي الحار جداً ≥ 45°C)"
-elif ambient_temp >= 43.0: recommended_oil = "15W40 (مناخ حار)"
+recommended_oil = "15W40 (Standard)"
+if ambient_temp >= 45.0: recommended_oil = "20W50 (Extreme Hot Climate >= 45C)"
+elif ambient_temp >= 43.0: recommended_oil = "15W40 (Hot Climate)"
 
 col_oil1, col_oil2, col_oil3 = st.columns(3)
 col_oil1.metric("ساعات الزيت الحالية", f"{hours_since_oil_change} hrs")
@@ -213,7 +208,7 @@ for index, row in edited_table.iterrows():
     
     usage_pct = (used_hours / lifespan) * 100
     rem_hrs = lifespan - used_hours
-    status = "تغيير فوري 🔴" if usage_pct >= 90 else ("قرب الخدمة 🟡" if usage_pct >= 80 else "حالة جيدة 🟢")
+    status = "Replace Immediately [CRITICAL]" if usage_pct >= 90 else ("Service Soon [WARNING]" if usage_pct >= 80 else "Good Condition [OK]")
     
     processed_rows.append({
         "تصنيف القطعة": category,
@@ -228,7 +223,7 @@ for index, row in edited_table.iterrows():
 df_result = pd.DataFrame(processed_rows)
 
 # ---------------------------------------------------------
-# 7. محرك طباعة تقرير PDF الشامل
+# 7. محرك طباعة تقرير PDF الشامل المعدل (خالي من مشاكل ASCII)
 # ---------------------------------------------------------
 st.divider()
 st.subheader("📄 استخراج وطباعة التقرير الفني الشامل (Full PDF Report)")
@@ -247,19 +242,30 @@ class ComprehensivePDF(FPDF):
         self.set_font("Helvetica", 'I', 8)
         self.cell(0, 10, f"Page {self.page_no()} | Generated Automatically by Addoma Maintenance System", align='C')
 
+def clean_ascii(text):
+    """دالة لتنظيف النص وإزالة أي أحرف غير تدعمها خطوط Helvetica القياسية"""
+    if not isinstance(text, str):
+        text = str(text)
+    return "".join([c for c in text if ord(c) < 128])
+
 def generate_full_pdf():
     pdf = ComprehensivePDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
     
+    # تحويل النصوص إلى ASCII آمنة
+    safe_client = clean_ascii(client_name) or "Authorized Client"
+    safe_model = clean_ascii(gen_model) or "Generator Unit"
+    safe_plan = clean_ascii(plan_type) or "Standard Plan"
+    
     # 1. المخطط العام والصورة
     pdf.set_font("Helvetica", 'B', 10)
-    pdf.cell(0, 5, f"Client: {client_name} | Model: {gen_model}", ln=True)
+    pdf.cell(0, 5, f"Client: {safe_client} | Model: {safe_model}", ln=True)
     pdf.set_font("Helvetica", '', 9)
-    pdf.cell(0, 5, f"Report Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Subscription: {plan_type}", ln=True)
+    pdf.cell(0, 5, f"Report Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Subscription: {safe_plan}", ln=True)
     pdf.ln(2)
 
-    # معالجة وإدراج صورة المولد إن وجدت
+    # إدراج الصورة المرفوعة معالجة
     if uploaded_image is not None:
         try:
             img = Image.open(uploaded_image)
@@ -268,12 +274,11 @@ def generate_full_pdf():
             temp_img_path = "temp_generator_img.jpg"
             img.save(temp_img_path, "JPEG", quality=85)
             
-            # محاذاة الصورة في الزاوية اليمنى العليا
             pdf.image(temp_img_path, x=140, y=28, w=55)
             if os.path.exists(temp_img_path):
                 os.remove(temp_img_path)
             pdf.ln(2)
-        except Exception as e:
+        except Exception:
             pass
 
     # 2. البيانات التشغيلية والميكانيكية والكهربائية
@@ -306,7 +311,7 @@ def generate_full_pdf():
     pdf.set_font("Helvetica", '', 9)
     if range_alarms:
         for alarm in range_alarms:
-            clean_alarm = alarm.replace("🔴", "[ALARM]").replace("**", "")
+            clean_alarm = clean_ascii(alarm.replace("🔴", "[ALARM]").replace("**", ""))
             pdf.cell(0, 5, f"WARNING: {clean_alarm}", ln=True)
     else:
         pdf.cell(0, 5, "Status: All electrical & mechanical parameters are within safe limits.", ln=True)
@@ -320,7 +325,7 @@ def generate_full_pdf():
     pdf.cell(0, 5, f"- Last Oil Change Run Hours: {last_oil_change_hours} hrs", ln=True)
     pdf.cell(0, 5, f"- Hours Used on Current Oil: {hours_since_oil_change} hrs", ln=True)
     pdf.cell(0, 5, f"- Remaining Hours to Next Oil Change: {hours_until_next_oil_change} hrs", ln=True)
-    pdf.cell(0, 5, f"- Recommended Oil Grade: {recommended_oil}", ln=True)
+    pdf.cell(0, 5, f"- Recommended Oil Grade: {clean_ascii(recommended_oil)}", ln=True)
     
     pdf.ln(4)
 
@@ -339,7 +344,10 @@ def generate_full_pdf():
     pdf.set_font("Helvetica", '', 8)
     for idx, row in df_result.iterrows():
         raw_part = str(row["اسم قطعة الغيار (Spare Part)"])
-        part_eng = raw_part.split("(")[1].split(")")[0] if ("(" in raw_part and ")" in raw_part) else f"Part #{idx+1}"
+        if "(" in raw_part and ")" in raw_part:
+            part_eng = raw_part.split("(")[1].split(")")[0]
+        else:
+            part_eng = clean_ascii(raw_part) or f"Part #{idx+1}"
         
         pdf.cell(50, 5, part_eng[:25], border=1)
         pdf.cell(30, 5, str(row["العمر الافتراضي (Hours)"]), border=1)
@@ -350,7 +358,6 @@ def generate_full_pdf():
 
     return pdf.output()
 
-# زر تنزيل الـ PDF الشامل
 try:
     pdf_output = generate_full_pdf()
     st.download_button(
