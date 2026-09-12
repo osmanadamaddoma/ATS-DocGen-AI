@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import io
 import os
+import re
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF
@@ -142,17 +143,17 @@ st.divider()
 st.subheader("🚨 إنذارات وتنبيهات تجاوز المعايير التشغيلية (Threshold Alarms)")
 
 range_alarms = []
-if voltage < v_min: range_alarms.append(f"🔴 **انخفاض الجهد:** ({voltage}V) أقل من الحد الأدنى ({v_min}V).")
-elif voltage > v_max: range_alarms.append(f"🔴 **ارتفاع الجهد:** ({voltage}V) أعلى من الحد الأقصى ({v_max}V).")
+if voltage < v_min: range_alarms.append(f"Low Voltage Alert: ({voltage}V) below minimum ({v_min}V)")
+elif voltage > v_max: range_alarms.append(f"High Voltage Alert: ({voltage}V) exceeds maximum ({v_max}V)")
 
-if freq < f_min: range_alarms.append(f"🔴 **انخفاض التردد:** ({freq} Hz) أقل من الحد الأدنى ({f_min} Hz).")
-elif freq > f_max: range_alarms.append(f"🔴 **ارتفاع التردد:** ({freq} Hz) أعلى من الحد الأقصى ({f_max} Hz).")
+if freq < f_min: range_alarms.append(f"Low Frequency Alert: ({freq} Hz) below minimum ({f_min} Hz)")
+elif freq > f_max: range_alarms.append(f"High Frequency Alert: ({freq} Hz) exceeds maximum ({f_max} Hz)")
 
-if coolant_temp > temp_max_limit: range_alarms.append(f"🔴 **ارتفاع حرارة المحرك:** ({coolant_temp}°C) تتجاوز الحد الأقصى ({temp_max_limit}°C).")
-if amperes > amp_max_limit: range_alarms.append(f"🔴 **زيادة التيار (Overcurrent):** ({amperes} A) يتجاوز الحد المسموح ({amp_max_limit} A).")
+if coolant_temp > temp_max_limit: range_alarms.append(f"Engine Overheat Alert: ({coolant_temp}C) exceeds limit ({temp_max_limit}C)")
+if amperes > amp_max_limit: range_alarms.append(f"Overcurrent Alert: ({amperes} A) exceeds limit ({amp_max_limit} A)")
 
 if range_alarms:
-    for alarm in range_alarms: st.error(alarm)
+    for alarm in range_alarms: st.error(f"🔴 {alarm}")
 else:
     st.success("🟢 جميع قراءات الجهد، التردد، الحرارة، والتيار ضمن المعايير الآمنة المحددة.")
 
@@ -166,7 +167,7 @@ hours_since_oil_change = run_hours - last_oil_change_hours
 hours_until_next_oil_change = oil_change_interval - hours_since_oil_change
 
 recommended_oil = "15W40 (Standard)"
-if ambient_temp >= 45.0: recommended_oil = "20W50 (Extreme Hot Climate >= 45C)"
+if ambient_temp >= 45.0: recommended_oil = "20W50 (Extreme Hot Climate)"
 elif ambient_temp >= 43.0: recommended_oil = "15W40 (Hot Climate)"
 
 col_oil1, col_oil2, col_oil3 = st.columns(3)
@@ -174,33 +175,27 @@ col_oil1.metric("ساعات الزيت الحالية", f"{hours_since_oil_chang
 col_oil2.metric("المتبقي للخدمة القادمة", f"{hours_until_next_oil_change} hrs")
 col_oil3.metric("اللزوجة الموصى بها", recommended_oil)
 
-if hours_until_next_oil_change <= 0:
-    st.error("🚨 **تنبيه هام:** تجاوز المولد فترة تغيير الزيت المسموحة! يرجى الاستبدال فوراً.")
-elif hours_until_next_oil_change <= 30:
-    st.warning("⚠️ **تنبيه:** اقتربت مواعيد تغيير زيت المحرك (متبقي أقل من 30 ساعة).")
-
 # ---------------------------------------------------------
-# 6. جدول الصيانة التنبؤية المحدث (المأخوذ من الصورة)
+# 6. جدول الصيانة التنبؤية
 # ---------------------------------------------------------
 st.divider()
 st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة التنبؤية")
 
-# إدراج قائمة عناصر الجدول المأخوذة من جدول الصورة بدقة
 full_lifespan_data = [
-    {"تصنيف القطعة (Category)": "الصيانة الدورية Schedule Services", "اسم قطعة الغيار (Spare Part)": "فلتر زيت (Oil Filter)", "العمر الافتراضي - ساعات (Lifespan)": 250.0, "الساعات المنقضية (Hours Used)": 210.0},
-    {"تصنيف القطعة (Category)": "الصيانة الدورية Schedule Services", "اسم قطعة الغيار (Spare Part)": "فلتر وقود - أولي (Primary Fuel Filter)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": 430.0},
-    {"تصنيف القطعة (Category)": "الصيانة الدورية Schedule Services", "اسم قطعة الغيار (Spare Part)": "فلتر وقود - ثانوي (Secondary Fuel Filter)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": 455.0},
-    {"تصنيف القطعة (Category)": "نظام الهواء Air System", "اسم قطعة الغيار (Spare Part)": "فلتر هواء (Air Filter)", "العمر الافتراضي - ساعات (Lifespan)": 1000.0, "الساعات المنقضية (Hours Used)": 860.0},
-    {"تصنيف القطعة (Category)": "نظام التبريد Fan Belt System", "اسم قطعة الغيار (Spare Part)": "قشاط المروحة (Fan Belt)", "العمر الافتراضي - ساعات (Lifespan)": 2000.0, "الساعات المنقضية (Hours Used)": 1550.0},
-    {"تصنيف القطعة (Category)": "نظام التبريد Coolant System", "اسم قطعة الغيار (Spare Part)": "سائل تبريد ELC (Coolant)", "العمر الافتراضي - ساعات (Lifespan)": 3000.0, "الساعات المنقضية (Hours Used)": 2200.0},
-    {"تصنيف القطعة (Category)": "نظام الوقود Fuel System", "اسم قطعة الغيار (Spare Part)": "بخاخات الوقود (Injectors Check)", "العمر الافتراضي - ساعات (Lifespan)": 5000.0, "الساعات المنقضية (Hours Used)": 4400.0},
-    {"تصنيف القطعة (Category)": "النظام الكهربائي Electric System", "اسم قطعة الغيار (Spare Part)": "بطاريات (Batteries)", "العمر الافتراضي - ساعات (Lifespan)": 8000.0, "الساعات المنقضية (Hours Used)": 6100.0},
-    {"تصنيف القطعة (Category)": "النظام الكهربائي Electric System", "اسم قطعة الغيار (Spare Part)": "دينامو الشحن (Charging Alternator)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": 8900.0},
-    {"تصنيف القطعة (Category)": "المحرك - ميكانيك Engine Motor", "اسم قطعة الغيار (Spare Part)": "طقم عمرة رأس (Top Overhaul)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": 9100.0},
-    {"تصنيف القطعة (Category)": "المحرك - ميكانيك Engine Motor", "اسم قطعة الغيار (Spare Part)": "عمرة كاملة (Major Overhaul)", "العمر الافتراضي - ساعات (Lifespan)": 20000.0, "الساعات المنقضية (Hours Used)": 15000.0},
-    {"تصنيف القطعة (Category)": "نظام التزييت Oilers System", "اسم قطعة الغيار (Spare Part)": "مبرد الزيت (Oil Cooler Clean)", "العمر الافتراضي - ساعات (Lifespan)": 5000.0, "الساعات المنقضية (Hours Used)": 3800.0},
-    {"تصنيف القطعة (Category)": "نظام التبريد", "اسم قطعة الغيار (Spare Part)": "مضخة الماء (Water Pump)", "العمر الافتراضي - ساعات (Lifespan)": 6000.0, "الساعات المنقضية (Hours Used)": 5200.0},
-    {"تصنيف القطعة (Category)": "نظام الهواء", "اسم قطعة الغيار (Spare Part)": "تيربو (Turbocharger Check)", "العمر الافتراضي - ساعات (Lifespan)": 8000.0, "الساعات المنقضية (Hours Used)": 7100.0}
+    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Oil Filter (فلتر زيت)", "العمر الافتراضي - ساعات (Lifespan)": 250.0, "الساعات المنقضية (Hours Used)": 210.0},
+    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Primary Fuel Filter (فلتر وقود أولي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": 430.0},
+    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Secondary Fuel Filter (فلتر وقود ثانوي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": 455.0},
+    {"تصنيف القطعة (Category)": "Air System", "اسم قطعة الغيار (Spare Part)": "Air Filter (فلتر هواء)", "العمر الافتراضي - ساعات (Lifespan)": 1000.0, "الساعات المنقضية (Hours Used)": 860.0},
+    {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "Fan Belt (قشاط المروحة)", "العمر الافتراضي - ساعات (Lifespan)": 2000.0, "الساعات المنقضية (Hours Used)": 1550.0},
+    {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "ELC Coolant (سائل تبريد)", "العمر الافتراضي - ساعات (Lifespan)": 3000.0, "الساعات المنقضية (Hours Used)": 2200.0},
+    {"تصنيف القطعة (Category)": "Fuel System", "اسم قطعة الغيار (Spare Part)": "Fuel Injectors (بخاخات الوقود)", "العمر الافتراضي - ساعات (Lifespan)": 5000.0, "الساعات المنقضية (Hours Used)": 4400.0},
+    {"تصنيف القطعة (Category)": "Electrical System", "اسم قطعة الغيار (Spare Part)": "Batteries (البطاريات)", "العمر الافتراضي - ساعات (Lifespan)": 8000.0, "الساعات المنقضية (Hours Used)": 6100.0},
+    {"تصنيف القطعة (Category)": "Electrical System", "اسم قطعة الغيار (Spare Part)": "Charging Alternator (دينامو الشحن)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": 8900.0},
+    {"تصنيف القطعة (Category)": "Engine Mechanical", "اسم قطعة الغيار (Spare Part)": "Top Overhaul (طقم عمرة رأس)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": 9100.0},
+    {"تصنيف القطعة (Category)": "Engine Mechanical", "اسم قطعة الغيار (Spare Part)": "Major Overhaul (عمرة كاملة)", "العمر الافتراضي - ساعات (Lifespan)": 20000.0, "الساعات المنقضية (Hours Used)": 15000.0},
+    {"تصنيف القطعة (Category)": "Lubrication System", "اسم قطعة الغيار (Spare Part)": "Oil Cooler (مبرد الزيت)", "العمر الافتراضي - ساعات (Lifespan)": 5000.0, "الساعات المنقضية (Hours Used)": 3800.0},
+    {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "Water Pump (مضخة الماء)", "العمر الافتراضي - ساعات (Lifespan)": 6000.0, "الساعات المنقضية (Hours Used)": 5200.0},
+    {"تصنيف القطعة (Category)": "Air System", "اسم قطعة الغيار (Spare Part)": "Turbocharger (التيربو)", "العمر الافتراضي - ساعات (Lifespan)": 8000.0, "الساعات المنقضية (Hours Used)": 7100.0}
 ]
 
 if "maintenance_df" not in st.session_state:
@@ -211,83 +206,82 @@ st.session_state.maintenance_df = edited_table
 
 processed_rows = []
 for index, row in edited_table.iterrows():
-    category = str(row.get("تصنيف القطعة (Category)", "أخرى"))
-    part_name = str(row.get("اسم قطعة الغيار (Spare Part)", "قطعة جديدة"))
+    category = str(row.get("تصنيف القطعة (Category)", "Other"))
+    part_name = str(row.get("اسم قطعة الغيار (Spare Part)", "Part"))
     lifespan = pd.to_numeric(row.get("العمر الافتراضي - ساعات (Lifespan)", 250), errors='coerce') or 250.0
     used_hours = pd.to_numeric(row.get("الساعات المنقضية (Hours Used)", 0), errors='coerce') or 0.0
     
     usage_pct = (used_hours / lifespan) * 100 if lifespan > 0 else 0
     rem_hrs = lifespan - used_hours
     
-    # تحديد حالة التنبيه تلقائياً بحسب النسب المعيارية للجدول
     if usage_pct >= 90:
-        status = "تغيير فوري (خطر)"
+        status = "CRITICAL (Replace)"
     elif usage_pct >= 85:
-        status = "تنبيه (استعداد)"
+        status = "WARNING (Ready)"
     elif usage_pct >= 75:
-        status = "قرب الخدمة"
+        status = "ATTENTION (Soon)"
     else:
-        status = "حالة جيدة"
+        status = "GOOD"
     
     processed_rows.append({
-        "تصنيف القطعة (Category)": category,
-        "اسم قطعة الغيار (Spare Part)": part_name,
-        "العمر الافتراضي - ساعات (Lifespan)": lifespan,
-        "الساعات المنقضية (Hours Used)": used_hours,
-        "نسبة الاستهلاك (%)": f"{usage_pct:.0f}%",
-        "العمر المتبقي (Remaining)": rem_hrs,
-        "حالة التنبيه (Alert Status)": status
+        "Category": category,
+        "Spare Part": part_name,
+        "Lifespan": lifespan,
+        "Used Hours": used_hours,
+        "Usage Pct": f"{usage_pct:.0f}%",
+        "Remaining Hours": rem_hrs,
+        "Status": status
     })
 
 df_result = pd.DataFrame(processed_rows)
 
-# عرض التنبيهات الحرجة الخاصة بجدول الصيانة
-st.caption("🔍 **نتائج تحليل حالة القطع:**")
-critical_parts = df_result[df_result["حالة التنبيه (Alert Status)"] == "تغيير فوري (خطر)"]
-if not critical_parts.empty:
-    for _, item in critical_parts.iterrows():
-        st.error(f"🔴 **تغيير فوري:** {item['اسم قطعة الغيار (Spare Part)']} وصلت نسبتها إلى {item['نسبة الاستهلاك (%)']} (العمر المتبقي {item['العمر المتبقي (Remaining)']} ساعة).")
+# ---------------------------------------------------------
+# 7. دالة تنظيف النصوص لاستخراج الأحرف الإنجليزية والرمزية فقط لـ PDF
+# ---------------------------------------------------------
+def sanitize_latin_only(text):
+    """تضمن إزالة أي حرف غير لاتيني لمنع خطأ FPDF Font Error"""
+    if not isinstance(text, str):
+        text = str(text)
+    # الاحتفاظ بالأحرف الإنجليزية والأرقام والرموز القياسية فقط
+    clean_text = re.sub(r'[^\x00-\x7F]+', '', text).strip()
+    return clean_text if clean_text else "N/A"
 
 # ---------------------------------------------------------
-# 7. محرك طباعة تقرير PDF الشامل
+# 8. محرك طباعة تقرير PDF الشامل المضمون
 # ---------------------------------------------------------
 st.divider()
 st.subheader("📄 استخراج وطباعة التقرير الفني الشامل (Full PDF Report)")
 
-class ComprehensivePDF(FPDF):
+class SafePDF(FPDF):
     def header(self):
         self.set_font("Helvetica", 'B', 14)
         self.cell(0, 8, "INDUSTRIAL GENERATOR COMPREHENSIVE TECHNICAL REPORT", ln=True, align='C')
         self.set_font("Helvetica", 'I', 9)
-        self.cell(0, 5, "Addoma Trading Services - Predictive Maintenance Platform", ln=True, align='C')
+        self.cell(0, 5, "Addoma Trading Services - Maintenance Platform", ln=True, align='C')
         self.line(10, 22, 200, 22)
         self.ln(5)
 
     def footer(self):
         self.set_y(-15)
         self.set_font("Helvetica", 'I', 8)
-        self.cell(0, 10, f"Page {self.page_no()} | Generated Automatically by Addoma Maintenance System", align='C')
+        self.cell(0, 10, f"Page {self.page_no()} | Generated Automatically by Addoma System", align='C')
 
-def clean_ascii(text):
-    """دالة لترشيح وحماية الخطوط في PDF من الاستثناءات"""
-    if not isinstance(text, str):
-        text = str(text)
-    return "".join([c for c in text if ord(c) < 128])
-
-def generate_full_pdf():
-    pdf = ComprehensivePDF()
+def generate_safe_pdf():
+    pdf = SafePDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
     
-    safe_client = clean_ascii(client_name) or "Authorized Client"
-    safe_model = clean_ascii(gen_model) or "Generator Unit"
-    safe_plan = clean_ascii(plan_type) or "Standard Plan"
+    safe_client = sanitize_latin_only(client_name)
+    if safe_client == "N/A": safe_client = "Addoma Trading Services Client"
     
-    # 1. المخطط العام والصورة
+    safe_model = sanitize_latin_only(gen_model)
+    if safe_model == "N/A": safe_model = "Industrial Generator"
+    
+    # 1. المخطط العام
     pdf.set_font("Helvetica", 'B', 10)
     pdf.cell(0, 5, f"Client: {safe_client} | Model: {safe_model}", ln=True)
     pdf.set_font("Helvetica", '', 9)
-    pdf.cell(0, 5, f"Report Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Subscription: {safe_plan}", ln=True)
+    pdf.cell(0, 5, f"Report Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
     pdf.ln(2)
 
     if uploaded_image is not None:
@@ -307,7 +301,7 @@ def generate_full_pdf():
 
     # 2. القراءات الأساسية
     pdf.set_font("Helvetica", 'B', 11)
-    pdf.cell(0, 6, "1. Operational, Electrical & Mechanical Readings", ln=True)
+    pdf.cell(0, 6, "1. Operational & Technical Readings", ln=True)
     pdf.set_font("Helvetica", '', 9)
     
     readings = [
@@ -329,16 +323,15 @@ def generate_full_pdf():
     
     pdf.ln(3)
 
-    # 3. حالة الحدود والإنذارات
+    # 3. حالة الإنذارات
     pdf.set_font("Helvetica", 'B', 11)
-    pdf.cell(0, 6, "2. System Alarms & Threshold Status", ln=True)
+    pdf.cell(0, 6, "2. System Alarms & Safety Status", ln=True)
     pdf.set_font("Helvetica", '', 9)
     if range_alarms:
         for alarm in range_alarms:
-            clean_alarm = clean_ascii(alarm.replace("🔴", "[ALARM]").replace("**", ""))
-            pdf.cell(0, 5, f"WARNING: {clean_alarm}", ln=True)
+            pdf.cell(0, 5, f"[ALARM] {sanitize_latin_only(alarm)}", ln=True)
     else:
-        pdf.cell(0, 5, "Status: All electrical & mechanical parameters are within safe limits.", ln=True)
+        pdf.cell(0, 5, "Status: All parameters are within safe limits.", ln=True)
         
     pdf.ln(3)
 
@@ -349,11 +342,11 @@ def generate_full_pdf():
     pdf.cell(0, 5, f"- Last Oil Change Run Hours: {last_oil_change_hours} hrs", ln=True)
     pdf.cell(0, 5, f"- Hours Used on Current Oil: {hours_since_oil_change} hrs", ln=True)
     pdf.cell(0, 5, f"- Remaining Hours to Next Oil Change: {hours_until_next_oil_change} hrs", ln=True)
-    pdf.cell(0, 5, f"- Recommended Oil Grade: {clean_ascii(recommended_oil)}", ln=True)
+    pdf.cell(0, 5, f"- Recommended Oil Grade: {sanitize_latin_only(recommended_oil)}", ln=True)
     
     pdf.ln(4)
 
-    # 5. جدول قطع الغيار المحدث المأخوذ من الصورة
+    # 5. جدول قطع الغيار
     pdf.set_font("Helvetica", 'B', 11)
     pdf.cell(0, 6, "4. Predictive Maintenance & Spare Parts Schedule", ln=True)
     
@@ -363,33 +356,30 @@ def generate_full_pdf():
     pdf.cell(25, 6, "Used(h)", border=1)
     pdf.cell(25, 6, "Usage (%)", border=1)
     pdf.cell(25, 6, "Remaining(h)", border=1)
-    pdf.cell(35, 6, "Alert Status", border=1)
+    pdf.cell(35, 6, "Status", border=1)
     pdf.ln()
 
     pdf.set_font("Helvetica", '', 8)
     for idx, row in df_result.iterrows():
-        raw_part = str(row["اسم قطعة الغيار (Spare Part)"])
-        if "(" in raw_part and ")" in raw_part:
-            part_eng = raw_part.split("(")[1].split(")")[0]
-        else:
-            part_eng = clean_ascii(raw_part) or f"Part #{idx+1}"
+        part_clean = sanitize_latin_only(str(row["Spare Part"]))
+        status_clean = sanitize_latin_only(str(row["Status"]))
         
-        pdf.cell(45, 5, part_eng[:22], border=1)
-        pdf.cell(25, 5, str(row["العمر الافتراضي - ساعات (Lifespan)"]), border=1)
-        pdf.cell(25, 5, str(row["الساعات المنقضية (Hours Used)"]), border=1)
-        pdf.cell(25, 5, str(row["نسبة الاستهلاك (%)"]), border=1)
-        pdf.cell(25, 5, str(row["العمر المتبقي (Remaining)"]), border=1)
-        pdf.cell(35, 5, str(row["حالة التنبيه (Alert Status)"]), border=1)
+        pdf.cell(45, 5, part_clean[:22], border=1)
+        pdf.cell(25, 5, str(row["Lifespan"]), border=1)
+        pdf.cell(25, 5, str(row["Used Hours"]), border=1)
+        pdf.cell(25, 5, str(row["Usage Pct"]), border=1)
+        pdf.cell(25, 5, str(row["Remaining Hours"]), border=1)
+        pdf.cell(35, 5, status_clean, border=1)
         pdf.ln()
 
     return pdf.output()
 
 try:
-    pdf_output = generate_full_pdf()
+    pdf_bytes = generate_safe_pdf()
     st.download_button(
-        label="🖨️ طباعة وتنزيل التقرير الفني الشامل بصيغة PDF (Full Comprehensive Report)",
-        data=bytes(pdf_output),
-        file_name=f"Full_Generator_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+        label="🖨️ طباعة وتنزيل التقرير الفني الشامل بصيغة PDF (Download Report)",
+        data=bytes(pdf_bytes),
+        file_name=f"Generator_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
         mime="application/pdf",
         use_container_width=True
     )
