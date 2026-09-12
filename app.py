@@ -31,6 +31,7 @@ CLIENTS_DATABASE = {
 st.sidebar.header("🔐 بوابة تفعيل العميل والصلاحيات")
 input_code = st.sidebar.text_input("أدخل كود التفعيل الخاص بالعميل:", type="password")
 
+is_authenticated = False
 is_pro = False
 client_name = "زائر (Visitor)"
 plan_type = "غير مفعل"
@@ -43,14 +44,27 @@ if input_code in CLIENTS_DATABASE:
     expiry_dt = start_dt + timedelta(days=data["duration_days"])
     
     if datetime.now().date() <= expiry_dt:
+        is_authenticated = True
         is_pro = True
-        st.sidebar.success(f"✅ مفعل: {client_name} ({plan_type})")
+        st.sidebar.success(f"✅ تم التفعيل بنجاح: {client_name} ({plan_type})")
     else:
         st.sidebar.error("❌ انتهت صلاحية اشتراك هذا العميل.")
 elif input_code != "":
     st.sidebar.error("❌ كود التفعيل غير صحيح.")
 else:
-    st.sidebar.info("💡 أدخل كود العميل لفتح التحليلات المتقدمة.")
+    st.sidebar.warning("⚠️ أدخل كود التفعيل في الشريط الجانبي للوصول إلى النظام.")
+
+# ---------------------------------------------------------
+# التحقق من الصلاحيات: منع عرض البيانات أو الكتابة بدون كود
+# ---------------------------------------------------------
+if not is_authenticated:
+    st.error("🔒 **النظام مقفل:** يرجى إدخال كود تفعيل صحيح في الشريط الجانبي لفتح لوحة التحكم، إدخال البيانات، وتعديل جدول الصيانة.")
+    st.info("💡 للوصول والتجربة، يمكنك استخدام الكود الخاص بك: `ADDOMA-2026-PRO`")
+    st.stop()  # إيقاف تنفيذ بقية البرمجة حتى يتم إدخال الكود
+
+# =========================================================
+# الجزء أدناه لن يظهر إلا بعد التفعيل الناجح بكود صحيح
+# =========================================================
 
 st.sidebar.divider()
 
@@ -85,13 +99,13 @@ with st.sidebar.form("generator_comprehensive_form"):
     st.subheader("قراءات الشاشة والمؤشرات الميكانيكية")
     coolant_temp = st.number_input("حرارة سائل التبريد (°C)", min_value=0.0, max_value=150.0, value=85.0)
     oil_press = st.number_input("ضغط الزيت (Bar)", min_value=0.0, max_value=10.0, value=4.2)
-    vibration = st.number_input("مستوى الاهتزاز (mm/s)", min_value=0.0, max_value=50.0, value=2.2, disabled=not is_pro)
+    vibration = st.number_input("مستوى الاهتزاز (mm/s)", min_value=0.0, max_value=50.0, value=2.2)
 
     st.subheader("المؤشرات الكهربائية")
     voltage = st.number_input("الجهد Voltage (V)", min_value=0.0, max_value=600.0, value=400.0)
     freq = st.number_input("التردد Frequency (Hz)", min_value=0.0, max_value=70.0, value=50.0)
     amperes = st.number_input("التيار Amperes (A)", min_value=0.0, max_value=4000.0, value=350.0)
-    pf = st.number_input("معامل القدرة (PF)", min_value=0.0, max_value=1.0, value=0.85, disabled=not is_pro)
+    pf = st.number_input("معامل القدرة (PF)", min_value=0.0, max_value=1.0, value=0.85)
 
     submit_btn = st.form_submit_button("تحديث وتحليل البيانات")
 
@@ -99,7 +113,7 @@ with st.sidebar.form("generator_comprehensive_form"):
 load_percentage = (load_kw / gen_kw) * 100 if gen_kw > 0 else 0
 
 # الواجهة الرئيسية
-st.info(f"🔹 **العميل الحالي:** {client_name} | **الباقة:** {plan_type}")
+st.success(f"🔓 **تم تسجيل الدخول:** {client_name} | **نوع الاشتراك:** {plan_type}")
 st.subheader("📊 لوحة المراقبة التشغيلية والبيانات الكهربائية")
 
 col1, col2, col3, col4 = st.columns(4)
@@ -112,7 +126,7 @@ col5, col6, col7, col8 = st.columns(4)
 col5.metric("حرارة المحرك", f"{coolant_temp} °C")
 col6.metric("ضغط الزيت", f"{oil_press} Bar")
 col7.metric("الجهد / التردد", f"{voltage}V | {freq}Hz")
-col8.metric("التيار / معامل القدرة", f"{amperes}A | {pf}" if is_pro else f"{amperes}A | 🔒")
+col8.metric("التيار / معامل القدرة", f"{amperes}A | {pf}")
 
 # 🔴 قسم إنذارات تجاوز الحدود الكهربائية والحرارية المحددة يدوياً
 st.divider()
@@ -256,25 +270,22 @@ df_result = pd.DataFrame(processed_rows)
 st.dataframe(df_result, use_container_width=True)
 
 # التحليلات التنبؤية المتقدمة
+st.divider()
+st.subheader("🔍 تحليلات التنبؤ بالأعطال المتقدمة (AI Diagnostics)")
+
 advanced_alerts = []
-if is_pro:
-    st.divider()
-    st.subheader("🔍 تحليلات التنبؤ بالأعطال المتقدمة (AI Diagnostics)")
+if vibration > 4.0:
+    advanced_alerts.append("⚠️ **تحذير اهتزاز عالي:** يشير إلى عدم توازن المحور أو تآكل كراسي المحرك.")
+if pf < 0.8:
+    advanced_alerts.append("💡 **معامل قدرة منخفض (< 0.8):** يوصى بمراجعة لوحة مكثفات تحسين القدرة (PFC).")
+if coolant_temp >= 95:
+    advanced_alerts.append("🚨 **خطر ارتفاع الحرارة:** حرارة سائل التبريد تتجاوز الحد الطبيعي.")
     
-    if vibration > 4.0:
-        advanced_alerts.append("⚠️ **تحذير اهتزاز عالي:** يشير إلى عدم توازن المحور أو تآكل كراسي المحرك.")
-    if pf < 0.8:
-        advanced_alerts.append("💡 **معامل قدرة منخفض (< 0.8):** يوصى بمراجعة لوحة مكثفات تحسين القدرة (PFC).")
-    if coolant_temp >= 95:
-        advanced_alerts.append("🚨 **خطر ارتفاع الحرارة:** حرارة سائل التبريد تتجاوز الحد الطبيعي.")
-        
-    if advanced_alerts:
-        for alert in advanced_alerts:
-            st.error(alert)
-    else:
-        st.success("🌟 كافة مؤشرات الاهتزاز ومعامل القدرة ضمن النطاق المثالي الآمن.")
+if advanced_alerts:
+    for alert in advanced_alerts:
+        st.error(alert)
 else:
-    st.info("ℹ️ للوصول إلى تحليلات الاهتزاز ومعامل القدرة المتقدمة، يرجى تفعيل كود العميل في الشريط الجانبي.")
+    st.success("🌟 كافة مؤشرات الاهتزاز ومعامل القدرة ضمن النطاق المثالي الآمن.")
 
 # ---------------------------------------------------------
 # 📥 قسم تصدير التقارير (Excel & PDF)
