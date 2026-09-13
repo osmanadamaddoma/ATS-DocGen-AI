@@ -3,7 +3,6 @@ import io
 import os
 import re
 from fpdf import FPDF
-import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 import plotly.express as px
@@ -518,7 +517,7 @@ def sanitize_latin_only(text):
 
 
 # ---------------------------------------------------------
-# 8. محرك طباعة تقرير PDF الشامل (مع تضمين صور الرسوم البيانية)
+# 8. محرك طباعة تقرير PDF الشامل المضمون
 # ---------------------------------------------------------
 st.divider()
 st.subheader("📄 استخراج وطباعة التقرير الفني الشامل (Full PDF Report)")
@@ -559,8 +558,8 @@ class SafePDF(FPDF):
 
 def generate_safe_pdf_bytes():
     pdf = SafePDF()
-    pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
 
     safe_client = sanitize_latin_only(client_name)
     if safe_client == "N/A":
@@ -582,13 +581,13 @@ def generate_safe_pdf_bytes():
     )
     pdf.ln(2)
 
-    # إضافة صورة المولد الشخصية بحذر
+    # إضافة صورة المولد إن وجدت
     if uploaded_image is not None:
         try:
             img = Image.open(uploaded_image)
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
-            temp_img_path = f"temp_{datetime.now().timestamp()}.jpg"
+            temp_img_path = f"temp_gen_{datetime.now().timestamp()}.jpg"
             img.save(temp_img_path, "JPEG", quality=85)
 
             pdf.image(temp_img_path, x=140, y=28, w=55)
@@ -695,117 +694,27 @@ def generate_safe_pdf_bytes():
         pdf.cell(35, 5, status_clean, border=1)
         pdf.ln()
 
-    pdf.ln(5)
-
-    # ---------------------------------------------------------
-    # توليد وإدراج الرسوم البيانية في صفحة PDF جديدة
-    # ---------------------------------------------------------
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "5. Technical Visual Analytics & Charts", ln=True)
-    pdf.ln(2)
-
-    # أ. إنشاء الرسم البياني العمودي (Bar Chart) باستخدام Matplotlib وحفظه مؤقتاً
-    try:
-        plt.figure(figsize=(7, 3.8), dpi=150)
-        p_names = [
-            str(row["قطع الغيار / الفلاتر"])[:16]
-            for _, row in df_result.iterrows()
-        ]
-        u_hrs = [
-            float(row["المدة المنقضية (ساعة)"]) for _, row in df_result.iterrows()
-        ]
-        r_hrs = [
-            float(row["المدة المتبقية (ساعة)"]) for _, row in df_result.iterrows()
-        ]
-
-        x_indices = range(len(p_names))
-        plt.bar(
-            x_indices, u_hrs, label="Used Hours", color="#d9534f", width=0.6
-        )
-        plt.bar(
-            x_indices,
-            r_hrs,
-            bottom=u_hrs,
-            label="Remaining Hours",
-            color="#28a745",
-            width=0.6,
-        )
-        plt.xticks(
-            x_indices, p_names, rotation=35, ha="right", fontsize=7
-        )
-        plt.ylabel("Hours", fontsize=8)
-        plt.title("Parts Used vs Remaining Hours", fontsize=9)
-        plt.legend(fontsize=7, loc="upper right")
-        plt.tight_layout()
-
-        bar_path = f"temp_bar_{datetime.now().timestamp()}.png"
-        plt.savefig(bar_path)
-        plt.close()
-
-        pdf.image(bar_path, x=15, w=180)
-        if os.path.exists(bar_path):
-            os.remove(bar_path)
-        pdf.ln(5)
-    except Exception:
-        pass
-
-    # ب. إنشاء الرسم البياني الدائري (Pie Chart) باستخدام Matplotlib وحفظه مؤقتاً
-    try:
-        plt.figure(figsize=(5, 3.2), dpi=150)
-        status_counts = df_result["الحالة الفنية"].value_counts()
-        status_colors = {
-            "GOOD (جيدة)": "#28a745",
-            "ATTENTION (قرب التغيير)": "#ffc107",
-            "WARNING (متبقي أقل من 10%)": "#fd7e14",
-            "EXPIRED (انقضاء الفترة)": "#dc3545",
-        }
-        pie_colors_list = [
-            status_colors.get(k, "#cccccc") for k in status_counts.index
-        ]
-
-        plt.pie(
-            status_counts,
-            labels=status_counts.index,
-            autopct="%1.0f%%",
-            colors=pie_colors_list,
-            textprops={"fontsize": 7},
-        )
-        plt.title("Parts Technical Status Distribution", fontsize=9)
-        plt.tight_layout()
-
-        pie_path = f"temp_pie_{datetime.now().timestamp()}.png"
-        plt.savefig(pie_path)
-        plt.close()
-
-        pdf.image(pie_path, x=45, w=120)
-        if os.path.exists(pie_path):
-            os.remove(pie_path)
-    except Exception:
-        pass
-
-    # تحويل المخرجات بشكل صريح إلى BytesIO متوافق مع الهواتف والمتصفحات
-    buffer = io.BytesIO()
-    pdf_string_or_bytes = pdf.output()
-    if isinstance(pdf_string_or_bytes, str):
-        buffer.write(pdf_string_or_bytes.encode("latin-1"))
+    # استخراج مخرجات PDF بأمان تحسباً لاختلاف أنواع الإرجاع (String / Bytes)
+    pdf_output = pdf.output(dest="S")
+    if isinstance(pdf_output, str):
+        return pdf_output.encode("latin-1", errors="replace")
+    elif isinstance(pdf_output, (bytes, bytearray)):
+        return bytes(pdf_output)
     else:
-        buffer.write(bytes(pdf_string_or_bytes))
-
-    buffer.seek(0)
-    return buffer.getvalue()
+        return bytes(pdf_output)
 
 
+# استدعاء التنزيل المباشر
 try:
-    report_data = generate_safe_pdf_bytes()
+    pdf_bytes_data = generate_safe_pdf_bytes()
     st.download_button(
         label=(
             "🖨️ طباعة وتنزيل التقرير الفني الشامل بصيغة PDF (Download Report)"
         ),
-        data=report_data,
-        file_name="generator_report.pdf",
+        data=pdf_bytes_data,
+        file_name=f"Generator_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
         mime="application/pdf",
         use_container_width=True,
     )
-except Exception as e:
-    st.error(f"حدث خطأ أثناء معالجة ملف PDF: {e}")
+except Exception as err:
+    st.error(f"❌ حدث خطأ أثناء تجهيز ملف الـ PDF: {err}")
