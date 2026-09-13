@@ -260,7 +260,7 @@ else:
     )
 
 # ---------------------------------------------------------
-# 5. جدولة خدمة تغيير الزيت والتحذيرات الذكية (تلقائية الخصم)
+# 5. جدولة خدمة تغيير الزيت والتحذيرات الذكية
 # ---------------------------------------------------------
 st.divider()
 st.subheader("🛢️ جدول الخدمة وتغيير زيت المحرك (Oil Service Schedule)")
@@ -517,7 +517,7 @@ def sanitize_latin_only(text):
 
 
 # ---------------------------------------------------------
-# 8. محرك طباعة تقرير PDF الشامل (تم إصلاح التعامل مع الـ bytes)
+# 8. محرك طباعة تقرير PDF الشامل (معدّل للتحميل على الهواتف)
 # ---------------------------------------------------------
 st.divider()
 st.subheader("📄 استخراج وطباعة التقرير الفني الشامل (Full PDF Report)")
@@ -556,7 +556,7 @@ class SafePDF(FPDF):
         )
 
 
-def generate_safe_pdf():
+def generate_safe_pdf_bytes():
     pdf = SafePDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -581,12 +581,13 @@ def generate_safe_pdf():
     )
     pdf.ln(2)
 
+    # إضافة صورة المولد بحذر
     if uploaded_image is not None:
         try:
             img = Image.open(uploaded_image)
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
-            temp_img_path = "temp_generator_img.jpg"
+            temp_img_path = f"temp_{datetime.now().timestamp()}.jpg"
             img.save(temp_img_path, "JPEG", quality=85)
 
             pdf.image(temp_img_path, x=140, y=28, w=55)
@@ -693,28 +694,26 @@ def generate_safe_pdf():
         pdf.cell(35, 5, status_clean, border=1)
         pdf.ln()
 
-    # إرجاع مخرجات PDF بشكل آمن وثنائي (bytes) لتفادي أخطاء التشفير
-    pdf_output = pdf.output()
-    if isinstance(pdf_output, str):
-        return pdf_output.encode("latin-1")
-    elif isinstance(pdf_output, bytearray):
-        return bytes(pdf_output)
-    elif isinstance(pdf_output, bytes):
-        return pdf_output
+    # تحويل المخرجات بشكل صريح إلى BytesIO متوافق مع متصفحات الهواتف
+    buffer = io.BytesIO()
+    pdf_string_or_bytes = pdf.output()
+    if isinstance(pdf_string_or_bytes, str):
+        buffer.write(pdf_string_or_bytes.encode("latin-1"))
     else:
-        return bytes(pdf_output)
+        buffer.write(bytes(pdf_string_or_bytes))
+
+    buffer.seek(0)
+    return buffer.getvalue()
 
 
 try:
-    pdf_bytes = generate_safe_pdf()
+    report_data = generate_safe_pdf_bytes()
     st.download_button(
         label=(
             "🖨️ طباعة وتنزيل التقرير الفني الشامل بصيغة PDF (Download Report)"
         ),
-        data=pdf_bytes,
-        file_name=(
-            f"Generator_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
-        ),
+        data=report_data,
+        file_name="generator_report.pdf",
         mime="application/pdf",
         use_container_width=True,
     )
