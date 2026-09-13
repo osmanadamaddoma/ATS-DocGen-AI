@@ -13,4 +13,4 @@ streamlit
 pandas
 plotly
 fpdf
-PIL
+Pillow
