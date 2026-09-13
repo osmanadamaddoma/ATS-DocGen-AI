@@ -91,9 +91,7 @@ st.sidebar.header("📥 لوحة إدخال البيانات والتشغيل")
 with st.sidebar.form("generator_comprehensive_form"):
     st.subheader("معلومات المولد العامة")
     gen_model = st.text_input("طراز / اسم المولد (Generator Model/ID)", value="Perkins 250 kVA - DSE 8610")
-    run_hours = st.number_input("ساعات التشغيل الحالية (Current Run Hours)", min_value=0.0, max_value=100000.0, value=1250.0, step=10.0)
-    
-    # الإضافة الجديدة: ساعات التشغيل القادمة الافتراضية
+    run_hours = st.number_input("ساعات التشغيل الحالية الكلية (Current Total Hours)", min_value=0.0, max_value=100000.0, value=1250.0, step=10.0)
     future_run_hours = st.number_input("ساعات تشغيل العمل القادمة الافتراضية (Target Future Hours)", min_value=0.0, max_value=100000.0, value=1500.0, step=10.0, help="الساعات المستهدفة للتشغيل القادم لتقييم استهلاك الزيت وقطع الغيار.")
     
     gen_kw = st.number_input("سعة المولد الكلية (Generator kW)", min_value=5.0, max_value=3000.0, value=250.0, step=10.0)
@@ -111,9 +109,9 @@ with st.sidebar.form("generator_comprehensive_form"):
     amperes = st.number_input("التيار Amperes (A)", min_value=0.0, max_value=4000.0, value=350.0)
     pf = st.number_input("معامل القدرة (PF)", min_value=0.0, max_value=1.0, value=0.85)
 
-    st.subheader("بيانات خدمة زيت المحرك")
-    last_oil_change_hours = st.number_input("قراءة الساعات عند آخر تغيير زيت", min_value=0.0, value=1000.0, step=10.0)
-    oil_change_interval = st.number_input("الفترة القياسية الافتراضية للزيت (ساعة)", min_value=100.0, value=250.0, step=50.0)
+    st.subheader("بيانات خدمة زيت المحرك والفلاتر")
+    last_oil_change_hours = st.number_input("قراءة عداد الساعات عند آخر تغيير زيت وفلاتر الدوري", min_value=0.0, value=1000.0, step=10.0)
+    oil_change_interval = st.number_input("الفترة القياسية الافتراضية للزيت والفلاتر (ساعة)", min_value=100.0, value=250.0, step=50.0)
 
     submit_btn = st.form_submit_button("تحديث وتحليل البيانات")
 
@@ -162,15 +160,15 @@ else:
     st.success("🟢 جميع قراءات الجهد، التردد، الحرارة، والتيار ضمن المعايير الآمنة المحددة.")
 
 # ---------------------------------------------------------
-# 5. جدولة خدمة تغيير الزيت والتحذيرات الذكية (ديناميكي)
+# 5. جدولة خدمة تغيير الزيت والتحذيرات الذكية (تلقائية الخصم)
 # ---------------------------------------------------------
 st.divider()
 st.subheader("🛢️ جدول الخدمة وتغيير زيت المحرك (Oil Service Schedule)")
 
-# الحسابات بناءً على الساعات المستهدفة/القادمة
+# حساب المدة المنقضية والمتبقية لغيار الزيت خصماً من قراءة آخر تغيير
 effective_hours = future_run_hours if future_run_hours > 0 else run_hours
-hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
-hours_until_next_oil_change = oil_change_interval - hours_since_oil_change
+hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours) # المدة المنقضية للزيت
+hours_until_next_oil_change = oil_change_interval - hours_since_oil_change # المدة المتبقية
 oil_usage_pct = (hours_since_oil_change / oil_change_interval) * 100 if oil_change_interval > 0 else 0
 
 recommended_oil = "15W40 (Standard)"
@@ -178,30 +176,31 @@ if ambient_temp >= 45.0: recommended_oil = "20W50 (Extreme Hot Climate)"
 elif ambient_temp >= 43.0: recommended_oil = "15W40 (Hot Climate)"
 
 col_oil1, col_oil2, col_oil3, col_oil4 = st.columns(4)
-col_oil1.metric("الساعات عند التشغيل القادم", f"{effective_hours:.1f} hrs")
+col_oil1.metric("المدة المنقضية للزيت الحالية", f"{hours_since_oil_change:.1f} hrs")
 col_oil2.metric("الفترة الافتراضية للزيت", f"{oil_change_interval:.1f} hrs")
-col_oil3.metric("المتبقي للخدمة", f"{max(0.0, hours_until_next_oil_change):.1f} hrs", f"استهلاك {oil_usage_pct:.0f}%")
+col_oil3.metric("المدة المتبقية للخدمة", f"{max(0.0, hours_until_next_oil_change):.1f} hrs", f"استهلاك {oil_usage_pct:.0f}%")
 col_oil4.metric("اللزوجة الموصى بها", recommended_oil)
 
-# المنطق التنبيهي الصارم للزيت
 if oil_usage_pct >= 100:
-    st.error(f"🚨 **تحذير حرج (انقضاء الساعات الافتراضية):** سيتجاوز الزيت الفترة الافتراضية ({oil_change_interval} ساعة) عند الوصول لـ {effective_hours} ساعة! يرجى تغيير زيت المحرك.")
+    st.error(f"🚨 **تحذير حرج:** تم استهلاك مدة غيار الزيت بالكامل وتجاوز الفترة الافتراضية بـ ({abs(hours_until_next_oil_change):.1f} ساعة)! يرجى استبدال الزيت والفلاتر فوراً.")
 elif oil_usage_pct >= 90:
-    st.warning(f"⚠️ **تنبيه (وصول 90% من الساعات):** سيتم استهلاك {oil_usage_pct:.1f}% من العمر الافتراضي للزيت عند الوصول لـ {effective_hours} ساعة (متبقي {hours_until_next_oil_change:.1f} ساعة).")
+    st.warning(f"⚠️ **تنبيه:** تم استهلاك {oil_usage_pct:.1f}% من الفترة الافتراضية (متبقي {hours_until_next_oil_change:.1f} ساعة فقط).")
 else:
-    st.info("🟢 حالة زيت المحرك جيدة وتلبي ساعات العمل القادمة الافتراضية.")
+    st.info("🟢 حالة زيت المحرك جيدة وتعمل ضمن الفترة المسموحة.")
 
 # ---------------------------------------------------------
-# 6. جدول الصيانة التنبؤية المربوط تلقائياً بساعات التشغيل القادمة
+# 6. جدول الصيانة التنبؤية بالخصم التلقائي للمدة المنقضية والمتبقية
 # ---------------------------------------------------------
 st.divider()
-st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة التنبؤية")
+st.subheader("🔧 جدول تتبع العمر الافتراضي والمدد المتبقية لقطع الغيار والفلاتر")
 
-# ضبط الساعات المنقضية تلقائياً بناءً على الساعات القادمة المستهدفة
+# تخصيص المدة المنقضية: الفلاتر الدورية تحتسب من آخر غيار زيت، والباقي تحتسب من إجمالي ساعات المولد
+service_used_hours = hours_since_oil_change
+
 base_parts_data = [
-    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Oil Filter (فلتر زيت)", "العمر الافتراضي - ساعات (Lifespan)": 250.0, "الساعات المنقضية (Hours Used)": float(effective_hours)},
-    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Primary Fuel Filter (فلتر وقود أولي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": float(effective_hours)},
-    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Secondary Fuel Filter (فلتر وقود ثانوي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": float(effective_hours)},
+    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Engine Oil & Filter (زيت وفلتر المحرك)", "العمر الافتراضي - ساعات (Lifespan)": float(oil_change_interval), "الساعات المنقضية (Hours Used)": float(service_used_hours)},
+    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Primary Fuel Filter (فلتر وقود أولي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": float(service_used_hours)},
+    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Secondary Fuel Filter (فلتر وقود ثانوي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": float(service_used_hours)},
     {"تصنيف القطعة (Category)": "Air System", "اسم قطعة الغيار (Spare Part)": "Air Filter (فلتر هواء)", "العمر الافتراضي - ساعات (Lifespan)": 1000.0, "الساعات المنقضية (Hours Used)": float(effective_hours)},
     {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "Fan Belt (قشاط المروحة)", "العمر الافتراضي - ساعات (Lifespan)": 2000.0, "الساعات المنقضية (Hours Used)": float(effective_hours)},
     {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "ELC Coolant (سائل تبريد)", "العمر الافتراضي - ساعات (Lifespan)": 3000.0, "الساعات المنقضية (Hours Used)": float(effective_hours)},
@@ -225,47 +224,48 @@ for index, row in edited_table.iterrows():
     lifespan = pd.to_numeric(row.get("العمر الافتراضي - ساعات (Lifespan)", 250), errors='coerce') or 250.0
     used_hours = pd.to_numeric(row.get("الساعات المنقضية (Hours Used)", effective_hours), errors='coerce') or 0.0
     
-    usage_pct = (used_hours / lifespan) * 100 if lifespan > 0 else 0
+    # الخصم التلقائي لحساب المدة المتبقية ونسبة الاستهلاك
     rem_hrs = lifespan - used_hours
+    usage_pct = (used_hours / lifespan) * 100 if lifespan > 0 else 0
     
-    if usage_pct >= 100:
-        status = "EXPIRED (انقضاء الساعات)"
-        expired_parts.append(f"{part_name} - تجاوز العمر الافتراضي ({used_hours}/{lifespan} ساعة)")
+    if rem_hrs <= 0:
+        status = "EXPIRED (انقضاء الفترة)"
+        expired_parts.append(f"{part_name} - انتهت مدته الخدمية وتجاوز بـ ({abs(rem_hrs):.0f} ساعة)")
     elif usage_pct >= 90:
-        status = "WARNING (وصلت 90%)"
-        warning_parts.append(f"{part_name} - وصلت {usage_pct:.0f}% (متبقي {rem_hrs:.0f} ساعة)")
+        status = "WARNING (متبقي أقل من 10%)"
+        warning_parts.append(f"{part_name} - استهلك {usage_pct:.0f}% (متبقي {rem_hrs:.0f} ساعة فقط)")
     elif usage_pct >= 75:
-        status = "ATTENTION (قرب الخدمة)"
+        status = "ATTENTION (قرب التغيير)"
     else:
         status = "GOOD (جيدة)"
     
     processed_rows.append({
-        "Category": category,
-        "Spare Part": part_name,
-        "Lifespan": lifespan,
-        "Used Hours": used_hours,
-        "Usage Pct": f"{usage_pct:.0f}%",
-        "Remaining Hours": max(0.0, rem_hrs),
-        "Status": status
+        "تصنيف القطعة": category,
+        "قطع الغيار / الفلاتر": part_name,
+        "العمر الافتراضي (ساعة)": lifespan,
+        "المدة المنقضية (ساعة)": used_hours,
+        "نسبة الاستهلاك": f"{usage_pct:.0f}%",
+        "المدة المتبقية (ساعة)": max(0.0, rem_hrs),
+        "الحالة الفنية": status
     })
 
 df_result = pd.DataFrame(processed_rows)
 
-st.caption("🔍 **لوحة التحليل الفني لقطع الغيار:**")
+st.caption("🔍 **لوحة التحليل الفني التلقائي لقطع الغيار والفلاتر:**")
 
 if expired_parts:
     for item in expired_parts:
-        st.error(f"🚨 **تحذير انقضاء الساعات الافتراضية:** {item} - يجب التغيير الفوري!")
+        st.error(f"🚨 **تحذير انقضاء الساعات:** {item} - يتطلب الاستبدال التلقائي!")
 
 if warning_parts:
     for item in warning_parts:
-        st.warning(f"⚠️ **تنبيه وصول 90% من الساعات:** {item} - يرجى التحضير للاستبدال.")
+        st.warning(f"⚠️ **تنبيه اقتراب موعد الخدمة:** {item}")
 
 if not expired_parts and not warning_parts:
-    st.success("🟢 جميع قطع الغيار تعمل ضمن الحدود والساعات الافتراضية المسموحة.")
+    st.success("🟢 جميع الفلاتر وقطع الغيار تعمل ضمن المدة المتبقية والحدود الآمنة.")
 
 # ---------------------------------------------------------
-# 7. دالة تنظيف النصوص لاستخراج الأحرف اللاتينية فقط لـ PDF
+# 7. دالة تنظيف النصوص لـ PDF
 # ---------------------------------------------------------
 def sanitize_latin_only(text):
     if not isinstance(text, str):
@@ -274,7 +274,7 @@ def sanitize_latin_only(text):
     return clean_text if clean_text else "N/A"
 
 # ---------------------------------------------------------
-# 8. محرك طباعة تقرير PDF الشامل المضمون
+# 8. محرك طباعة تقرير PDF الشامل
 # ---------------------------------------------------------
 st.divider()
 st.subheader("📄 استخراج وطباعة التقرير الفني الشامل (Full PDF Report)")
@@ -332,8 +332,8 @@ def generate_safe_pdf():
     pdf.set_font("Helvetica", '', 9)
     
     readings = [
-        f"Current Run Hours: {run_hours} hrs",
-        f"Target Future Run Hours: {future_run_hours} hrs",
+        f"Current Total Run Hours: {run_hours} hrs",
+        f"Target Future Hours: {future_run_hours} hrs",
         f"Generator Capacity: {gen_kw} kW",
         f"Current Active Load: {load_kw} kW ({load_percentage:.1f}%)",
         f"Ambient Temp: {ambient_temp} C",
@@ -365,19 +365,18 @@ def generate_safe_pdf():
 
     # 4. جدول تغيير وساعات الزيت
     pdf.set_font("Helvetica", 'B', 11)
-    pdf.cell(0, 6, "3. Engine Oil Service Status", ln=True)
+    pdf.cell(0, 6, "3. Engine Oil & Filter Service Status", ln=True)
     pdf.set_font("Helvetica", '', 9)
     pdf.cell(0, 5, f"- Default Oil Interval: {oil_change_interval} hrs", ln=True)
-    pdf.cell(0, 5, f"- Target Operating Hours: {effective_hours} hrs", ln=True)
     pdf.cell(0, 5, f"- Hours Used on Current Oil: {hours_since_oil_change} hrs ({oil_usage_pct:.0f}%)", ln=True)
-    pdf.cell(0, 5, f"- Remaining Hours to Next Oil Change: {hours_until_next_oil_change} hrs", ln=True)
+    pdf.cell(0, 5, f"- Remaining Hours to Next Oil Change: {max(0.0, hours_until_next_oil_change)} hrs", ln=True)
     pdf.cell(0, 5, f"- Recommended Oil Grade: {sanitize_latin_only(recommended_oil)}", ln=True)
     
     pdf.ln(4)
 
     # 5. جدول قطع الغيار
     pdf.set_font("Helvetica", 'B', 11)
-    pdf.cell(0, 6, "4. Predictive Maintenance & Spare Parts Schedule", ln=True)
+    pdf.cell(0, 6, "4. Predictive Maintenance & Parts Remaining Schedule", ln=True)
     
     pdf.set_font("Helvetica", 'B', 8)
     pdf.cell(45, 6, "Part Name", border=1)
@@ -390,14 +389,14 @@ def generate_safe_pdf():
 
     pdf.set_font("Helvetica", '', 8)
     for idx, row in df_result.iterrows():
-        part_clean = sanitize_latin_only(str(row["Spare Part"]))
-        status_clean = sanitize_latin_only(str(row["Status"]))
+        part_clean = sanitize_latin_only(str(row["قطع الغيار / الفلاتر"]))
+        status_clean = sanitize_latin_only(str(row["الحالة الفنية"]))
         
         pdf.cell(45, 5, part_clean[:22], border=1)
-        pdf.cell(25, 5, str(row["Lifespan"]), border=1)
-        pdf.cell(25, 5, str(row["Used Hours"]), border=1)
-        pdf.cell(25, 5, str(row["Usage Pct"]), border=1)
-        pdf.cell(25, 5, str(row["Remaining Hours"]), border=1)
+        pdf.cell(25, 5, str(row["العمر الافتراضي (ساعة)"]), border=1)
+        pdf.cell(25, 5, str(row["المدة المنقضية (ساعة)"]), border=1)
+        pdf.cell(25, 5, str(row["نسبة الاستهلاك"]), border=1)
+        pdf.cell(25, 5, str(row["المدة المتبقية (ساعة)"]), border=1)
         pdf.cell(35, 5, status_clean, border=1)
         pdf.ln()
 
