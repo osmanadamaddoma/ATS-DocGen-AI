@@ -109,7 +109,7 @@ with st.sidebar.form("generator_comprehensive_form"):
 
     st.subheader("بيانات خدمة زيت المحرك")
     last_oil_change_hours = st.number_input("قراءة الساعات عند آخر تغيير زيت", min_value=0.0, value=1000.0, step=10.0)
-    oil_change_interval = st.number_input("الفترة القياسية لتغيير الزيت (ساعة)", min_value=100.0, value=250.0, step=50.0)
+    oil_change_interval = st.number_input("الفترة القياسية الافتراضية للزيت (ساعة)", min_value=100.0, value=250.0, step=50.0)
 
     submit_btn = st.form_submit_button("تحديث وتحليل البيانات")
 
@@ -158,43 +158,53 @@ else:
     st.success("🟢 جميع قراءات الجهد، التردد، الحرارة، والتيار ضمن المعايير الآمنة المحددة.")
 
 # ---------------------------------------------------------
-# 5. جدولة خدمة تغيير الزيت واللزوجة
+# 5. جدولة خدمة تغيير الزيت والتحذيرات الذكية
 # ---------------------------------------------------------
 st.divider()
 st.subheader("🛢️ جدول الخدمة وتغيير زيت المحرك (Oil Service Schedule)")
 
 hours_since_oil_change = run_hours - last_oil_change_hours
 hours_until_next_oil_change = oil_change_interval - hours_since_oil_change
+oil_usage_pct = (hours_since_oil_change / oil_change_interval) * 100 if oil_change_interval > 0 else 0
 
 recommended_oil = "15W40 (Standard)"
 if ambient_temp >= 45.0: recommended_oil = "20W50 (Extreme Hot Climate)"
 elif ambient_temp >= 43.0: recommended_oil = "15W40 (Hot Climate)"
 
-col_oil1, col_oil2, col_oil3 = st.columns(3)
+col_oil1, col_oil2, col_oil3, col_oil4 = st.columns(4)
 col_oil1.metric("ساعات الزيت الحالية", f"{hours_since_oil_change} hrs")
-col_oil2.metric("المتبقي للخدمة القادمة", f"{hours_until_next_oil_change} hrs")
-col_oil3.metric("اللزوجة الموصى بها", recommended_oil)
+col_oil2.metric("الفترة الافتراضية", f"{oil_change_interval} hrs")
+col_oil3.metric("المتبقي للخدمة", f"{hours_until_next_oil_change} hrs", f"استهلاك {oil_usage_pct:.0f}%")
+col_oil4.metric("اللزوجة الموصى بها", recommended_oil)
+
+# المنطق التنبيهي الخاص بالزيت
+if oil_usage_pct >= 100:
+    st.error(f"🚨 **تحذير حرج (انقضاء الساعات الافتراضية):** تجاوز الزيت الفترة الافتراضية المسموحة ({oil_change_interval} ساعة)! يرجى تغيير زيت المحرك فوراً لتجنب تلف المحرك.")
+elif oil_usage_pct >= 90:
+    st.warning(f"⚠️ **تنبيه (وصلت 90% من الساعات):** تم استهلاك {oil_usage_pct:.1f}% من العمر الافتراضي للزيت (متبقي {hours_until_next_oil_change} ساعة فقط). يرجى التجهيز للاستبدال.")
+else:
+    st.info("🟢 حالة زيت المحرك جيدة وضمن الساعات الافتراضية المسموحة.")
 
 # ---------------------------------------------------------
-# 6. جدول الصيانة التنبؤية
+# 6. جدول الصيانة التنبؤية لقطع الغيار والتنبيهات المزدوجة
 # ---------------------------------------------------------
 st.divider()
 st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة التنبؤية")
 
 full_lifespan_data = [
-    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Oil Filter (فلتر زيت)", "العمر الافتراضي - ساعات (Lifespan)": 250.0, "الساعات المنقضية (Hours Used)": 210.0},
-    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Primary Fuel Filter (فلتر وقود أولي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": 430.0},
+    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Oil Filter (فلتر زيت)", "العمر الافتراضي - ساعات (Lifespan)": 250.0, "الساعات المنقضية (Hours Used)": 230.0},
+    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Primary Fuel Filter (فلتر وقود أولي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": 505.0},
     {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Secondary Fuel Filter (فلتر وقود ثانوي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": 455.0},
-    {"تصنيف القطعة (Category)": "Air System", "اسم قطعة الغيار (Spare Part)": "Air Filter (فلتر هواء)", "العمر الافتراضي - ساعات (Lifespan)": 1000.0, "الساعات المنقضية (Hours Used)": 860.0},
+    {"تصنيف القطعة (Category)": "Air System", "اسم قطعة الغيار (Spare Part)": "Air Filter (فلتر هواء)", "العمر الافتراضي - ساعات (Lifespan)": 1000.0, "الساعات المنقضية (Hours Used)": 910.0},
     {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "Fan Belt (قشاط المروحة)", "العمر الافتراضي - ساعات (Lifespan)": 2000.0, "الساعات المنقضية (Hours Used)": 1550.0},
     {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "ELC Coolant (سائل تبريد)", "العمر الافتراضي - ساعات (Lifespan)": 3000.0, "الساعات المنقضية (Hours Used)": 2200.0},
     {"تصنيف القطعة (Category)": "Fuel System", "اسم قطعة الغيار (Spare Part)": "Fuel Injectors (بخاخات الوقود)", "العمر الافتراضي - ساعات (Lifespan)": 5000.0, "الساعات المنقضية (Hours Used)": 4400.0},
     {"تصنيف القطعة (Category)": "Electrical System", "اسم قطعة الغيار (Spare Part)": "Batteries (البطاريات)", "العمر الافتراضي - ساعات (Lifespan)": 8000.0, "الساعات المنقضية (Hours Used)": 6100.0},
     {"تصنيف القطعة (Category)": "Electrical System", "اسم قطعة الغيار (Spare Part)": "Charging Alternator (دينامو الشحن)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": 8900.0},
-    {"تصنيف القطعة (Category)": "Engine Mechanical", "اسم قطعة الغيار (Spare Part)": "Top Overhaul (طقم عمرة رأس)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": 9100.0},
+    {"تصنيف القطعة (Category)": "Engine Mechanical", "اسم قطعة الغيار (Spare Part)": "Top Overhaul (طقم عمرة رأس)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": 10100.0},
     {"تصنيف القطعة (Category)": "Engine Mechanical", "اسم قطعة الغيار (Spare Part)": "Major Overhaul (عمرة كاملة)", "العمر الافتراضي - ساعات (Lifespan)": 20000.0, "الساعات المنقضية (Hours Used)": 15000.0},
     {"تصنيف القطعة (Category)": "Lubrication System", "اسم قطعة الغيار (Spare Part)": "Oil Cooler (مبرد الزيت)", "العمر الافتراضي - ساعات (Lifespan)": 5000.0, "الساعات المنقضية (Hours Used)": 3800.0},
-    {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "Water Pump (مضخة الماء)", "العمر الافتراضي - ساعات (Lifespan)": 6000.0, "الساعات المنقضية (Hours Used)": 5200.0},
+    {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "Water Pump (مضخة الماء)", "العمر الافتراضي - ساعات (Lifespan)": 6000.0, "الساعات المنقضية (Hours Used)": 5450.0},
     {"تصنيف القطعة (Category)": "Air System", "اسم قطعة الغيار (Spare Part)": "Turbocharger (التيربو)", "العمر الافتراضي - ساعات (Lifespan)": 8000.0, "الساعات المنقضية (Hours Used)": 7100.0}
 ]
 
@@ -205,6 +215,9 @@ edited_table = st.data_editor(st.session_state.maintenance_df, num_rows="dynamic
 st.session_state.maintenance_df = edited_table
 
 processed_rows = []
+warning_parts = []
+expired_parts = []
+
 for index, row in edited_table.iterrows():
     category = str(row.get("تصنيف القطعة (Category)", "Other"))
     part_name = str(row.get("اسم قطعة الغيار (Spare Part)", "Part"))
@@ -214,14 +227,17 @@ for index, row in edited_table.iterrows():
     usage_pct = (used_hours / lifespan) * 100 if lifespan > 0 else 0
     rem_hrs = lifespan - used_hours
     
-    if usage_pct >= 90:
-        status = "CRITICAL (Replace)"
-    elif usage_pct >= 85:
-        status = "WARNING (Ready)"
+    # تحديد الحالة بدقة بناءً على طلبك
+    if usage_pct >= 100:
+        status = "EXPIRED (انقضاء الساعات)"
+        expired_parts.append(f"{part_name} - تجاوز العمر الافتراضي ({used_hours}/{lifespan} hrs)")
+    elif usage_pct >= 90:
+        status = "WARNING (وصلت 90%)"
+        warning_parts.append(f"{part_name} - وصلت {usage_pct:.0f}% (متبقي {rem_hrs:.0f} ساعة)")
     elif usage_pct >= 75:
-        status = "ATTENTION (Soon)"
+        status = "ATTENTION (قرب الخدمة)"
     else:
-        status = "GOOD"
+        status = "GOOD (جيدة)"
     
     processed_rows.append({
         "Category": category,
@@ -235,14 +251,26 @@ for index, row in edited_table.iterrows():
 
 df_result = pd.DataFrame(processed_rows)
 
+# عرض شريط التنبيهات والتحذيرات للقطع بشكل بارز
+st.caption("🔍 **لوحة التحليل الفني لقطع الغيار:**")
+
+if expired_parts:
+    for item in expired_parts:
+        st.error(f"🚨 **تحذير انقضاء الساعات الافتراضية:** {item} - يجب التغيير الفوري!")
+
+if warning_parts:
+    for item in warning_parts:
+        st.warning(f"⚠️ **تنبيه وصول 90% من الساعات:** {item} - يرجى التحضير للاستبدال.")
+
+if not expired_parts and not warning_parts:
+    st.success("🟢 جميع قطع الغيار تعمل ضمن الحدود والساعات الافتراضية المسموحة.")
+
 # ---------------------------------------------------------
-# 7. دالة تنظيف النصوص لاستخراج الأحرف الإنجليزية والرمزية فقط لـ PDF
+# 7. دالة تنظيف النصوص لاستخراج الأحرف اللاتينية فقط لـ PDF
 # ---------------------------------------------------------
 def sanitize_latin_only(text):
-    """تضمن إزالة أي حرف غير لاتيني لمنع خطأ FPDF Font Error"""
     if not isinstance(text, str):
         text = str(text)
-    # الاحتفاظ بالأحرف الإنجليزية والأرقام والرموز القياسية فقط
     clean_text = re.sub(r'[^\x00-\x7F]+', '', text).strip()
     return clean_text if clean_text else "N/A"
 
@@ -339,8 +367,8 @@ def generate_safe_pdf():
     pdf.set_font("Helvetica", 'B', 11)
     pdf.cell(0, 6, "3. Engine Oil Service Status", ln=True)
     pdf.set_font("Helvetica", '', 9)
-    pdf.cell(0, 5, f"- Last Oil Change Run Hours: {last_oil_change_hours} hrs", ln=True)
-    pdf.cell(0, 5, f"- Hours Used on Current Oil: {hours_since_oil_change} hrs", ln=True)
+    pdf.cell(0, 5, f"- Default Oil Interval: {oil_change_interval} hrs", ln=True)
+    pdf.cell(0, 5, f"- Hours Used on Current Oil: {hours_since_oil_change} hrs ({oil_usage_pct:.0f}%)", ln=True)
     pdf.cell(0, 5, f"- Remaining Hours to Next Oil Change: {hours_until_next_oil_change} hrs", ln=True)
     pdf.cell(0, 5, f"- Recommended Oil Grade: {sanitize_latin_only(recommended_oil)}", ln=True)
     
