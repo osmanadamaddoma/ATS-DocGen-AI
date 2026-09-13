@@ -106,20 +106,20 @@ with st.sidebar.form("generator_comprehensive_form"):
     st.subheader("معلومات المولد العامة")
     gen_model = st.text_input(
         "طراز / اسم المولد (Generator Model/ID)",
-        value="Perkins 250 kVA - DSE 8610",
+        value="Perkins 410 kVA - DSE 7320",
     )
     run_hours = st.number_input(
         "ساعات التشغيل الحالية الكلية (Current Total Hours)",
         min_value=0.0,
         max_value=100000.0,
-        value=1250.0,
+        value=700.0,
         step=10.0,
     )
     future_run_hours = st.number_input(
         "ساعات تشغيل العمل القادمة الافتراضية (Target Future Hours)",
         min_value=0.0,
         max_value=100000.0,
-        value=1500.0,
+        value=940.0,
         step=10.0,
         help="الساعات المستهدفة للتشغيل القادم لتقييم استهلاك الزيت وقطع الغيار.",
     )
@@ -128,14 +128,14 @@ with st.sidebar.form("generator_comprehensive_form"):
         "سعة المولد الكلية (Generator kW)",
         min_value=5.0,
         max_value=3000.0,
-        value=250.0,
+        value=410.0,
         step=10.0,
     )
     load_kw = st.number_input(
         "حجم الحمولة الحالية (Load kW)",
         min_value=0.0,
         max_value=3000.0,
-        value=150.0,
+        value=50.0,
         step=10.0,
     )
     ambient_temp = st.number_input(
@@ -151,7 +151,7 @@ with st.sidebar.form("generator_comprehensive_form"):
         "حرارة سائل التبريد (°C)", min_value=0.0, max_value=150.0, value=85.0
     )
     oil_press = st.number_input(
-        "ضغط الزيت (Bar)", min_value=0.0, max_value=10.0, value=4.2
+        "ضغط الزيت (Bar)", min_value=0.0, max_value=10.0, value=2.5
     )
     vibration = st.number_input(
         "مستوى الاهتزاز (mm/s)", min_value=0.0, max_value=50.0, value=2.2
@@ -165,7 +165,7 @@ with st.sidebar.form("generator_comprehensive_form"):
         "التردد Frequency (Hz)", min_value=0.0, max_value=70.0, value=50.0
     )
     amperes = st.number_input(
-        "التيار Amperes (A)", min_value=0.0, max_value=4000.0, value=350.0
+        "التيار Amperes (A)", min_value=0.0, max_value=4000.0, value=118.0
     )
     pf = st.number_input(
         "معامل القدرة (PF)", min_value=0.0, max_value=1.0, value=0.85
@@ -175,7 +175,7 @@ with st.sidebar.form("generator_comprehensive_form"):
     last_oil_change_hours = st.number_input(
         "قراءة عداد الساعات عند آخر تغيير زيت وفلاتر الدوري",
         min_value=0.0,
-        value=1000.0,
+        value=460.0,
         step=10.0,
     )
     oil_change_interval = st.number_input(
@@ -255,8 +255,8 @@ if range_alarms:
         st.error(f"🔴 {alarm}")
 else:
     st.success(
-        "🟢 جميع قراءات الجهد، التردد، الحرارة، والتيار ضمن المعايير الآمنة"
-        " المحدد."
+        "🟢 جميع قراءات الجهد، التردد، الحرارة، التيار ضمن المعايير الآمنة"
+        " المحددة."
     )
 
 # ---------------------------------------------------------
@@ -265,14 +265,9 @@ else:
 st.divider()
 st.subheader("🛢️ جدول الخدمة وتغيير زيت المحرك (Oil Service Schedule)")
 
-# حساب المدة المنقضية والمتبقية لغيار الزيت خصماً من قراءة آخر تغيير
 effective_hours = future_run_hours if future_run_hours > 0 else run_hours
-hours_since_oil_change = max(
-    0.0, effective_hours - last_oil_change_hours
-)  # المدة المنقضية للزيت
-hours_until_next_oil_change = (
-    oil_change_interval - hours_since_oil_change
-)  # المدة المتبقية
+hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
+hours_until_next_oil_change = oil_change_interval - hours_since_oil_change
 oil_usage_pct = (
     (hours_since_oil_change / oil_change_interval) * 100
     if oil_change_interval > 0
@@ -319,7 +314,6 @@ st.subheader(
     "🔧 جدول تتبع العمر الافتراضي والمدد المتبقية لقطع الغيار والفلاتر"
 )
 
-# تخصيص المدة المنقضية: الفلاتر الدورية تحتسب من آخر غيار زيت، والباقي تحتسب من إجمالي ساعات المولد
 service_used_hours = hours_since_oil_change
 
 base_parts_data = [
@@ -424,7 +418,6 @@ for index, row in edited_table.iterrows():
         or 0.0
     )
 
-    # الخصم التلقائي لحساب المدة المتبقية ونسبة الاستهلاك
     rem_hrs = lifespan - used_hours
     usage_pct = (used_hours / lifespan) * 100 if lifespan > 0 else 0
 
@@ -475,7 +468,7 @@ if not expired_parts and not warning_parts:
     )
 
 # ---------------------------------------------------------
-# 📊 [الجديد] إضافة الرسوم البيانية لتوضيح الأداء والعمر الافتراضي
+# التحليل البياني لساعات التشغيل والمدد الافتراضية
 # ---------------------------------------------------------
 st.divider()
 st.subheader("📊 التحليل البياني لساعات التشغيل والمدد الافتراضية")
@@ -483,7 +476,6 @@ st.subheader("📊 التحليل البياني لساعات التشغيل و�
 chart_col1, chart_col2 = st.columns(2)
 
 with chart_col1:
-    # 1. رسم بياني شريطي لمقارنة العمر الافتراضي بالساعات المنقضية والمتبقية
     df_chart = df_result.copy()
     fig_bar = px.bar(
         df_chart,
@@ -498,7 +490,6 @@ with chart_col1:
     st.plotly_chart(fig_bar, use_container_width=True)
 
 with chart_col2:
-    # 2. رسم بياني دائرى لتوزيع حالة قطع الغيار والصيانة
     fig_pie = px.pie(
         df_chart,
         names="الحالة الفنية",
@@ -526,7 +517,7 @@ def sanitize_latin_only(text):
 
 
 # ---------------------------------------------------------
-# 8. محرك طباعة تقرير PDF الشامل
+# 8. محرك طباعة تقرير PDF الشامل (تم إصلاح التعامل مع الـ bytes)
 # ---------------------------------------------------------
 st.divider()
 st.subheader("📄 استخراج وطباعة التقرير الفني الشامل (Full PDF Report)")
@@ -702,7 +693,16 @@ def generate_safe_pdf():
         pdf.cell(35, 5, status_clean, border=1)
         pdf.ln()
 
-    return pdf.output()
+    # إرجاع مخرجات PDF بشكل آمن وثنائي (bytes) لتفادي أخطاء التشفير
+    pdf_output = pdf.output()
+    if isinstance(pdf_output, str):
+        return pdf_output.encode("latin-1")
+    elif isinstance(pdf_output, bytearray):
+        return bytes(pdf_output)
+    elif isinstance(pdf_output, bytes):
+        return pdf_output
+    else:
+        return bytes(pdf_output)
 
 
 try:
@@ -711,7 +711,7 @@ try:
         label=(
             "🖨️ طباعة وتنزيل التقرير الفني الشامل بصيغة PDF (Download Report)"
         ),
-        data=bytes(pdf_bytes),
+        data=pdf_bytes,
         file_name=(
             f"Generator_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
         ),
