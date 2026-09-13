@@ -9,3 +9,8 @@ streamlit
 pandas
 openpyxl
 fpdf2
+streamlit
+pandas
+plotly
+fpdf
+PIL
