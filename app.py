@@ -2,7 +2,9 @@ from datetime import datetime, timedelta
 import io
 import os
 import re
+
 from fpdf import FPDF
+import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 import plotly.express as px
@@ -517,7 +519,7 @@ def sanitize_latin_only(text):
 
 
 # ---------------------------------------------------------
-# 8. محرك طباعة تقرير PDF الشامل المضمون
+# 8. محرك طباعة تقرير PDF الشامل + إضافة الصور والرسوم البيانية
 # ---------------------------------------------------------
 st.divider()
 st.subheader("📄 استخراج وطباعة التقرير الفني الشامل (Full PDF Report)")
@@ -561,6 +563,8 @@ def generate_safe_pdf_bytes():
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
+    temp_files = []
+
     safe_client = sanitize_latin_only(client_name)
     if safe_client == "N/A":
         safe_client = "Addoma Trading Services Client"
@@ -589,10 +593,9 @@ def generate_safe_pdf_bytes():
                 img = img.convert("RGB")
             temp_img_path = f"temp_gen_{datetime.now().timestamp()}.jpg"
             img.save(temp_img_path, "JPEG", quality=85)
+            temp_files.append(temp_img_path)
 
             pdf.image(temp_img_path, x=140, y=28, w=55)
-            if os.path.exists(temp_img_path):
-                os.remove(temp_img_path)
             pdf.ln(2)
         except Exception:
             pass
@@ -694,8 +697,82 @@ def generate_safe_pdf_bytes():
         pdf.cell(35, 5, status_clean, border=1)
         pdf.ln()
 
-    # استخراج مخرجات PDF بأمان تحسباً لاختلاف أنواع الإرجاع (String / Bytes)
+    # ---------------------------------------------------------
+    # 6. إضافة صور الرسم البياني للأداء إلى ملف الـ PDF
+    # ---------------------------------------------------------
+    try:
+        pdf.add_page()  # صفحة جديدة مخصصة للرسوم البيانية
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "5. Performance & Operational Charts", ln=True)
+        pdf.ln(2)
+
+        # إنشاء الرسم البياني الأول (العمودي) باستخدام Matplotlib
+        fig, ax = plt.subplots(figsize=(7, 3.5))
+        parts_short = [
+            sanitize_latin_only(str(x))[:12]
+            for x in df_result["قطع الغيار / الفلاتر"]
+        ]
+        used_h = df_result["المدة المنقضية (ساعة)"].values
+        rem_h = df_result["المدة المتبقية (ساعة)"].values
+
+        ax.bar(parts_short, used_h, label="Used Hours", color="#d9534f")
+        ax.bar(
+            parts_short, rem_h, bottom=used_h, label="Remaining Hours", color="#28a745"
+        )
+        ax.set_title("Spare Parts Used vs Remaining Lifespan (Hours)", fontsize=10)
+        ax.set_ylabel("Hours", fontsize=8)
+        plt.xticks(rotation=45, ha="right", fontsize=7)
+        plt.tight_layout()
+
+        chart1_path = f"temp_chart1_{datetime.now().timestamp()}.png"
+        plt.savefig(chart1_path, dpi=200)
+        plt.close(fig)
+        temp_files.append(chart1_path)
+
+        # إضافة الرسم البياني الأول لـ PDF
+        pdf.image(chart1_path, x=15, y=35, w=180)
+
+        # إنشاء الرسم البياني الثاني (الدائري)
+        fig2, ax2 = plt.subplots(figsize=(6, 3))
+        status_counts = df_result["الحالة الفنية"].value_counts()
+        labels_clean = [sanitize_latin_only(str(x)) for x in status_counts.index]
+        ax2.pie(
+            status_counts.values,
+            labels=labels_clean,
+            autopct="%1.1f%%",
+            startangle=140,
+            colors=["#28a745", "#ffc107", "#fd7e14", "#dc3545"],
+        )
+        ax2.set_title("Overall Parts Health & Readiness Distribution", fontsize=10)
+        plt.tight_layout()
+
+        chart2_path = f"temp_chart2_{datetime.now().timestamp()}.png"
+        plt.savefig(chart2_path, dpi=200)
+        plt.close(fig2)
+        temp_files.append(chart2_path)
+
+        # إضافة الرسم البياني الثاني لـ PDF
+        pdf.image(chart2_path, x=25, y=140, w=160)
+
+    except Exception as chart_err:
+        pdf.cell(
+            0,
+            5,
+            f"Note: Performance charts could not be rendered ({chart_err})",
+            ln=True,
+        )
+
+    # استخراج مخرجات PDF بأمان
     pdf_output = pdf.output(dest="S")
+
+    # تنظيف الملفات المؤقتة
+    for file_path in temp_files:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception:
+                pass
+
     if isinstance(pdf_output, str):
         return pdf_output.encode("latin-1", errors="replace")
     elif isinstance(pdf_output, (bytes, bytearray)):
@@ -709,10 +786,10 @@ try:
     pdf_bytes_data = generate_safe_pdf_bytes()
     st.download_button(
         label=(
-            "🖨️ طباعة وتنزيل التقرير الفني الشامل بصيغة PDF (Download Report)"
+            "🖨️ طباعة وتنزيل التقرير الفني الشامل مع الرسوم البيانية بصيغة PDF"
         ),
         data=pdf_bytes_data,
-        file_name=f"Generator_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+        file_name=f"Generator_Full_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
         mime="application/pdf",
         use_container_width=True,
     )
