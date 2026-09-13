@@ -3,6 +3,7 @@ import io
 import os
 import re
 from fpdf import FPDF
+import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 import plotly.express as px
@@ -517,7 +518,7 @@ def sanitize_latin_only(text):
 
 
 # ---------------------------------------------------------
-# 8. محرك طباعة تقرير PDF الشامل (معدّل للتحميل على الهواتف)
+# 8. محرك طباعة تقرير PDF الشامل (مع تضمين صور الرسوم البيانية)
 # ---------------------------------------------------------
 st.divider()
 st.subheader("📄 استخراج وطباعة التقرير الفني الشامل (Full PDF Report)")
@@ -581,7 +582,7 @@ def generate_safe_pdf_bytes():
     )
     pdf.ln(2)
 
-    # إضافة صورة المولد بحذر
+    # إضافة صورة المولد الشخصية بحذر
     if uploaded_image is not None:
         try:
             img = Image.open(uploaded_image)
@@ -694,7 +695,96 @@ def generate_safe_pdf_bytes():
         pdf.cell(35, 5, status_clean, border=1)
         pdf.ln()
 
-    # تحويل المخرجات بشكل صريح إلى BytesIO متوافق مع متصفحات الهواتف
+    pdf.ln(5)
+
+    # ---------------------------------------------------------
+    # توليد وإدراج الرسوم البيانية في صفحة PDF جديدة
+    # ---------------------------------------------------------
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "5. Technical Visual Analytics & Charts", ln=True)
+    pdf.ln(2)
+
+    # أ. إنشاء الرسم البياني العمودي (Bar Chart) باستخدام Matplotlib وحفظه مؤقتاً
+    try:
+        plt.figure(figsize=(7, 3.8), dpi=150)
+        p_names = [
+            str(row["قطع الغيار / الفلاتر"])[:16]
+            for _, row in df_result.iterrows()
+        ]
+        u_hrs = [
+            float(row["المدة المنقضية (ساعة)"]) for _, row in df_result.iterrows()
+        ]
+        r_hrs = [
+            float(row["المدة المتبقية (ساعة)"]) for _, row in df_result.iterrows()
+        ]
+
+        x_indices = range(len(p_names))
+        plt.bar(
+            x_indices, u_hrs, label="Used Hours", color="#d9534f", width=0.6
+        )
+        plt.bar(
+            x_indices,
+            r_hrs,
+            bottom=u_hrs,
+            label="Remaining Hours",
+            color="#28a745",
+            width=0.6,
+        )
+        plt.xticks(
+            x_indices, p_names, rotation=35, ha="right", fontsize=7
+        )
+        plt.ylabel("Hours", fontsize=8)
+        plt.title("Parts Used vs Remaining Hours", fontsize=9)
+        plt.legend(fontsize=7, loc="upper right")
+        plt.tight_layout()
+
+        bar_path = f"temp_bar_{datetime.now().timestamp()}.png"
+        plt.savefig(bar_path)
+        plt.close()
+
+        pdf.image(bar_path, x=15, w=180)
+        if os.path.exists(bar_path):
+            os.remove(bar_path)
+        pdf.ln(5)
+    except Exception:
+        pass
+
+    # ب. إنشاء الرسم البياني الدائري (Pie Chart) باستخدام Matplotlib وحفظه مؤقتاً
+    try:
+        plt.figure(figsize=(5, 3.2), dpi=150)
+        status_counts = df_result["الحالة الفنية"].value_counts()
+        status_colors = {
+            "GOOD (جيدة)": "#28a745",
+            "ATTENTION (قرب التغيير)": "#ffc107",
+            "WARNING (متبقي أقل من 10%)": "#fd7e14",
+            "EXPIRED (انقضاء الفترة)": "#dc3545",
+        }
+        pie_colors_list = [
+            status_colors.get(k, "#cccccc") for k in status_counts.index
+        ]
+
+        plt.pie(
+            status_counts,
+            labels=status_counts.index,
+            autopct="%1.0f%%",
+            colors=pie_colors_list,
+            textprops={"fontsize": 7},
+        )
+        plt.title("Parts Technical Status Distribution", fontsize=9)
+        plt.tight_layout()
+
+        pie_path = f"temp_pie_{datetime.now().timestamp()}.png"
+        plt.savefig(pie_path)
+        plt.close()
+
+        pdf.image(pie_path, x=45, w=120)
+        if os.path.exists(pie_path):
+            os.remove(pie_path)
+    except Exception:
+        pass
+
+    # تحويل المخرجات بشكل صريح إلى BytesIO متوافق مع الهواتف والمتصفحات
     buffer = io.BytesIO()
     pdf_string_or_bytes = pdf.output()
     if isinstance(pdf_string_or_bytes, str):
