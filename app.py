@@ -4,6 +4,8 @@ import os
 import re
 
 from fpdf import FPDF
+import firebase_admin
+from firebase_admin import credentials, firestore
 import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
@@ -11,14 +13,79 @@ import plotly.express as px
 import streamlit as st
 
 st.set_page_config(
-    page_title="Industrial Generator Maintenance & Comprehensive Reporting System",
+    page_title="Industrial Generator Maintenance & Firebase System",
     layout="wide",
 )
 
 st.title("⚙️ نظام الصيانة التنبؤية والتقارير الشاملة للمولدات الصناعية")
 
 # ---------------------------------------------------------
-# 1. قاعدة بيانات العملاء وأكواد التفعيل
+# 1. تهيئة الاتصال بـ Firebase Firestore
+# ---------------------------------------------------------
+@st.cache_resource
+def init_firebase():
+    if not firebase_admin._apps:
+        if "firebase" in st.secrets:
+            firebase_dict = dict(st.secrets["firebase"])
+            firebase_dict["private_key"] = firebase_dict[
+                "private_key"
+            ].replace("\\n", "\n")
+            cred = credentials.Certificate(firebase_dict)
+        else:
+            cred = credentials.Certificate("firebase_key.json")
+        firebase_admin.initialize_app(cred)
+    return firestore.client()
+
+
+try:
+    db = init_firebase()
+    st.sidebar.success("🔥 متصل بـ Firebase Firestore بنجاح!")
+except Exception as e:
+    st.sidebar.error(
+        f"⚠️ وضع العمل المحلي (فشل الاتصال بـ Firebase): {e}"
+    )
+    db = None
+
+
+def save_log_to_firestore(client_id, gen_id, readings_data, parts_status):
+    if db is None:
+        st.warning("⚠️ قاعدة البيانات غير متصلة، تعذر الحفظ السحابي.")
+        return False
+    try:
+        doc_ref = (
+            db.collection("generators")
+            .document(str(gen_id))
+            .collection("maintenance_logs")
+            .document()
+        )
+
+        log_payload = {
+            "timestamp": firestore.SERVER_TIMESTAMP,
+            "client_name": str(client_id),
+            "generator_id": str(gen_id),
+            "readings": readings_data,
+            "parts_status": parts_status,
+        }
+
+        doc_ref.set(log_payload)
+
+        db.collection("generators").document(str(gen_id)).set(
+            {
+                "last_updated": firestore.SERVER_TIMESTAMP,
+                "latest_readings": readings_data,
+                "client_name": str(client_id),
+            },
+            merge=True,
+        )
+
+        return True
+    except Exception as ex:
+        st.error(f"❌ خطأ أثناء التخزين في Firebase: {ex}")
+        return False
+
+
+# ---------------------------------------------------------
+# 2. قاعدة بيانات العملاء وأكواد التفعيل
 # ---------------------------------------------------------
 CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
@@ -76,10 +143,9 @@ if not is_authenticated:
 st.sidebar.divider()
 
 # ---------------------------------------------------------
-# 2. إعدادات المعايير والحدود للإنذارات
+# 3. إعدادات المعايير والحدود للإنذارات
 # ---------------------------------------------------------
 st.sidebar.header("🎯 ضبط معايير الحدود والإنذارات (Thresholds Setting)")
-st.sidebar.caption("حدد النطاقات الآمنة يدوياً للتنبيه باللون الأحمر عند تجاوزها:")
 
 col_v1, col_v2 = st.sidebar.columns(2)
 v_min = col_v1.number_input("أدنى جهد مسموح (V Min)", value=380.0, step=5.0)
@@ -100,7 +166,7 @@ amp_max_limit = col_amp.number_input(
 st.sidebar.divider()
 
 # ---------------------------------------------------------
-# 3. إدخال القراءات الفنية ورفع صورة المولد
+# 4. إدخال القراءات الفنية ورفع صورة المولد
 # ---------------------------------------------------------
 st.sidebar.header("📥 لوحة إدخال البيانات والتشغيل")
 
@@ -123,7 +189,6 @@ with st.sidebar.form("generator_comprehensive_form"):
         max_value=100000.0,
         value=940.0,
         step=10.0,
-        help="الساعات المستهدفة للتشغيل القادم لتقييم استهلاك الزيت وقطع الغيار.",
     )
 
     gen_kw = st.number_input(
@@ -196,7 +261,7 @@ uploaded_image = st.sidebar.file_uploader(
 )
 
 # ---------------------------------------------------------
-# 4. عرض القراءات والإنذارات في الواجهة الرئيسية
+# 5. عرض القراءات والإنذارات في الواجهة الرئيسية
 # ---------------------------------------------------------
 load_percentage = (load_kw / gen_kw) * 100 if gen_kw > 0 else 0
 
@@ -262,7 +327,7 @@ else:
     )
 
 # ---------------------------------------------------------
-# 5. جدولة خدمة تغيير الزيت والتحذيرات الذكية
+# 6. جدولة خدمة تغيير الزيت والتحذيرات الذكية
 # ---------------------------------------------------------
 st.divider()
 st.subheader("🛢️ جدول الخدمة وتغيير زيت المحرك (Oil Service Schedule)")
@@ -309,7 +374,7 @@ else:
     st.info("🟢 حالة زيت المحرك جيدة وتعمل ضمن الفترة المسموحة.")
 
 # ---------------------------------------------------------
-# 6. جدول الصيانة التنبؤية بالخصم التلقائي للمدة المنقضية والمتبقية
+# 7. جدول الصيانة التنبؤية بالخصم التلقائي للمدة المنقضية
 # ---------------------------------------------------------
 st.divider()
 st.subheader(
@@ -457,7 +522,7 @@ st.caption("🔍 **لوحة التحليل الفني التلقائي لقطع 
 if expired_parts:
     for item in expired_parts:
         st.error(
-            f"🚨 **تحذير انقضاء الساعات:** {item} - يتطلب الاستبدال التلقائي!"
+            f"🚨 **تحذير انقضاء الساعات:** {item} - يتطلب الاستبدال الفوري!"
         )
 
 if warning_parts:
@@ -468,6 +533,31 @@ if not expired_parts and not warning_parts:
     st.success(
         "🟢 جميع الفلاتر وقطع الغيار تعمل ضمن المدة المتبقية والحدود الآمنة."
     )
+
+# ---------------------------------------------------------
+# زر حفظ البيانات السحابي في Firebase Firestore
+# ---------------------------------------------------------
+st.divider()
+if st.button(
+    "💾 حفظ القراءات الحالية وسجلات الصيانة في قاعدة بيانات Firebase",
+    use_container_width=True,
+):
+    readings_payload = {
+        "run_hours": run_hours,
+        "future_run_hours": future_run_hours,
+        "load_kw": load_kw,
+        "coolant_temp": coolant_temp,
+        "oil_press": oil_press,
+        "voltage": voltage,
+        "freq": freq,
+        "amperes": amperes,
+        "oil_usage_pct": oil_usage_pct,
+    }
+
+    if save_log_to_firestore(
+        client_name, gen_model, readings_payload, df_result.to_dict("records")
+    ):
+        st.success("✅ تم حفظ السجل والقراءات بنجاح في Firebase Firestore!")
 
 # ---------------------------------------------------------
 # التحليل البياني لساعات التشغيل والمدد الافتراضية
@@ -507,7 +597,7 @@ with chart_col2:
     st.plotly_chart(fig_pie, use_container_width=True)
 
 # ---------------------------------------------------------
-# 7. دالة تنظيف النصوص لـ PDF
+# 8. دالة تنظيف النصوص لـ PDF
 # ---------------------------------------------------------
 
 
@@ -519,7 +609,7 @@ def sanitize_latin_only(text):
 
 
 # ---------------------------------------------------------
-# 8. محرك طباعة تقرير PDF الشامل + إضافة الصور والرسوم البيانية
+# 9. محرك طباعة تقرير PDF الشامل + إضافة الصور والرسوم البيانية
 # ---------------------------------------------------------
 st.divider()
 st.subheader("📄 استخراج وطباعة التقرير الفني الشامل (Full PDF Report)")
@@ -573,7 +663,6 @@ def generate_safe_pdf_bytes():
     if safe_model == "N/A":
         safe_model = "Industrial Generator"
 
-    # 1. المخطط العام
     pdf.set_font("Helvetica", "B", 10)
     pdf.cell(0, 5, f"Client: {safe_client} | Model: {safe_model}", ln=True)
     pdf.set_font("Helvetica", "", 9)
@@ -585,7 +674,6 @@ def generate_safe_pdf_bytes():
     )
     pdf.ln(2)
 
-    # إضافة صورة المولد إن وجدت
     if uploaded_image is not None:
         try:
             img = Image.open(uploaded_image)
@@ -600,7 +688,6 @@ def generate_safe_pdf_bytes():
         except Exception:
             pass
 
-    # 2. القراءات الأساسية
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(0, 6, "1. Operational & Technical Readings", ln=True)
     pdf.set_font("Helvetica", "", 9)
@@ -625,7 +712,6 @@ def generate_safe_pdf_bytes():
 
     pdf.ln(3)
 
-    # 3. حالة الإنذارات
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(0, 6, "2. System Alarms & Safety Status", ln=True)
     pdf.set_font("Helvetica", "", 9)
@@ -639,7 +725,6 @@ def generate_safe_pdf_bytes():
 
     pdf.ln(3)
 
-    # 4. جدول تغيير وساعات الزيت
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(0, 6, "3. Engine Oil & Filter Service Status", ln=True)
     pdf.set_font("Helvetica", "", 9)
@@ -669,7 +754,6 @@ def generate_safe_pdf_bytes():
 
     pdf.ln(4)
 
-    # 5. جدول قطع الغيار
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(
         0, 6, "4. Predictive Maintenance & Parts Remaining Schedule", ln=True
@@ -697,16 +781,12 @@ def generate_safe_pdf_bytes():
         pdf.cell(35, 5, status_clean, border=1)
         pdf.ln()
 
-    # ---------------------------------------------------------
-    # 6. إضافة صور الرسم البياني للأداء إلى ملف الـ PDF
-    # ---------------------------------------------------------
     try:
-        pdf.add_page()  # صفحة جديدة مخصصة للرسوم البيانية
+        pdf.add_page()
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "5. Performance & Operational Charts", ln=True)
         pdf.ln(2)
 
-        # إنشاء الرسم البياني الأول (العمودي) باستخدام Matplotlib
         fig, ax = plt.subplots(figsize=(7, 3.5))
         parts_short = [
             sanitize_latin_only(str(x))[:12]
@@ -729,10 +809,8 @@ def generate_safe_pdf_bytes():
         plt.close(fig)
         temp_files.append(chart1_path)
 
-        # إضافة الرسم البياني الأول لـ PDF
         pdf.image(chart1_path, x=15, y=35, w=180)
 
-        # إنشاء الرسم البياني الثاني (الدائري)
         fig2, ax2 = plt.subplots(figsize=(6, 3))
         status_counts = df_result["الحالة الفنية"].value_counts()
         labels_clean = [sanitize_latin_only(str(x)) for x in status_counts.index]
@@ -751,7 +829,6 @@ def generate_safe_pdf_bytes():
         plt.close(fig2)
         temp_files.append(chart2_path)
 
-        # إضافة الرسم البياني الثاني لـ PDF
         pdf.image(chart2_path, x=25, y=140, w=160)
 
     except Exception as chart_err:
@@ -762,10 +839,8 @@ def generate_safe_pdf_bytes():
             ln=True,
         )
 
-    # استخراج مخرجات PDF بأمان
     pdf_output = pdf.output(dest="S")
 
-    # تنظيف الملفات المؤقتة
     for file_path in temp_files:
         if os.path.exists(file_path):
             try:
@@ -781,7 +856,6 @@ def generate_safe_pdf_bytes():
         return bytes(pdf_output)
 
 
-# استدعاء التنزيل المباشر
 try:
     pdf_bytes_data = generate_safe_pdf_bytes()
     st.download_button(
