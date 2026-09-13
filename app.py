@@ -91,7 +91,7 @@ st.sidebar.header("📥 لوحة إدخال البيانات والتشغيل")
 with st.sidebar.form("generator_comprehensive_form"):
     st.subheader("معلومات المولد العامة")
     gen_model = st.text_input("طراز / اسم المولد (Generator Model/ID)", value="Perkins 250 kVA - DSE 8610")
-    run_hours = st.number_input("ساعات التشغيل العامة (Total Run Hours)", min_value=0.0, max_value=50000.0, value=1250.0, step=10.0)
+    run_hours = st.number_input("ساعات التشغيل العامة (Total Run Hours)", min_value=0.0, max_value=100000.0, value=1250.0, step=10.0)
     gen_kw = st.number_input("سعة المولد الكلية (Generator kW)", min_value=5.0, max_value=3000.0, value=250.0, step=10.0)
     load_kw = st.number_input("حجم الحمولة الحالية (Load kW)", min_value=0.0, max_value=3000.0, value=150.0, step=10.0)
     ambient_temp = st.number_input("درجة الحرارة المحيطة / المناخ (°C)", min_value=10.0, max_value=60.0, value=43.0, step=1.0)
@@ -158,12 +158,12 @@ else:
     st.success("🟢 جميع قراءات الجهد، التردد، الحرارة، والتيار ضمن المعايير الآمنة المحددة.")
 
 # ---------------------------------------------------------
-# 5. جدولة خدمة تغيير الزيت والتحذيرات الذكية
+# 5. جدولة خدمة تغيير الزيت والتحذيرات الذكية (ديناميكي)
 # ---------------------------------------------------------
 st.divider()
 st.subheader("🛢️ جدول الخدمة وتغيير زيت المحرك (Oil Service Schedule)")
 
-hours_since_oil_change = run_hours - last_oil_change_hours
+hours_since_oil_change = max(0.0, run_hours - last_oil_change_hours)
 hours_until_next_oil_change = oil_change_interval - hours_since_oil_change
 oil_usage_pct = (hours_since_oil_change / oil_change_interval) * 100 if oil_change_interval > 0 else 0
 
@@ -172,21 +172,21 @@ if ambient_temp >= 45.0: recommended_oil = "20W50 (Extreme Hot Climate)"
 elif ambient_temp >= 43.0: recommended_oil = "15W40 (Hot Climate)"
 
 col_oil1, col_oil2, col_oil3, col_oil4 = st.columns(4)
-col_oil1.metric("ساعات الزيت الحالية", f"{hours_since_oil_change} hrs")
-col_oil2.metric("الفترة الافتراضية", f"{oil_change_interval} hrs")
-col_oil3.metric("المتبقي للخدمة", f"{hours_until_next_oil_change} hrs", f"استهلاك {oil_usage_pct:.0f}%")
+col_oil1.metric("ساعات الزيت الحالية", f"{hours_since_oil_change:.1f} hrs")
+col_oil2.metric("الفترة الافتراضية", f"{oil_change_interval:.1f} hrs")
+col_oil3.metric("المتبقي للخدمة", f"{max(0.0, hours_until_next_oil_change):.1f} hrs", f"استهلاك {oil_usage_pct:.0f}%")
 col_oil4.metric("اللزوجة الموصى بها", recommended_oil)
 
-# المنطق التنبيهي الخاص بالزيت
+# المنطق التنبيهي الصارم للزيت
 if oil_usage_pct >= 100:
-    st.error(f"🚨 **تحذير حرج (انقضاء الساعات الافتراضية):** تجاوز الزيت الفترة الافتراضية المسموحة ({oil_change_interval} ساعة)! يرجى تغيير زيت المحرك فوراً لتجنب تلف المحرك.")
+    st.error(f"🚨 **تحذير حرج (انقضاء الساعات الافتراضية):** تجاوز الزيت الفترة الافتراضية المسموحة ({oil_change_interval} ساعة)! يرجى تغيير زيت المحرك فوراً.")
 elif oil_usage_pct >= 90:
-    st.warning(f"⚠️ **تنبيه (وصلت 90% من الساعات):** تم استهلاك {oil_usage_pct:.1f}% من العمر الافتراضي للزيت (متبقي {hours_until_next_oil_change} ساعة فقط). يرجى التجهيز للاستبدال.")
+    st.warning(f"⚠️ **تنبيه (وصلت 90% من الساعات):** تم استهلاك {oil_usage_pct:.1f}% من العمر الافتراضي للزيت (متبقي {hours_until_next_oil_change:.1f} ساعة فقط). يرجى التجهيز للاستبدال.")
 else:
     st.info("🟢 حالة زيت المحرك جيدة وضمن الساعات الافتراضية المسموحة.")
 
 # ---------------------------------------------------------
-# 6. جدول الصيانة التنبؤية لقطع الغيار والتنبيهات المزدوجة
+# 6. جدول الصيانة التنبؤية لقطع الغيار والتنبيهات المستقلة
 # ---------------------------------------------------------
 st.divider()
 st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة التنبؤية")
@@ -203,15 +203,12 @@ full_lifespan_data = [
     {"تصنيف القطعة (Category)": "Electrical System", "اسم قطعة الغيار (Spare Part)": "Charging Alternator (دينامو الشحن)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": 8900.0},
     {"تصنيف القطعة (Category)": "Engine Mechanical", "اسم قطعة الغيار (Spare Part)": "Top Overhaul (طقم عمرة رأس)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": 10100.0},
     {"تصنيف القطعة (Category)": "Engine Mechanical", "اسم قطعة الغيار (Spare Part)": "Major Overhaul (عمرة كاملة)", "العمر الافتراضي - ساعات (Lifespan)": 20000.0, "الساعات المنقضية (Hours Used)": 15000.0},
-    {"تصنيف القطعة (Category)": "Lubrication System", "اسم قطعة الغيار (Spare Part)": "Oil Cooler (مبرد الزيت)", "العمر الافتراضي - ساعات (Lifespan)": 5000.0, "الساعات المنقضية (Hours Used)": 3800.0},
-    {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "Water Pump (مضخة الماء)", "العمر الافتراضي - ساعات (Lifespan)": 6000.0, "الساعات المنقضية (Hours Used)": 5450.0},
-    {"تصنيف القطعة (Category)": "Air System", "اسم قطعة الغيار (Spare Part)": "Turbocharger (التيربو)", "العمر الافتراضي - ساعات (Lifespan)": 8000.0, "الساعات المنقضية (Hours Used)": 7100.0}
 ]
 
 if "maintenance_df" not in st.session_state:
     st.session_state.maintenance_df = pd.DataFrame(full_lifespan_data)
 
-edited_table = st.data_editor(st.session_state.maintenance_df, num_rows="dynamic", use_container_width=True)
+edited_table = st.data_editor(st.session_state.maintenance_df, num_rows="dynamic", use_container_width=True, key="parts_editor")
 st.session_state.maintenance_df = edited_table
 
 processed_rows = []
@@ -227,10 +224,10 @@ for index, row in edited_table.iterrows():
     usage_pct = (used_hours / lifespan) * 100 if lifespan > 0 else 0
     rem_hrs = lifespan - used_hours
     
-    # تحديد الحالة بدقة بناءً على طلبك
+    # تصحيح الشروط لتفادي دمج الـ 90% مع 100%
     if usage_pct >= 100:
         status = "EXPIRED (انقضاء الساعات)"
-        expired_parts.append(f"{part_name} - تجاوز العمر الافتراضي ({used_hours}/{lifespan} hrs)")
+        expired_parts.append(f"{part_name} - تجاوز العمر الافتراضي ({used_hours}/{lifespan} ساعة)")
     elif usage_pct >= 90:
         status = "WARNING (وصلت 90%)"
         warning_parts.append(f"{part_name} - وصلت {usage_pct:.0f}% (متبقي {rem_hrs:.0f} ساعة)")
@@ -251,7 +248,6 @@ for index, row in edited_table.iterrows():
 
 df_result = pd.DataFrame(processed_rows)
 
-# عرض شريط التنبيهات والتحذيرات للقطع بشكل بارز
 st.caption("🔍 **لوحة التحليل الفني لقطع الغيار:**")
 
 if expired_parts:
