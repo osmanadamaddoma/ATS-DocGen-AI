@@ -186,30 +186,29 @@ else:
     st.info("🟢 حالة زيت المحرك جيدة وضمن الساعات الافتراضية المسموحة.")
 
 # ---------------------------------------------------------
-# 6. جدول الصيانة التنبؤية لقطع الغيار والتنبيهات المستقلة
+# 6. جدول الصيانة التنبؤية المربوط تلقائياً بساعات التشغيل العامة
 # ---------------------------------------------------------
 st.divider()
 st.subheader("🔧 جدول تتبع العمر الافتراضي لقطع الغيار والصيانة التنبؤية")
 
-full_lifespan_data = [
-    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Oil Filter (فلتر زيت)", "العمر الافتراضي - ساعات (Lifespan)": 250.0, "الساعات المنقضية (Hours Used)": 230.0},
-    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Primary Fuel Filter (فلتر وقود أولي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": 505.0},
-    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Secondary Fuel Filter (فلتر وقود ثانوي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": 455.0},
-    {"تصنيف القطعة (Category)": "Air System", "اسم قطعة الغيار (Spare Part)": "Air Filter (فلتر هواء)", "العمر الافتراضي - ساعات (Lifespan)": 1000.0, "الساعات المنقضية (Hours Used)": 910.0},
-    {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "Fan Belt (قشاط المروحة)", "العمر الافتراضي - ساعات (Lifespan)": 2000.0, "الساعات المنقضية (Hours Used)": 1550.0},
-    {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "ELC Coolant (سائل تبريد)", "العمر الافتراضي - ساعات (Lifespan)": 3000.0, "الساعات المنقضية (Hours Used)": 2200.0},
-    {"تصنيف القطعة (Category)": "Fuel System", "اسم قطعة الغيار (Spare Part)": "Fuel Injectors (بخاخات الوقود)", "العمر الافتراضي - ساعات (Lifespan)": 5000.0, "الساعات المنقضية (Hours Used)": 4400.0},
-    {"تصنيف القطعة (Category)": "Electrical System", "اسم قطعة الغيار (Spare Part)": "Batteries (البطاريات)", "العمر الافتراضي - ساعات (Lifespan)": 8000.0, "الساعات المنقضية (Hours Used)": 6100.0},
-    {"تصنيف القطعة (Category)": "Electrical System", "اسم قطعة الغيار (Spare Part)": "Charging Alternator (دينامو الشحن)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": 8900.0},
-    {"تصنيف القطعة (Category)": "Engine Mechanical", "اسم قطعة الغيار (Spare Part)": "Top Overhaul (طقم عمرة رأس)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": 10100.0},
-    {"تصنيف القطعة (Category)": "Engine Mechanical", "اسم قطعة الغيار (Spare Part)": "Major Overhaul (عمرة كاملة)", "العمر الافتراضي - ساعات (Lifespan)": 20000.0, "الساعات المنقضية (Hours Used)": 15000.0},
+# إنشاء البيانات الأساسية وتحديث عمود "الساعات المنقضية" تلقائياً بقيمة run_hours
+base_parts_data = [
+    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Oil Filter (فلتر زيت)", "العمر الافتراضي - ساعات (Lifespan)": 250.0, "الساعات المنقضية (Hours Used)": float(run_hours)},
+    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Primary Fuel Filter (فلتر وقود أولي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": float(run_hours)},
+    {"تصنيف القطعة (Category)": "Schedule Services", "اسم قطعة الغيار (Spare Part)": "Secondary Fuel Filter (فلتر وقود ثانوي)", "العمر الافتراضي - ساعات (Lifespan)": 500.0, "الساعات المنقضية (Hours Used)": float(run_hours)},
+    {"تصنيف القطعة (Category)": "Air System", "اسم قطعة الغيار (Spare Part)": "Air Filter (فلتر هواء)", "العمر الافتراضي - ساعات (Lifespan)": 1000.0, "الساعات المنقضية (Hours Used)": float(run_hours)},
+    {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "Fan Belt (قشاط المروحة)", "العمر الافتراضي - ساعات (Lifespan)": 2000.0, "الساعات المنقضية (Hours Used)": float(run_hours)},
+    {"تصنيف القطعة (Category)": "Cooling System", "اسم قطعة الغيار (Spare Part)": "ELC Coolant (سائل تبريد)", "العمر الافتراضي - ساعات (Lifespan)": 3000.0, "الساعات المنقضية (Hours Used)": float(run_hours)},
+    {"تصنيف القطعة (Category)": "Fuel System", "اسم قطعة الغيار (Spare Part)": "Fuel Injectors (بخاخات الوقود)", "العمر الافتراضي - ساعات (Lifespan)": 5000.0, "الساعات المنقضية (Hours Used)": float(run_hours)},
+    {"تصنيف القطعة (Category)": "Electrical System", "اسم قطعة الغيار (Spare Part)": "Batteries (البطاريات)", "العمر الافتراضي - ساعات (Lifespan)": 8000.0, "الساعات المنقضية (Hours Used)": float(run_hours)},
+    {"تصنيف القطعة (Category)": "Electrical System", "اسم قطعة الغيار (Spare Part)": "Charging Alternator (دينامو الشحن)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": float(run_hours)},
+    {"تصنيف القطعة (Category)": "Engine Mechanical", "اسم قطعة الغيار (Spare Part)": "Top Overhaul (طقم عمرة رأس)", "العمر الافتراضي - ساعات (Lifespan)": 10000.0, "الساعات المنقضية (Hours Used)": float(run_hours)},
+    {"تصنيف القطعة (Category)": "Engine Mechanical", "اسم قطعة الغيار (Spare Part)": "Major Overhaul (عمرة كاملة)", "العمر الافتراضي - ساعات (Lifespan)": 20000.0, "الساعات المنقضية (Hours Used)": float(run_hours)},
 ]
 
-if "maintenance_df" not in st.session_state:
-    st.session_state.maintenance_df = pd.DataFrame(full_lifespan_data)
-
-edited_table = st.data_editor(st.session_state.maintenance_df, num_rows="dynamic", use_container_width=True, key="parts_editor")
-st.session_state.maintenance_df = edited_table
+# تحديث الإطار تلقائياً مع السماح للتعديل اليدوي إن لزم الأمر
+df_parts_input = pd.DataFrame(base_parts_data)
+edited_table = st.data_editor(df_parts_input, num_rows="dynamic", use_container_width=True, key="parts_editor")
 
 processed_rows = []
 warning_parts = []
@@ -219,12 +218,11 @@ for index, row in edited_table.iterrows():
     category = str(row.get("تصنيف القطعة (Category)", "Other"))
     part_name = str(row.get("اسم قطعة الغيار (Spare Part)", "Part"))
     lifespan = pd.to_numeric(row.get("العمر الافتراضي - ساعات (Lifespan)", 250), errors='coerce') or 250.0
-    used_hours = pd.to_numeric(row.get("الساعات المنقضية (Hours Used)", 0), errors='coerce') or 0.0
+    used_hours = pd.to_numeric(row.get("الساعات المنقضية (Hours Used)", run_hours), errors='coerce') or 0.0
     
     usage_pct = (used_hours / lifespan) * 100 if lifespan > 0 else 0
     rem_hrs = lifespan - used_hours
     
-    # تصحيح الشروط لتفادي دمج الـ 90% مع 100%
     if usage_pct >= 100:
         status = "EXPIRED (انقضاء الساعات)"
         expired_parts.append(f"{part_name} - تجاوز العمر الافتراضي ({used_hours}/{lifespan} ساعة)")
@@ -242,7 +240,7 @@ for index, row in edited_table.iterrows():
         "Lifespan": lifespan,
         "Used Hours": used_hours,
         "Usage Pct": f"{usage_pct:.0f}%",
-        "Remaining Hours": rem_hrs,
+        "Remaining Hours": max(0.0, rem_hrs),
         "Status": status
     })
 
