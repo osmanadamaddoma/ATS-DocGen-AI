@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import io
+import json
 import os
 import re
 
@@ -20,19 +21,26 @@ st.set_page_config(
 st.title("⚙️ نظام الصيانة التنبؤية والتقارير الشاملة للمولدات الصناعية")
 
 # ---------------------------------------------------------
-# 1. تهيئة الاتصال بـ Firebase Firestore
+# 1. تهيئة الاتصال بـ Firebase Firestore (النسخة المرنة المطورة)
 # ---------------------------------------------------------
 @st.cache_resource
 def init_firebase():
     if not firebase_admin._apps:
-        if "firebase" in st.secrets:
+        # 1. قراءة المفتاح من المتغيرات البيئية (في حال التشغيل على Google Cloud Run)
+        firebase_json_env = os.environ.get("FIREBASE_CREDENTIALS")
+        
+        if firebase_json_env:
+            cred_dict = json.loads(firebase_json_env)
+            cred = credentials.Certificate(cred_dict)
+        # 2. قراءة المفتاح من Secrets (في حال التشغيل على Streamlit Cloud)
+        elif "firebase" in st.secrets:
             firebase_dict = dict(st.secrets["firebase"])
-            firebase_dict["private_key"] = firebase_dict[
-                "private_key"
-            ].replace("\\n", "\n")
+            firebase_dict["private_key"] = firebase_dict["private_key"].replace("\\n", "\n")
             cred = credentials.Certificate(firebase_dict)
+        # 3. قراءة المفتاح من الملف المحلي (في حال التشغيل على جهازك الشخصي)
         else:
             cred = credentials.Certificate("firebase_key.json")
+            
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
@@ -599,8 +607,6 @@ with chart_col2:
 # ---------------------------------------------------------
 # 8. دالة تنظيف النصوص لـ PDF
 # ---------------------------------------------------------
-
-
 def sanitize_latin_only(text):
     if not isinstance(text, str):
         text = str(text)
