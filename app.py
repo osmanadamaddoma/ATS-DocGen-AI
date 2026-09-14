@@ -3,6 +3,7 @@ import io
 import json
 import os
 import re
+import uuid
 
 from fpdf import FPDF
 import firebase_admin
@@ -21,29 +22,25 @@ st.set_page_config(
 st.title("⚙️ نظام الصيانة التنبؤية والتقارير الشاملة للمولدات الصناعية")
 
 # ---------------------------------------------------------
-# 1. تهيئة الاتصال بـ Firebase Firestore (النسخة المرنة المطورة)
+# 1. تهيئة الاتصال بـ Firebase Firestore
 # ---------------------------------------------------------
 @st.cache_resource
 def init_firebase():
     if not firebase_admin._apps:
-        # 1. قراءة المفتاح من المتغيرات البيئية (في حال التشغيل على Google Cloud Run)
         firebase_json_env = os.environ.get("FIREBASE_CREDENTIALS")
         
         if firebase_json_env:
             cred_dict = json.loads(firebase_json_env)
             cred = credentials.Certificate(cred_dict)
-        # 2. قراءة المفتاح من Secrets (في حال التشغيل على Streamlit Cloud)
         elif "firebase" in st.secrets:
             firebase_dict = dict(st.secrets["firebase"])
             firebase_dict["private_key"] = firebase_dict["private_key"].replace("\\n", "\n")
             cred = credentials.Certificate(firebase_dict)
-        # 3. قراءة المفتاح من الملف المحلي (في حال التشغيل على جهازك الشخصي)
         else:
             cred = credentials.Certificate("firebase_key.json")
             
         firebase_admin.initialize_app(cred)
     return firestore.client()
-
 
 try:
     db = init_firebase()
@@ -54,7 +51,183 @@ except Exception as e:
     )
     db = None
 
+# ---------------------------------------------------------
+# 2. إدارة معرف الجهاز وفترة التجربة والاشتراكات السحابية
+# ---------------------------------------------------------
+if "device_id" not in st.session_state:
+    query_params = st.query_params
+    if "did" in query_params:
+        st.session_state.device_id = query_params["did"]
+    else:
+        new_id = str(uuid.uuid4())
+        st.session_state.device_id = new_id
+        st.query_params["did"] = new_id
 
+device_id = st.session_state.device_id
+
+def get_or_create_device_record(dev_id):
+    now = datetime.now()
+    if db is not None:
+        try:
+            doc_ref = db.collection("devices").document(dev_id)
+            doc = doc_ref.get()
+            if doc.exists:
+                data = doc.to_dict()
+                return {
+                    "first_visit": data.get("first_visit", now),
+                    "trial_expiry": data.get("trial_expiry", now + timedelta(days=7)),
+                    "subscription_expiry": data.get("subscription_expiry"),
+                    "plan_type": data.get("plan_type", "فترة تجريبية 7 أيام")
+                }
+            else:
+                # زائر جديد كلياً: منح 7 أيام تجريبية تلقائياً
+                trial_exp = now + timedelta(days=7)
+                initial_data = {
+                    "first_visit": now,
+                    "trial_expiry": trial_exp,
+                    "subscription_expiry": None,
+                    "plan_type": "فترة تجريبية 7 أيام"
+                }
+                doc_ref.set(initial_data)
+                return initial_data
+        except Exception:
+            pass
+    
+    # محاكاة محلية مؤقتة في حال عدم توفر الاتصال السحابي
+    if "mock_device_db" not in st.session_state:
+        st.session_state.mock_device_db = {
+            "first_visit": now,
+            "trial_expiry": now + timedelta(days=7),
+            "subscription_expiry": None,
+            "plan_type": "فترة تجريبية 7 أيام"
+        }
+    return st.session_state.mock_device_db
+
+def update_device_subscription(dev_id, sub_expiry, plan_name):
+    if db is not None:
+        try:
+            doc_ref = db.collection("devices").document(dev_id)
+            doc_ref.update({
+                "subscription_expiry": sub_expiry,
+                "plan_type": plan_name
+            })
+        except Exception:
+            pass
+    if "mock_device_db" in st.session_state:
+        st.session_state.mock_device_db["subscription_expiry"] = sub_expiry
+        st.session_state.mock_device_db["plan_type"] = plan_name
+
+def verify_and_apply_activation_code(code_str, dev_id):
+    code_str = code_str.strip().upper()
+    now = datetime.now()
+    
+    # التحقق عبر قاعدة بيانات الأكواد في Firestore
+    if db is not None:
+        try:
+            code_ref = db.collection("activation_codes").document(code_str)
+            code_doc = code_ref.get()
+            if code_doc.exists:
+                code_data = code_doc.to_dict()
+                duration_days = code_data.get("duration_days", 30) # الافتراضي شهر
+                plan_name = code_data.get("plan_name", f"اشتراك لمدة {duration_days} يوم")
+                is_active_code = code_data.get("is_active", True)
+                
+                if is_active_code:
+                    expiry = now + timedelta(days=duration_days)
+                    update_device_subscription(dev_id, expiry, plan_name)
+                    return True, f"✅ تم تفعيل الاشتراك بنجاح: {plan_name}"
+                else:
+                    return False, "❌ عذراً، هذا الكود معطل حالياً."
+        except Exception:
+            pass
+            
+    # أكواد افتراضية للاختبار ودعم المدد المختلفة (أيام، شهور، سنوات)
+    default_codes = {
+        "ADDOMA-2026-PRO": {"days": 365, "name": "اشتراك سنوي (Yearly - 1 Year)"},
+        "CLIENT-M-30D": {"days": 30, "name": "اشتراك شهري (Monthly - 30 Days)"},
+        "TRIAL-EXT-7D": {"days": 7, "name": "تمديد تجريبي (7 Days Extension)"},
+    }
+    
+    if code_str in default_codes:
+        cfg = default_codes[code_str]
+        expiry = now + timedelta(days=cfg["days"])
+        update_device_subscription(dev_id, expiry, cfg["name"])
+        return True, f"✅ تم تفعيل الاشتراك بنجاح: {cfg['name']}"
+        
+    return False, "❌ كود التفعيل غير صحيح أو منتهي الصلاحية."
+
+# جلب بيانات المستخدم الحالي
+user_record = get_or_create_device_record(device_id)
+now = datetime.now()
+
+trial_exp = user_record.get("trial_expiry")
+sub_exp = user_record.get("subscription_expiry")
+
+if hasattr(trial_exp, "timestamp"):
+    trial_exp = datetime.fromtimestamp(trial_exp.timestamp())
+if sub_exp and hasattr(sub_exp, "timestamp"):
+    sub_exp = datetime.fromtimestamp(sub_exp.timestamp())
+
+is_sub_active = sub_exp and now < sub_exp
+is_trial_active = trial_exp and now < trial_exp
+
+if is_sub_active:
+    time_left = (sub_exp - now).days
+    access_status = "paid"
+    plan_type = user_record.get("plan_type", "اشتراك مدفوع")
+elif is_trial_active:
+    time_left = (trial_exp - now).days
+    access_status = "trial"
+    plan_type = "فترة تجريبية مجانية (7 أيام)"
+else:
+    time_left = 0
+    access_status = "expired"
+    plan_type = "منتهي الصلاحية"
+
+client_name = f"مستخدم جهاز ({device_id[:8]})"
+
+# ---------------------------------------------------------
+# واجهة التحقق والمدخلات في الشريط الجانبي
+# ---------------------------------------------------------
+st.sidebar.header("🔐 بوابة تفعيل العميل والصلاحيات")
+input_code = st.sidebar.text_input(
+    "أدخل كود التفعيل (أيام، شهور، سنوات):", type="password"
+)
+
+if st.sidebar.button("تفعيل الكود"):
+    if input_code:
+        success, msg = verify_and_apply_activation_code(input_code, device_id)
+        if success:
+            st.sidebar.success(msg)
+            st.rerun()
+        else:
+            st.sidebar.error(msg)
+    else:
+        st.sidebar.warning("⚠️ يرجى إدخال كود التفعيل أولاً.")
+
+st.sidebar.divider()
+
+if access_status == "paid":
+    st.sidebar.success(f"🌟 اشتراك مدفوع مفعل\n\nالنوع: {plan_type}\nمتبقي: **{time_left}** يوماً")
+elif access_status == "trial":
+    st.sidebar.info(f"⏳ فترة تجريبية مجانية\n\nمتبقي من الـ 7 أيام: **{time_left}** يوماً")
+else:
+    st.sidebar.error("⚠️ انتهت الفترة التجريبية المجانية لـ 7 أيام.")
+
+# إذا انتهت التجربة وليس لديك اشتراك مدفوع، يتم إيقاف النظام وعرض شاشة القفل
+if access_status == "expired":
+    st.error(
+        "🔒 **النظام مقفل:** عذراً، انتهت الفترة التجريبية المجانية الخاصة بك (7 أيام)."
+        " يرجى إدخال كود اشتراك ساري في الشريط الجانبي (شهر، سنة، أو أيام) لاستعادة الوصول."
+    )
+    st.info(
+        "💡 للوصول التجريبي، يمكنك استخدام الكود الافتراضي: `ADDOMA-2026-PRO`"
+    )
+    st.stop()
+
+# ---------------------------------------------------------
+# دالة الحفظ في Firebase
+# ---------------------------------------------------------
 def save_log_to_firestore(client_id, gen_id, readings_data, parts_status):
     if db is None:
         st.warning("⚠️ قاعدة البيانات غير متصلة، تعذر الحفظ السحابي.")
@@ -90,65 +263,6 @@ def save_log_to_firestore(client_id, gen_id, readings_data, parts_status):
     except Exception as ex:
         st.error(f"❌ خطأ أثناء التخزين في Firebase: {ex}")
         return False
-
-
-# ---------------------------------------------------------
-# 2. قاعدة بيانات العملاء وأكواد التفعيل
-# ---------------------------------------------------------
-CLIENTS_DATABASE = {
-    "ADDOMA-2026-PRO": {
-        "name": "عثمان آدم (Addoma Trading Services)",
-        "plan": "سنوي (Yearly)",
-        "start_date": "2026-01-01",
-        "duration_days": 365,
-    },
-    "CLIENT-M-881": {
-        "name": "شركة النيل للصناعات الهندسية",
-        "plan": "شهري (Monthly)",
-        "start_date": "2026-09-01",
-        "duration_days": 30,
-    },
-}
-
-st.sidebar.header("🔐 بوابة تفعيل العميل والصلاحيات")
-input_code = st.sidebar.text_input(
-    "أدخل كود التفعيل الخاص بالعميل:", type="password"
-)
-
-is_authenticated = False
-client_name = "زائر (Visitor)"
-plan_type = "غير مفعل"
-
-if input_code in CLIENTS_DATABASE:
-    data = CLIENTS_DATABASE[input_code]
-    client_name = data["name"]
-    plan_type = data["plan"]
-    start_dt = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
-    expiry_dt = start_dt + timedelta(days=data["duration_days"])
-
-    if datetime.now().date() <= expiry_dt:
-        is_authenticated = True
-        st.sidebar.success(f"✅ تم التفعيل بنجاح: {client_name} ({plan_type})")
-    else:
-        st.sidebar.error("❌ انتهت صلاحية اشتراك هذا العميل.")
-elif input_code != "":
-    st.sidebar.error("❌ كود التفعيل غير صحيح.")
-else:
-    st.sidebar.warning(
-        "⚠️ أدخل كود التفعيل في الشريط الجانبي للوصول إلى النظام."
-    )
-
-if not is_authenticated:
-    st.error(
-        "🔒 **النظام مقفل:** يرجى إدخال كود تفعيل صحيح في الشريط الجانبي"
-        " لفتح لوحة التحكم والتعديل وطباعة التقارير."
-    )
-    st.info(
-        "💡 للوصول والتجربة، يمكنك استخدام الكود الخاص بك: `ADDOMA-2026-PRO`"
-    )
-    st.stop()
-
-st.sidebar.divider()
 
 # ---------------------------------------------------------
 # 3. إعدادات المعايير والحدود للإنذارات
@@ -274,7 +388,7 @@ uploaded_image = st.sidebar.file_uploader(
 load_percentage = (load_kw / gen_kw) * 100 if gen_kw > 0 else 0
 
 st.success(
-    f"🔓 **العميل المفعل:** {client_name} | **نوع الاشتراك:** {plan_type} |"
+    f"🔓 **حالة الوصول:** {plan_type} | **متبقي للصلاحية:** {time_left} يوم |"
     f" **طراز المولد:** {gen_model}"
 )
 
@@ -330,8 +444,7 @@ if range_alarms:
         st.error(f"🔴 {alarm}")
 else:
     st.success(
-        "🟢 جميع قراءات الجهد، التردد، الحرارة، التيار ضمن المعايير الآمنة"
-        " المحددة."
+        "🟢 جميع قراءات الجهد، التردد، الحرارة، التيار ضمن المعايير الآمنة المحددة."
     )
 
 # ---------------------------------------------------------
@@ -613,13 +726,11 @@ def sanitize_latin_only(text):
     clean_text = re.sub(r"[^\x00-\x7F]+", "", text).strip()
     return clean_text if clean_text else "N/A"
 
-
 # ---------------------------------------------------------
 # 9. محرك طباعة تقرير PDF الشامل + إضافة الصور والرسوم البيانية
 # ---------------------------------------------------------
 st.divider()
 st.subheader("📄 استخراج وطباعة التقرير الفني الشامل (Full PDF Report)")
-
 
 class SafePDF(FPDF):
 
@@ -652,7 +763,6 @@ class SafePDF(FPDF):
             f"Page {self.page_no()} | Generated Automatically by Addoma System",
             align="C",
         )
-
 
 def generate_safe_pdf_bytes():
     pdf = SafePDF()
@@ -860,7 +970,6 @@ def generate_safe_pdf_bytes():
         return bytes(pdf_output)
     else:
         return bytes(pdf_output)
-
 
 try:
     pdf_bytes_data = generate_safe_pdf_bytes()
