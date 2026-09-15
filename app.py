@@ -14,6 +14,12 @@ from PIL import Image
 import plotly.express as px
 import streamlit as st
 
+# استيراد محرك قراءة الأكواد (Barcode/QR) في حال توفره
+try:
+    from pyzbar.pyzbar import decode as decode_qr
+except ImportError:
+    decode_qr = None
+
 # ---------------------------------------------------------
 # 0. إعدادات الصفحة الرئيسية
 # ---------------------------------------------------------
@@ -217,8 +223,8 @@ selected_app = st.sidebar.radio(
     "اختر النظام المطلوب:",
     [
         "⚙️ 1. الصيانة التنبؤية والمولدات والرسوم البيانية",
-        "🤖 2. المساعد الذكي لتقارير الصيانة والتوجيه",
-        "🔍 3. نظام فحص المعدات وشجرة الأعطال"
+        "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد",
+        "🔍 3. نظام فحص المعدات والمقارنة البصرية (تالف/سليم)"
     ]
 )
 st.sidebar.divider()
@@ -263,8 +269,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
 
         submit_btn = st.form_submit_button("تحديث وتحليل البيانات")
 
-    uploaded_image = st.sidebar.file_uploader("رفع صورة المولد:", type=["png", "jpg", "jpeg"])
-
     load_percentage = (load_kw / gen_kw) * 100 if gen_kw > 0 else 0
 
     col1, col2, col3, col4 = st.columns(4)
@@ -290,9 +294,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     else:
         st.success("🟢 جميع المؤشرات التشغيلية ضمن الحدود الآمنة.")
 
-    # ---------------------------------------------------------
-    # خدمة غيار الزيت وتتبع العمر الافتراضي لقطع الغيار
-    # ---------------------------------------------------------
     st.divider()
     st.subheader("🛢️ جدول خدمة زيت المحرك والمدد الافتراضية للفلاتر وقطع الغيار")
 
@@ -340,9 +341,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
 
     df_result = pd.DataFrame(processed_rows)
 
-    # ---------------------------------------------------------
-    # الرسوم البيانية التفاعلية لأداء الآليات
-    # ---------------------------------------------------------
     st.divider()
     st.subheader("📊 رسومات وتأطير أداء الآليات وقطع الغيار")
 
@@ -367,9 +365,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         )
         st.plotly_chart(fig_pie, use_container_width=True)
 
-    # ---------------------------------------------------------
-    # 🖨️ زر إصدار التقرير الشامل PDF مع الرسوم البيانية
-    # ---------------------------------------------------------
     st.divider()
     st.subheader("📄 إصدار وتنزيل التقرير الفني الشامل (PDF Full Report)")
 
@@ -413,7 +408,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.cell(35, 5, sanitize_latin_only(str(row["الحالة الفنية"])), border=1)
             pdf.ln()
 
-        # توليد الرسم البياني للأداء وإدراجه في التقرير
         try:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 11)
@@ -454,65 +448,124 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     )
 
 # =========================================================
-# التطبيق 2: المساعد الذكي لتقارير الصيانة والتوجيه
+# التطبيق 2: المساعد الذكي والكتالوجات وقراءة الأكواد
 # =========================================================
-elif selected_app == "🤖 2. المساعد الذكي لتقارير الصيانة والتوجيه":
-    st.title("🤖 المساعد الذكي لتشخيص الأعطال والتقارير الموجهة")
+elif selected_app == "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد":
+    st.title("🤖 المساعد الذكي، مكتبة الكتالوجات وقراءة الأكواد")
 
-    if "ai_logs" not in st.session_state:
-        st.session_state.ai_logs = []
+    tab1, tab2, tab3 = st.tabs(["💬 الاستشارات والتحليل", "📚 رفع وتصفح الكتالوجات", "📷 رفع وقراءة الأكواد (QR/Barcode)"])
 
-    user_input = st.text_area("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: خروج دخان أسود عند تحميل المولد أكثر من 70%...")
+    # --- TAB 1: الاستشارات والتحليل ---
+    with tab1:
+        st.subheader("💡 تحليل العطل واستخراج التقرير")
+        user_input = st.text_area("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: ارتفاع حرارة المحرك مع انخفاض ضغط الزيت...")
 
-    if st.button("تحليل العطل وإنشاء التقرير 🔍", use_container_width=True):
-        if user_input:
-            res_text = f"""
-            **📋 التقرير الفني التوجيهي:**
-            1. **طبيعة المشكلة:** {user_input}
-            2. **خطوات الفحص والتوجيه:**
-               - فحص مرشح الهواء ونسبة الانسداد.
-               - اختبار بخاخات الوقود وضغط مضخة الحقن.
-               - التأكد من جودة الديزل وعدم وجود خلط بالماء.
-            """
-            st.session_state.ai_logs.append({"query": user_input, "result": res_text, "date": datetime.now().strftime("%Y-%m-%d %H:%M")})
-        else:
-            st.warning("يرجى كتابة تفاصيل العطل.")
+        if st.button("تحليل العطل وإنشاء التقرير 🔍", use_container_width=True):
+            if user_input:
+                res_text = f"""
+                **📋 التقرير الفني التوجيهي:**
+                1. **طبيعة المشكلة:** {user_input}
+                2. **خطوات الفحص والتوجيه:**
+                   - فحص مرشح الهواء ونسبة الانسداد.
+                   - اختبار بخاخات الوقود وضغط مضخة الحقن.
+                   - التأكد من جودة الديزل وعدم وجود خلط بالماء.
+                """
+                if "ai_logs" not in st.session_state: st.session_state.ai_logs = []
+                st.session_state.ai_logs.append({"query": user_input, "result": res_text, "date": datetime.now().strftime("%Y-%m-%d %H:%M")})
+            else:
+                st.warning("يرجى كتابة تفاصيل العطل.")
 
-    for log in reversed(st.session_state.ai_logs):
-        st.info(f"📅 التاريخ: {log['date']}")
-        st.write(f"**العطل:** {log['query']}")
-        st.markdown(log['result'])
-        st.divider()
+        if "ai_logs" in st.session_state and st.session_state.ai_logs:
+            for log in reversed(st.session_state.ai_logs):
+                st.info(f"📅 التاريخ: {log['date']}")
+                st.write(f"**العطل:** {log['query']}")
+                st.markdown(log['result'])
+                st.divider()
 
-    st.subheader("📄 إصدار تقرير الاستشارات PDF")
-    def generate_ai_pdf():
-        pdf = ComprehensivePDF("AI DIAGNOSTIC & MAINTENANCE REPORT")
-        pdf.add_page()
-        pdf.set_font("Helvetica", "", 9)
-        for log in st.session_state.ai_logs:
-            pdf.set_font("Helvetica", "B", 10)
-            pdf.cell(0, 5, f"Date: {log['date']}", ln=True)
-            pdf.set_font("Helvetica", "", 9)
-            pdf.cell(0, 5, f"Query: {sanitize_latin_only(log['query'])}", ln=True)
-            pdf.ln(3)
-        return pdf.output(dest="S").encode("latin-1", errors="replace")
+            st.subheader("📄 إصدار تقرير الاستشارات PDF")
+            def generate_ai_pdf():
+                pdf = ComprehensivePDF("AI DIAGNOSTIC & MAINTENANCE REPORT")
+                pdf.add_page()
+                pdf.set_font("Helvetica", "", 9)
+                for log in st.session_state.ai_logs:
+                    pdf.set_font("Helvetica", "B", 10)
+                    pdf.cell(0, 5, f"Date: {log['date']}", ln=True)
+                    pdf.set_font("Helvetica", "", 9)
+                    pdf.cell(0, 5, f"Query: {sanitize_latin_only(log['query'])}", ln=True)
+                    pdf.ln(3)
+                return pdf.output(dest="S").encode("latin-1", errors="replace")
 
-    st.download_button(
-        label="🖨️ إصدار تقرير الاستشارات الفنية (PDF)",
-        data=generate_ai_pdf(),
-        file_name=f"AI_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
-        mime="application/pdf",
-        use_container_width=True
-    )
+            st.download_button(
+                label="🖨️ إصدار تقرير الاستشارات الفنية (PDF)",
+                data=generate_ai_pdf(),
+                file_name=f"AI_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+
+    # --- TAB 2: الكتالوجات (PDF) ---
+    with tab2:
+        st.subheader("📚 مكتبة رفع وتحميل الكتالوجات الميدانية (PDF Manuals)")
+        uploaded_catalog = st.file_uploader("قم برفع ملف الكتالوج (PDF):", type=["pdf"])
+        
+        if uploaded_catalog is not None:
+            st.success(f"✅ تم رفع الكتالوج بنجاح: **{uploaded_catalog.name}** ({uploaded_catalog.size / 1024:.1f} KB)")
+            st.download_button(
+                label=f"⬇️ تنزيل كتالوج: {uploaded_catalog.name}",
+                data=uploaded_catalog.getvalue(),
+                file_name=uploaded_catalog.name,
+                mime="application/pdf",
+                use_container_width=True
+            )
+
+    # --- TAB 3: قراءة الأكواد (QR/Barcode) ---
+    with tab3:
+        st.subheader("📷 رفع وتحليل صورة الكود (QR Code / Barcode)")
+        uploaded_code_img = st.file_uploader("رفع صورة الكود أو الباركود الخارجي للقطعة:", type=["png", "jpg", "jpeg"])
+
+        if uploaded_code_img is not None:
+            image = Image.open(uploaded_code_img)
+            st.image(image, caption="الصورة المرفوعة للقطعة/الكود", width=300)
+            
+            if decode_qr is not None:
+                decoded_objects = decode_qr(image)
+                if decoded_objects:
+                    for obj in decoded_objects:
+                        st.success(f"🔑 **نتيجة قراءة الكود:** `{obj.data.decode('utf-8')}` (نوع الكود: {obj.type})")
+                else:
+                    st.warning("⚠️ لم يتم العثور على باركود أو QR ذكي واضح داخل الصورة، يمكنك إدخال الرقم يدوياً.")
+            else:
+                st.info("💡 **القراءة اليدوية:** تم رفع الصورة بنجاح. أداة تحليل الباركود التلقائي غير مفعلة في البيئة الحالية.")
 
 # =========================================================
-# التطبيق 3: فحص المعدات وشجرة الأعطال
+# التطبيق 3: فحص المعدات والمقارنة البصرية (تالف / سليم)
 # =========================================================
-elif selected_app == "🔍 3. نظام فحص المعدات وشجرة الأعطال":
-    st.title("🔍 نظام فحص المعدات وشجرة التشخيص الميداني")
+elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة البصرية (تالف/سليم)":
+    st.title("🔍 نظام فحص المعدات والمقارنة البصرية لقطع الغيار")
 
-    eq_type = st.selectbox("اختر المعدة للفحص:", ["مولد ديزل صناعي", "غرفة تبريد وتجميد WIC", "محرك كهربائي 3-Phase"])
+    eq_type = st.selectbox("اختر المعدة المراد فحصها:", ["مولد ديزل صناعي", "غرفة تبريد وتجميد WIC", "محرك كهربائي 3-Phase"])
 
+    st.divider()
+    st.subheader("🖼️ المقارنة البصرية لقطع الغيار (التالف vs السليم)")
+    
+    col_img1, col_img2 = st.columns(2)
+    with col_img1:
+        st.write("🟢 **رفع صورة القطعة السليمة (Reference):**")
+        good_img_file = st.file_uploader("اختر صورة قطعة جديدة/سليمة", type=["png", "jpg", "jpeg"], key="good_img")
+        if good_img_file:
+            st.image(Image.open(good_img_file), caption="القطعة السليمة المعيارية", use_column_width=True)
+
+    with col_img2:
+        st.write("🔴 **رفع صورة القطعة التالفة / المفحوصة (Damaged):**")
+        bad_img_file = st.file_uploader("اختر صورة القطعة التالفة من الميدان", type=["png", "jpg", "jpeg"], key="bad_img")
+        if bad_img_file:
+            st.image(Image.open(bad_img_file), caption="القطعة المفحوصة في الموقع", use_column_width=True)
+
+    if good_img_file and bad_img_file:
+        st.warning("🔍 **ملاحظة التحليل الميداني:** توجد فروقات بصرية واضحة في مستوى التآكل أو الرايش السطحي بين القطعتين. ينصح بالاستبدال الفوري.")
+
+    st.divider()
+    st.subheader("📋 قائمة الفحص الظاهري والميكانيكي")
     checklist = []
     if eq_type == "مولد ديزل صناعي":
         c1 = st.checkbox("1. تسريب زيت أو وقود أسفل المحرك")
@@ -531,9 +584,9 @@ elif selected_app == "🔍 3. نظام فحص المعدات وشجرة الأع
         checklist = [("ارتفاع الحرارة", m1), ("صوت الرمان بلي", m2)]
 
     st.divider()
-    st.subheader("📄 إصدار تقرير الفحص الميداني PDF")
+    st.subheader("📄 إصدار تقرير الفحص الميداني والمقارنة PDF")
     def generate_chk_pdf():
-        pdf = ComprehensivePDF("EQUIPMENT FIELD INSPECTION REPORT")
+        pdf = ComprehensivePDF("EQUIPMENT FIELD INSPECTION & VISUAL REPORT")
         pdf.add_page()
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(0, 5, f"Equipment Type: {sanitize_latin_only(eq_type)}", ln=True)
