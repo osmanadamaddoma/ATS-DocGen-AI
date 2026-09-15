@@ -22,6 +22,21 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
+# منع الترجمة التلقائية لتفادي تعارض الـ React DOM (removeChild Error)
+# ---------------------------------------------------------
+st.markdown("""
+    <script>
+        document.documentElement.classList.add('notranslate');
+        document.documentElement.setAttribute('translate', 'no');
+    </script>
+    <style>
+        .notranslate {
+            translate: no !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------
 # 1. تهيئة الاتصال بـ Firebase Firestore
 # ---------------------------------------------------------
 @st.cache_resource
