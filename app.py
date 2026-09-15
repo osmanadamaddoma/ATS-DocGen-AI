@@ -31,13 +31,13 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# 1. دالة البحث الهندسية الربط بـ Google Books & Web Search API
+# 1. دالة البحث الهندسية والربط بـ Google Books & Web Search API
 # ---------------------------------------------------------
 def search_engineering_resources(query_text):
     """دالة لجلب المراجع الهندسية والكتب من Google Books و Bing/Google Web."""
     results = {"books": [], "web_articles": []}
     
-    # 1. البحث في كتب Google Books API (مجاني ولا يتطلب API Key في الغالب)
+    # 1. البحث في كتب Google Books API
     try:
         gbooks_url = f"https://www.googleapis.com/books/v1/volumes?q={urllib.parse.quote(query_text)}&maxResults=3"
         resp = requests.get(gbooks_url, timeout=5)
@@ -51,10 +51,10 @@ def search_engineering_resources(query_text):
                     "link": volume_info.get("previewLink", "#"),
                     "snippet": volume_info.get("description", "لا يوجد وصف مختصر.")[:150] + "..."
                 })
-    except Exception as e:
+    except Exception:
         pass
 
-    # 2. البحث في ويب Google / Bing (يمكن إضافة API Keys في st.secrets مستقبلاً)
+    # 2. البحث في ويب Google / Bing
     bing_api_key = st.secrets.get("BING_API_KEY", os.environ.get("BING_API_KEY", ""))
     if bing_api_key:
         try:
@@ -128,7 +128,7 @@ except Exception as e:
     db = None
 
 # ---------------------------------------------------------
-# 4. إدارة الاشتراكات الزمنيّة (أيام / شهور / سنوات)
+# 4. إدارة الاشتراكات الزمنيّة
 # ---------------------------------------------------------
 if "device_id" not in st.session_state:
     query_params = st.query_params
@@ -259,7 +259,7 @@ if access_status == "expired":
     st.stop()
 
 # ---------------------------------------------------------
-# 5. قائمة اختيار التطبيقات (3 في 1) + المكتبة المحفوظة
+# 5. قائمة اختيار التطبيقات والمكتبة
 # ---------------------------------------------------------
 st.sidebar.divider()
 st.sidebar.header("🛠️ التطبيقات والمكتبة التلقائية")
@@ -274,12 +274,11 @@ selected_app = st.sidebar.radio(
 )
 st.sidebar.divider()
 
-# تهيئة شجرة المكتبة المحفوظة في st.session_state
 if "auto_library" not in st.session_state:
     st.session_state.auto_library = []
 
 # =========================================================
-# التطبيق 1: نظام الصيانة التنبؤية، الرسوم البيانية والتقرير الشامل
+# التطبيق 1: نظام الصيانة التنبؤية المتكامل
 # =========================================================
 if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات والرسوم البيانية":
     st.title("⚙️ نظام الصيانة التنبؤية ومراقبة المولدات الصناعية")
@@ -344,7 +343,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         st.success("🟢 جميع المؤشرات التشغيلية ضمن الحدود الآمنة.")
 
     st.divider()
-    st.subheader("🛢️ جدول خدمة زيت المحرك والمدد الافتراضية للفلاتر وقطع الغيار")
+    st.subheader("🛢️ جدول الصيانة التنبؤية والمدد الافتراضية المكتملة لقطع الغيار")
 
     effective_hours = future_run_hours if future_run_hours > 0 else run_hours
     hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
@@ -356,17 +355,22 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     col_o2.metric("المدة المتبقية للخدمة", f"{max(0.0, hours_until_next_oil_change):.1f} hrs")
     col_o3.metric("نسبة استهلاك فترة الزيت", f"{oil_usage_pct:.0f}%")
 
+    # قاعدة البيانات المكتملة لجميع قطع الغيار بمددها الافتراضية
     base_parts_data = [
         {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Engine Oil & Filter", "العمر الافتراضي (ساعة)": float(oil_change_interval), "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
         {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Primary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
         {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Secondary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
-        {"تصنيف القطعة": "Air System", "قطع الغيار / الفلاتر": "Air Filter", "العمر الافتراضي (ساعة)": 1000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "Fan Belt", "العمر الافتراضي (ساعة)": 2000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "ELC Coolant", "العمر الافتراضي (ساعة)": 3000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Air System", "قطع الغيار / الفلاتر": "Air Filter Element", "العمر الافتراضي (ساعة)": 1000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "Fan & Alternator Belt", "العمر الافتراضي (ساعة)": 2000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "ELC Coolant Fluid", "العمر الافتراضي (ساعة)": 3000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Fuel System", "قطع الغيار / الفلاتر": "Fuel Injectors (بخاخات)", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "Water Pump (مضخة الماء)", "العمر الافتراضي (ساعة)": 6000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Electrical", "قطع الغيار / الفلاتر": "Starter Battery", "العمر الافتراضي (ساعة)": 4000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Overhaul", "قطع الغيار / الفلاتر": "Turbocharger Kit", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
     ]
 
     df_parts_input = pd.DataFrame(base_parts_data)
-    edited_table = st.data_editor(df_parts_input, num_rows="dynamic", use_container_width=True, key="parts_editor")
+    edited_table = st.data_editor(df_parts_input, num_rows="dynamic", use_container_width=True, key="parts_editor_v2")
 
     processed_rows = []
     for idx, row in edited_table.iterrows():
@@ -377,7 +381,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         rem = life - used
         pct = (used / life) * 100 if life > 0 else 0
 
-        status = "EXPIRED (انقضاء المدة)" if rem <= 0 else ("WARNING (اقتراب الخدمة)" if pct >= 90 else "GOOD (جيدة)")
+        status = "EXPIRED (انقضاء المدة)" if rem <= 0 else ("WARNING (اقتراب الخدمة)" if pct >= 80 else "GOOD (جيدة)")
         processed_rows.append({
             "تصنيف القطعة": cat,
             "قطع الغيار / الفلاتر": part,
@@ -391,7 +395,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     df_result = pd.DataFrame(processed_rows)
 
     st.divider()
-    st.subheader("📊 رسومات وتأطير أداء الآليات وقطع الغيار")
+    st.subheader("📊 الرسوم البيانية لأداء الآليات وجاهزية قطع الغيار")
 
     chart_col1, chart_col2 = st.columns(2)
     with chart_col1:
@@ -409,19 +413,20 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         fig_pie = px.pie(
             df_result,
             names="الحالة الفنية",
-            title="توزيع جاهزية ونسبة سلامة قطع الغيار",
+            title="توزيع جاهزية ونسبة سلامة قطع الغيار (Pie Chart)",
             color_discrete_sequence=["#28a745", "#ffc107", "#dc3545"]
         )
         st.plotly_chart(fig_pie, use_container_width=True)
 
     st.divider()
-    st.subheader("📄 إصدار وتنزيل التقرير الفني الشامل (PDF Full Report)")
+    st.subheader("📄 إصدار وتنزيل التقرير الفني الشامل مع الرسوم البيانية الدائرية (PDF)")
 
     def generate_full_pdf_bytes():
-        pdf = ComprehensivePDF("GENERATOR & PREDICTIVE MAINTENANCE REPORT")
+        pdf = ComprehensivePDF("COMPREHENSIVE MAINTENANCE & DIAGNOSTIC REPORT")
         pdf.add_page()
         temp_files = []
 
+        # 1. القراءات التشغيلية
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(0, 5, f"Generator Model: {sanitize_latin_only(gen_model)}", ln=True)
         pdf.cell(0, 5, f"Total Run Hours: {run_hours} hrs | Target Hours: {future_run_hours} hrs", ln=True)
@@ -430,16 +435,18 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         pdf.cell(0, 5, f"Mechanical: Coolant {coolant_temp} C | Oil Press {oil_press} Bar | Vib {vibration} mm/s", ln=True)
         pdf.ln(3)
 
+        # 2. ملخص خدمة الزيت
         pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(0, 6, "1. Oil & Filter Service Summary:", ln=True)
+        pdf.cell(0, 6, "1. Engine Oil & Filter Service Summary:", ln=True)
         pdf.set_font("Helvetica", "", 9)
         pdf.cell(0, 5, f"- Default Oil Change Interval: {oil_change_interval} hrs", ln=True)
         pdf.cell(0, 5, f"- Hours Used on Oil: {hours_since_oil_change} hrs ({oil_usage_pct:.0f}%)", ln=True)
         pdf.cell(0, 5, f"- Remaining Hours to Change: {max(0.0, hours_until_next_oil_change)} hrs", ln=True)
         pdf.ln(3)
 
+        # 3. الجدول الكامل المحدث لقطع الغيار
         pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(0, 6, "2. Predictive Maintenance & Parts Lifespan Table:", ln=True)
+        pdf.cell(0, 6, "2. Full Spare Parts Lifespan & Predictive Maintenance Schedule:", ln=True)
         pdf.set_font("Helvetica", "B", 8)
         pdf.cell(45, 5, "Part Name", border=1)
         pdf.cell(25, 5, "Lifespan(h)", border=1)
@@ -457,29 +464,45 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.cell(35, 5, sanitize_latin_only(str(row["الحالة الفنية"])), border=1)
             pdf.ln()
 
+        # 4. إدراج الرسم البياني الدائري والشريطي داخل التقرير
         try:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 11)
-            pdf.cell(0, 6, "3. Performance & Maintenance Visual Charts:", ln=True)
+            pdf.cell(0, 6, "3. Visual Analytics & Predictive Maintenance Charts:", ln=True)
 
-            fig, ax = plt.subplots(figsize=(6.5, 3))
+            # توليد رسم شريطي (Bar Chart)
+            fig1, ax1 = plt.subplots(figsize=(6.5, 2.8))
             p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
             u_h = df_result["الساعات المنقضية (ساعة)"].values
             r_h = df_result["المدة المتبقية (ساعة)"].values
 
-            ax.bar(p_short, u_h, label="Used Hours", color="#d9534f")
-            ax.bar(p_short, r_h, bottom=u_h, label="Remaining Hours", color="#28a745")
-            ax.set_title("Parts Lifespan Overview (Hours)", fontsize=9)
+            ax1.bar(p_short, u_h, label="Used Hours", color="#d9534f")
+            ax1.bar(p_short, r_h, bottom=u_h, label="Remaining Hours", color="#28a745")
+            ax1.set_title("Spare Parts Lifespan Overview (Hours)", fontsize=9)
             plt.xticks(rotation=35, ha="right", fontsize=7)
             plt.tight_layout()
 
-            chart_path = f"temp_chart_{datetime.now().timestamp()}.png"
-            plt.savefig(chart_path, dpi=200)
-            plt.close(fig)
-            temp_files.append(chart_path)
+            chart_path_bar = f"temp_bar_{datetime.now().timestamp()}.png"
+            plt.savefig(chart_path_bar, dpi=200)
+            plt.close(fig1)
+            temp_files.append(chart_path_bar)
+            pdf.image(chart_path_bar, x=15, y=25, w=170)
 
-            pdf.image(chart_path, x=15, y=30, w=170)
-        except Exception:
+            # توليد وتضمين الرسم البياني الدائري (Pie Chart)
+            fig2, ax2 = plt.subplots(figsize=(5, 3))
+            status_counts = df_result["الحالة الفنية"].value_counts()
+            labels = [sanitize_latin_only(str(k)) for k in status_counts.index]
+            ax2.pie(status_counts.values, labels=labels, autopct='%1.1f%%', colors=['#28a745', '#ffc107', '#dc3545'][:len(labels)])
+            ax2.set_title("Parts Safety & Readiness Distribution (Pie Chart)", fontsize=9)
+            plt.tight_layout()
+
+            chart_path_pie = f"temp_pie_{datetime.now().timestamp()}.png"
+            plt.savefig(chart_path_pie, dpi=200)
+            plt.close(fig2)
+            temp_files.append(chart_path_pie)
+            pdf.image(chart_path_pie, x=25, y=115, w=150)
+
+        except Exception as e:
             pass
 
         pdf_bytes = pdf.output(dest="S")
@@ -489,9 +512,9 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         return pdf_bytes.encode("latin-1", errors="replace")
 
     st.download_button(
-        label="🖨️ أصدار التقرير الفني الشامل والرسوم البيانية (PDF)",
+        label="🖨️ إصدار التقرير الفني المكتمل مدمجاً بجدول القطع والرسوم البيانية الدائرية (PDF)",
         data=generate_full_pdf_bytes(),
-        file_name=f"Full_Maintenance_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+        file_name=f"Comprehensive_Maintenance_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
         mime="application/pdf",
         use_container_width=True
     )
@@ -530,7 +553,6 @@ elif selected_app == "🤖 2. المساعد الذكي والربط التلق�
                     else:
                         st.write(f"👉 [اضغط هنا للبحث المباشر عن `{fault_query}` في Google](https://www.google.com/search?q={urllib.parse.quote(fault_query)})")
                     
-                    # حفظ الاستعلام والمراجع تلقائياً في مكتبة المستخدم
                     st.session_state.auto_library.append({
                         "query": fault_query,
                         "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
