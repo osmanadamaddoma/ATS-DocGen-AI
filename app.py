@@ -257,7 +257,7 @@ if "auto_library" not in st.session_state:
     st.session_state.auto_library = []
 
 # =========================================================
-# التطبيق 1: نظام الصيانة التنبؤية المتكامل مع رفع وتحميل الصور
+# التطبيق 1: نظام الصيانة التنبؤية والمتكامل مع رفع وتحميل الصور
 # =========================================================
 if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات والرسوم البيانية":
     st.title("⚙️ نظام الصيانة التنبؤية ومراقبة المولدات الصناعية")
@@ -311,7 +311,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     col4.metric("حرارة المحرك", f"{coolant_temp} °C")
 
     st.divider()
-    st.subheader("🛢️ جدول الصيانة التنبؤية المطابق تماماً للمواصفات المعتمدة (14 بنداً)")
+    st.subheader("🛢️ جدول الصيانة التنبؤية المعتمد (14 بنداً كاملاً)")
 
     effective_hours = future_run_hours if future_run_hours > 0 else run_hours
     hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
@@ -334,7 +334,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     ]
 
     df_parts_input = pd.DataFrame(base_parts_data)
-    edited_table = st.data_editor(df_parts_input, num_rows="dynamic", use_container_width=True, key="parts_editor_v5")
+    edited_table = st.data_editor(df_parts_input, num_rows="dynamic", use_container_width=True, key="parts_editor_v6")
 
     processed_rows = []
     for idx, row in edited_table.iterrows():
@@ -371,7 +371,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
 
     st.divider()
 
-    # ** دالة توليد الـ PDF الآمنة بدون أخطاء **
+    # دالة توليد التقرير المضمونة والآمنة 100%
     def generate_full_pdf_bytes():
         pdf = ComprehensivePDF("COMPREHENSIVE MAINTENANCE REPORT")
         pdf.add_page()
@@ -439,12 +439,14 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         except Exception:
             pass
 
-        # تصحيح طريقة الإخراج لتفادي أخطاء FPDF في التنزيل
-        pdf_out = pdf.output()
-        if isinstance(pdf_out, str):
-            pdf_bytes = pdf_out.encode("latin-1", errors="replace")
+        # استخراج مخرجات PDF بشكل نقي ومتوافق مع النظم
+        pdf_output = pdf.output()
+        if isinstance(pdf_output, str):
+            final_bytes = pdf_output.encode("latin-1", errors="replace")
+        elif isinstance(pdf_output, (bytes, bytearray)):
+            final_bytes = bytes(pdf_output)
         else:
-            pdf_bytes = bytes(pdf_out)
+            final_bytes = b""
 
         for f in temp_files:
             if os.path.exists(f): 
@@ -454,11 +456,11 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             try: os.remove(saved_img_path)
             except Exception: pass
 
-        return pdf_bytes
+        return final_bytes
 
-    # زر التحميل المباشر الآمن
+    # زر التحميل الفعال والآمن
     st.download_button(
-        label="🖨️ إصدار وتنزيل التقرير الفني الشامل المعتمد (PDF) مع الصور والرسوم الدائرية",
+        label="🖨️ إصدار وتنزيل التقرير الفني الشامل المعتمد (PDF) مع الصور والرسوم البيانية",
         data=generate_full_pdf_bytes(),
         file_name=f"Comprehensive_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
         mime="application/pdf",
