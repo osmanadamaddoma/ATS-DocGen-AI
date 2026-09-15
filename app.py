@@ -4,10 +4,21 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+# ---------------------------------------------------------
 # 1. تهيئة إعدادات الصفحة
+# ---------------------------------------------------------
 st.set_page_config(
     page_title="منصة الدومة المتكاملة", page_icon="🛠️", layout="wide"
 )
+
+
+# دالة مساعدة لتصدير البيانات إلى ملف Excel
+def convert_df_to_excel(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="تقرير المولد")
+    return output.getvalue()
+
 
 # ---------------------------------------------------------
 # 2. القائمة الجانبية (Sidebar)
@@ -23,7 +34,7 @@ with st.sidebar:
         "اختر النظام المطلوب:",
         [
             "⚙️ لوحة التحكم والصيانة التنبؤية",
-            "📊 التقارير والرسوم البيانية",
+            "📊 التقارير والرسوم البيانية وإصدار البيانات",
         ],
     )
 
@@ -92,7 +103,7 @@ if app_mode == "⚙️ لوحة التحكم والصيانة التنبؤية":
         "⚙️ نظام الصيانة التنبؤية والتقارير الشاملة للمولدات الصناعية"
     )
 
-    # عرض البطاقات الأساسية (KPIs)
+    # عرض بطاقات المؤشرات (KPIs)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("إجمالي التشغيل", f"{hours_current} hrs")
@@ -111,7 +122,6 @@ if app_mode == "⚙️ لوحة التحكم والصيانة التنبؤية":
     st.markdown("---")
     st.subheader("🚨 إنذارات الحدود التشغيلية")
 
-    # فحص الحدود
     alerts = []
     if volt < v_min or volt > v_max:
         alerts.append(f"تجاوز حدود الجهد الكهربائي: {volt}V")
@@ -176,12 +186,12 @@ if app_mode == "⚙️ لوحة التحكم والصيانة التنبؤية":
     }
     st.table(pd.DataFrame(parts_data))
 
-elif app_mode == "📊 التقارير والرسوم البيانية":
-    st.title("📊 مركز التقارير وتحليل الرسوم البيانية")
+elif app_mode == "📊 التقارير والرسوم البيانية وإصدار البيانات":
+    st.title("📊 مركز التقارير والرسوم البيانية وإصدار البيانات")
 
     st.subheader("📈 الرسم البياني لأداء المولد")
 
-    # توليد بيانات زَمنية توضيحية للرسم البياني
+    # بيانات زمنية توضيحية للرسم البياني
     np.random.seed(42)
     time_index = pd.date_range("2026-09-01", periods=30, freq="D")
     df_chart = pd.DataFrame(
@@ -200,9 +210,8 @@ elif app_mode == "📊 التقارير والرسوم البيانية":
     st.line_chart(df_chart)
 
     st.markdown("---")
-    st.subheader("📥 إصدار وتصدير التقارير")
+    st.subheader("📥 مركز إصدار وتصدير التقارير")
 
-    # إعداد جدول التقرير للتحميل
     report_dict = {
         "طراز المولد": [gen_model],
         "ساعات التشغيل الحالية": [hours_current],
@@ -222,15 +231,15 @@ elif app_mode == "📊 التقارير والرسوم البيانية":
     }
     df_report = pd.DataFrame(report_dict)
 
-    st.dataframe(df_report)
+    st.dataframe(df_report, use_container_width=True)
 
-    col_exp1, col_exp2 = st.columns(2)
+    col_exp1, col_exp2, col_exp3 = st.columns(3)
 
     with col_exp1:
-        # تصدير ملف CSV
+        # تصدير CSV
         csv_buffer = df_report.to_csv(index=False).encode("utf-8-sig")
         st.download_button(
-            label="📥 تصدير التقرير الحالي (CSV)",
+            label="📄 تصدير التقرير (CSV)",
             data=csv_buffer,
             file_name=f"Generator_Report_{gen_model}.csv",
             mime="text/csv",
@@ -238,10 +247,24 @@ elif app_mode == "📊 التقارير والرسوم البيانية":
         )
 
     with col_exp2:
-        # خيار إعداد للطباعة PDF
-        if st.button("🖨️ تجهيز التقرير للطباعة (PDF)", use_container_width=True):
+        # تصدير Excel
+        try:
+            excel_buffer = convert_df_to_excel(df_report)
+            st.download_button(
+                label="📊 تصدير التقرير (Excel)",
+                data=excel_buffer,
+                file_name=f"Generator_Report_{gen_model}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        except Exception:
+            st.caption("يتطلب تصدير Excel وجود مكتبة xlsxwriter")
+
+    with col_exp3:
+        # طباعة PDF
+        if st.button("🖨️ طباعة التقرير (PDF)", use_container_width=True):
             st.info(
-                "💡 يمكنك الآن الضغط على (Ctrl + P) أو (Cmd + P) لحفظ الصفحة بصيغة PDF."
+                "💡 يمكنك الآن الضغط على (Ctrl + P) أو (Cmd + P) لحفظ التقرير بصيغة PDF."
             )
 
 # ---------------------------------------------------------
