@@ -371,7 +371,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
 
     st.divider()
 
-    # دالة توليد التقرير المضمونة والآمنة 100% باستخدام الذاكرة المؤقتة BytesIO
+    # دالة توليد التقرير المضمونة والآمنة 100% والمتوافقة مع FPDF2
     def generate_full_pdf_bytes():
         pdf = ComprehensivePDF("COMPREHENSIVE MAINTENANCE REPORT")
         pdf.add_page()
@@ -467,8 +467,12 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             except Exception:
                 pass
 
-        # إرجاع البايتات النقية للتقرير
-        return bytes(pdf.output())
+        # إرجاع مخرجات الـ PDF بشكل آمن ومتوافق مع جميع إصدارات FPDF
+        out = pdf.output()
+        if isinstance(out, (bytes, bytearray)):
+            return bytes(out)
+        else:
+            return out.encode('latin1')
 
     # --- زر التجهيز والتنزيل المباشر لمنع الخطأ في الجوال ---
     st.divider()
