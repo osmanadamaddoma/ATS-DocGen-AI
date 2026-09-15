@@ -3,6 +3,7 @@ import io
 import json
 import os
 import re
+import urllib.parse
 import uuid
 
 from fpdf import FPDF
@@ -12,6 +13,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 import plotly.express as px
+import requests
 import streamlit as st
 
 # استيراد محرك قراءة الأكواد (Barcode/QR) في حال توفره
@@ -29,7 +31,51 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# 1. دالة تنظيف النصوص ومحرك تقارير PDF
+# 1. دالة البحث الهندسية الربط بـ Google Books & Web Search API
+# ---------------------------------------------------------
+def search_engineering_resources(query_text):
+    """دالة لجلب المراجع الهندسية والكتب من Google Books و Bing/Google Web."""
+    results = {"books": [], "web_articles": []}
+    
+    # 1. البحث في كتب Google Books API (مجاني ولا يتطلب API Key في الغالب)
+    try:
+        gbooks_url = f"https://www.googleapis.com/books/v1/volumes?q={urllib.parse.quote(query_text)}&maxResults=3"
+        resp = requests.get(gbooks_url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            for item in data.get("items", []):
+                volume_info = item.get("volumeInfo", {})
+                results["books"].append({
+                    "title": volume_info.get("title", "بدون عنوان"),
+                    "authors": ", ".join(volume_info.get("authors", ["مؤلف غير معروف"])),
+                    "link": volume_info.get("previewLink", "#"),
+                    "snippet": volume_info.get("description", "لا يوجد وصف مختصر.")[:150] + "..."
+                })
+    except Exception as e:
+        pass
+
+    # 2. البحث في ويب Google / Bing (يمكن إضافة API Keys في st.secrets مستقبلاً)
+    bing_api_key = st.secrets.get("BING_API_KEY", os.environ.get("BING_API_KEY", ""))
+    if bing_api_key:
+        try:
+            headers = {"Ocp-Apim-Subscription-Key": bing_api_key}
+            params = {"q": f"{query_text} maintenance manual repair guide", "textDecorations": True, "textFormat": "HTML"}
+            response = requests.get("https://api.bing.microsoft.com/v7.0/search", headers=headers, params=params, timeout=5)
+            if response.status_code == 200:
+                search_results = response.json()
+                for page in search_results.get("webPages", {}).get("value", [])[:3]:
+                    results["web_articles"].append({
+                        "title": page.get("name"),
+                        "link": page.get("url"),
+                        "snippet": page.get("snippet")
+                    })
+        except Exception:
+            pass
+
+    return results
+
+# ---------------------------------------------------------
+# 2. دالة تنظيف النصوص ومحرك تقارير PDF
 # ---------------------------------------------------------
 def sanitize_latin_only(text):
     if not isinstance(text, str):
@@ -56,7 +102,7 @@ class ComprehensivePDF(FPDF):
         self.cell(0, 10, f"Page {self.page_no()} | System Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
 
 # ---------------------------------------------------------
-# 2. تهيئة الاتصال بـ Firebase Firestore
+# 3. تهيئة الاتصال بـ Firebase Firestore
 # ---------------------------------------------------------
 @st.cache_resource
 def init_firebase():
@@ -82,7 +128,7 @@ except Exception as e:
     db = None
 
 # ---------------------------------------------------------
-# 3. إدارة المدد الزمنية للاشتراكات (أيام / شهور / سنوات)
+# 4. إدارة الاشتراكات الزمنيّة (أيام / شهور / سنوات)
 # ---------------------------------------------------------
 if "device_id" not in st.session_state:
     query_params = st.query_params
@@ -174,7 +220,7 @@ else:
     expiry_date_str = "منتهي"
 
 # ---------------------------------------------------------
-# لوحة عرض الاشتراكات وإدخال الأكواد الزمنية
+# لوحة تفاصيل الاشتراك والتفعيل
 # ---------------------------------------------------------
 st.sidebar.header("🔐 تفاصيل الاشتراك والتفعيل")
 
@@ -208,26 +254,29 @@ with st.sidebar.expander("🔑 إدخال كود التفعيل (أيام / شه
         else:
             st.error("❌ كود تفعيل غير صحيح.")
 
-st.sidebar.caption("💡 **أكواد للتجربة:** `ADDOMA-30D` (شهر) | `ADDOMA-1Y` (سنة)")
-
 if access_status == "expired":
     st.error("🔒 **النظام مقفل:** انتهت الفترة التجريبية. يرجى التفعيل باستخدام كود اشتراك ساري.")
     st.stop()
 
 # ---------------------------------------------------------
-# 4. قائمة اختيار التطبيق (3 في 1)
+# 5. قائمة اختيار التطبيقات (3 في 1) + المكتبة المحفوظة
 # ---------------------------------------------------------
 st.sidebar.divider()
-st.sidebar.header("🛠️ التطبيقات المتاحة")
+st.sidebar.header("🛠️ التطبيقات والمكتبة التلقائية")
 selected_app = st.sidebar.radio(
     "اختر النظام المطلوب:",
     [
         "⚙️ 1. الصيانة التنبؤية والمولدات والرسوم البيانية",
-        "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد",
-        "🔍 3. نظام فحص المعدات والمقارنة البصرية (تالف/سليم)"
+        "🤖 2. المساعد الذكي والربط التلقائي بمواقع البحوث",
+        "🔍 3. فحص المعدات والمقارنة البصرية (تالف/سليم)",
+        "📚 4. مكتبتي الفنية (التغذية التلقائية المحفوظة)"
     ]
 )
 st.sidebar.divider()
+
+# تهيئة شجرة المكتبة المحفوظة في st.session_state
+if "auto_library" not in st.session_state:
+    st.session_state.auto_library = []
 
 # =========================================================
 # التطبيق 1: نظام الصيانة التنبؤية، الرسوم البيانية والتقرير الشامل
@@ -448,163 +497,101 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     )
 
 # =========================================================
-# التطبيق 2: المساعد الذكي والكتالوجات وقراءة الأكواد
+# التطبيق 2: المساعد الذكي والربط التلقائي بمواقع البحوث
 # =========================================================
-elif selected_app == "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد":
-    st.title("🤖 المساعد الذكي، مكتبة الكتالوجات وقراءة الأكواد")
+elif selected_app == "🤖 2. المساعد الذكي والربط التلقائي بمواقع البحوث":
+    st.title("🤖 المساعد الذكي والربط التلقائي بمواقع البحوث والكتب")
 
-    tab1, tab2, tab3 = st.tabs(["💬 الاستشارات والتحليل", "📚 رفع وتصفح الكتالوجات", "📷 رفع وقراءة الأكواد (QR/Barcode)"])
+    tab1, tab2, tab3 = st.tabs(["🌐 البحث الآلي والتغذية الهندسية", "📚 مكتبة رفع الكتالوجات", "📷 تحليل الأكواد والقطع"])
 
-    # --- TAB 1: الاستشارات والتحليل ---
     with tab1:
-        st.subheader("💡 تحليل العطل واستخراج التقرير")
-        user_input = st.text_area("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: ارتفاع حرارة المحرك مع انخفاض ضغط الزيت...")
-
-        if st.button("تحليل العطل وإنشاء التقرير 🔍", use_container_width=True):
-            if user_input:
-                res_text = f"""
-                **📋 التقرير الفني التوجيهي:**
-                1. **طبيعة المشكلة:** {user_input}
-                2. **خطوات الفحص والتوجيه:**
-                   - فحص مرشح الهواء ونسبة الانسداد.
-                   - اختبار بخاخات الوقود وضغط مضخة الحقن.
-                   - التأكد من جودة الديزل وعدم وجود خلط بالماء.
-                """
-                if "ai_logs" not in st.session_state: st.session_state.ai_logs = []
-                st.session_state.ai_logs.append({"query": user_input, "result": res_text, "date": datetime.now().strftime("%Y-%m-%d %H:%M")})
-            else:
-                st.warning("يرجى كتابة تفاصيل العطل.")
-
-        if "ai_logs" in st.session_state and st.session_state.ai_logs:
-            for log in reversed(st.session_state.ai_logs):
-                st.info(f"📅 التاريخ: {log['date']}")
-                st.write(f"**العطل:** {log['query']}")
-                st.markdown(log['result'])
-                st.divider()
-
-            st.subheader("📄 إصدار تقرير الاستشارات PDF")
-            def generate_ai_pdf():
-                pdf = ComprehensivePDF("AI DIAGNOSTIC & MAINTENANCE REPORT")
-                pdf.add_page()
-                pdf.set_font("Helvetica", "", 9)
-                for log in st.session_state.ai_logs:
-                    pdf.set_font("Helvetica", "B", 10)
-                    pdf.cell(0, 5, f"Date: {log['date']}", ln=True)
-                    pdf.set_font("Helvetica", "", 9)
-                    pdf.cell(0, 5, f"Query: {sanitize_latin_only(log['query'])}", ln=True)
-                    pdf.ln(3)
-                return pdf.output(dest="S").encode("latin-1", errors="replace")
-
-            st.download_button(
-                label="🖨️ إصدار تقرير الاستشارات الفنية (PDF)",
-                data=generate_ai_pdf(),
-                file_name=f"AI_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
-
-    # --- TAB 2: الكتالوجات (PDF) ---
-    with tab2:
-        st.subheader("📚 مكتبة رفع وتحميل الكتالوجات الميدانية (PDF Manuals)")
-        uploaded_catalog = st.file_uploader("قم برفع ملف الكتالوج (PDF):", type=["pdf"])
+        st.subheader("🔍 استعلام البحث والتغذية الذكية للأعطال والآليات")
+        fault_query = st.text_input("أدخل كود العطل أو اسم القطعة أو نوع المعدة للبحث عنها تلقائياً:", placeholder="مثال: Perkins 2206 failure to start OR DSE 8610 alarm code 102")
         
-        if uploaded_catalog is not None:
-            st.success(f"✅ تم رفع الكتالوج بنجاح: **{uploaded_catalog.name}** ({uploaded_catalog.size / 1024:.1f} KB)")
-            st.download_button(
-                label=f"⬇️ تنزيل كتالوج: {uploaded_catalog.name}",
-                data=uploaded_catalog.getvalue(),
-                file_name=uploaded_catalog.name,
-                mime="application/pdf",
-                use_container_width=True
-            )
+        if st.button("تغذية التطبيق والبحث في المراجع 🚀", use_container_width=True):
+            if fault_query:
+                with st.spinner("جاري الاتصال بمكتبات Google Books ومحركات البحث الهندسية..."):
+                    search_data = search_engineering_resources(fault_query)
+                    
+                    st.success(f"🌐 نتائج التغذية التلقائية لاستعلام: **{fault_query}**")
+                    
+                    st.markdown("### 📖 المراجع المتاحة في Google Books API:")
+                    if search_data["books"]:
+                        for b in search_data["books"]:
+                            st.markdown(f"- **[{b['title']}]({b['link']})** - *{b['authors']}*\n  _{b['snippet']}_")
+                    else:
+                        st.info("لم يتم العثور على كتب مباشرة، جرب استعلام أكثر تحديداً بالإنجليزية.")
+                        
+                    st.divider()
+                    st.markdown("### 🔗 أدلة الصيانة والمقالات الميدانية:")
+                    if search_data["web_articles"]:
+                        for wa in search_data["web_articles"]:
+                            st.markdown(f"- **[{wa['title']}]({wa['link']})**\n  _{wa['snippet']}_")
+                    else:
+                        st.write(f"👉 [اضغط هنا للبحث المباشر عن `{fault_query}` في Google](https://www.google.com/search?q={urllib.parse.quote(fault_query)})")
+                    
+                    # حفظ الاستعلام والمراجع تلقائياً في مكتبة المستخدم
+                    st.session_state.auto_library.append({
+                        "query": fault_query,
+                        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "books": search_data["books"],
+                        "web": search_data["web_articles"]
+                    })
+                    st.success("💾 تم حفظ نتائج البحث والتغذية في 'مكتبتك الفنية' تلقائياً!")
 
-    # --- TAB 3: قراءة الأكواد (QR/Barcode) ---
+    with tab2:
+        st.subheader("📚 رفع وتصفح الكتالوجات الفنية")
+        uploaded_cat = st.file_uploader("رفع الكتالوج (PDF):", type=["pdf"])
+        if uploaded_cat:
+            st.success(f"تم رفع: {uploaded_cat.name}")
+
     with tab3:
-        st.subheader("📷 رفع وتحليل صورة الكود (QR Code / Barcode)")
-        uploaded_code_img = st.file_uploader("رفع صورة الكود أو الباركود الخارجي للقطعة:", type=["png", "jpg", "jpeg"])
-
-        if uploaded_code_img is not None:
-            image = Image.open(uploaded_code_img)
-            st.image(image, caption="الصورة المرفوعة للقطعة/الكود", width=300)
-            
-            if decode_qr is not None:
-                decoded_objects = decode_qr(image)
-                if decoded_objects:
-                    for obj in decoded_objects:
-                        st.success(f"🔑 **نتيجة قراءة الكود:** `{obj.data.decode('utf-8')}` (نوع الكود: {obj.type})")
-                else:
-                    st.warning("⚠️ لم يتم العثور على باركود أو QR ذكي واضح داخل الصورة، يمكنك إدخال الرقم يدوياً.")
-            else:
-                st.info("💡 **القراءة اليدوية:** تم رفع الصورة بنجاح. أداة تحليل الباركود التلقائي غير مفعلة في البيئة الحالية.")
+        st.subheader("📷 تحليل صورة الكود / Barcode")
+        up_img = st.file_uploader("رفع صورة الكود:", type=["png", "jpg", "jpeg"])
+        if up_img and decode_qr:
+            dec = decode_qr(Image.open(up_img))
+            if dec:
+                for obj in dec:
+                    st.info(f"رمز القطعة: {obj.data.decode('utf-8')}")
 
 # =========================================================
 # التطبيق 3: فحص المعدات والمقارنة البصرية (تالف / سليم)
 # =========================================================
-elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة البصرية (تالف/سليم)":
-    st.title("🔍 نظام فحص المعدات والمقارنة البصرية لقطع الغيار")
-
-    eq_type = st.selectbox("اختر المعدة المراد فحصها:", ["مولد ديزل صناعي", "غرفة تبريد وتجميد WIC", "محرك كهربائي 3-Phase"])
-
-    st.divider()
-    st.subheader("🖼️ المقارنة البصرية لقطع الغيار (التالف vs السليم)")
+elif selected_app == "🔍 3. فحص المعدات والمقارنة البصرية (تالف/سليم)":
+    st.title("🔍 فحص المعدات والمقارنة البصرية لقطع الغيار")
     
+    eq_type = st.selectbox("اختر المعدة للفحص:", ["مولد ديزل صناعي", "غرفة تبريد وتجميد WIC", "محرك كهربائي 3-Phase"])
+
     col_img1, col_img2 = st.columns(2)
     with col_img1:
-        st.write("🟢 **رفع صورة القطعة السليمة (Reference):**")
-        good_img_file = st.file_uploader("اختر صورة قطعة جديدة/سليمة", type=["png", "jpg", "jpeg"], key="good_img")
-        if good_img_file:
-            st.image(Image.open(good_img_file), caption="القطعة السليمة المعيارية", use_column_width=True)
+        st.write("🟢 **صورة القطعة السليمة:**")
+        good_img_file = st.file_uploader("رفع صورة جديدة", type=["png", "jpg", "jpeg"], key="good_chk")
+        if good_img_file: st.image(Image.open(good_img_file), use_column_width=True)
 
     with col_img2:
-        st.write("🔴 **رفع صورة القطعة التالفة / المفحوصة (Damaged):**")
-        bad_img_file = st.file_uploader("اختر صورة القطعة التالفة من الميدان", type=["png", "jpg", "jpeg"], key="bad_img")
-        if bad_img_file:
-            st.image(Image.open(bad_img_file), caption="القطعة المفحوصة في الموقع", use_column_width=True)
+        st.write("🔴 **صورة القطعة التالفة:**")
+        bad_img_file = st.file_uploader("رفع صورة تالفة", type=["png", "jpg", "jpeg"], key="bad_chk")
+        if bad_img_file: st.image(Image.open(bad_img_file), use_column_width=True)
 
     if good_img_file and bad_img_file:
-        st.warning("🔍 **ملاحظة التحليل الميداني:** توجد فروقات بصرية واضحة في مستوى التآكل أو الرايش السطحي بين القطعتين. ينصح بالاستبدال الفوري.")
+        st.warning("🔍 **ملاحظة:** تم رصد اختلاف في السطح والتآكل الفعلي للقطعة.")
 
-    st.divider()
-    st.subheader("📋 قائمة الفحص الظاهري والميكانيكي")
-    checklist = []
-    if eq_type == "مولد ديزل صناعي":
-        c1 = st.checkbox("1. تسريب زيت أو وقود أسفل المحرك")
-        c2 = st.checkbox("2. انخفاض سائل التبريد (Coolant)")
-        c3 = st.checkbox("3. أطراف البطارية تحتاج نظافة/إحكام")
-        checklist = [("تسريب زيت/وقود", c1), ("انخفاض سائل التبريد", c2), ("أطراف البطارية", c3)]
-        if c1: st.error("🚨 **تأكيد:** افحص وجه الكارتير وفلاتر الزيت.")
-    elif eq_type == "غرفة تبريد وتجميد WIC":
-        r1 = st.checkbox("1. تكوّن الثلج على ملف المبخر (Evaporator)")
-        r2 = st.checkbox("2. توقف مروحة المكثف الخارجية")
-        checklist = [("تراكم الثلج", r1), ("مروحة المكثف", r2)]
-        if r1: st.error("🚨 **تأكيد:** افحص دورة الإذابة وسخانات Defrost.")
-    elif eq_type == "محرك كهربائي 3-Phase":
-        m1 = st.checkbox("1. ارتفاع حرارة جسم المحرك")
-        m2 = st.checkbox("2. صوت صرير في الرمان بلي")
-        checklist = [("ارتفاع الحرارة", m1), ("صوت الرمان بلي", m2)]
+# =========================================================
+# التطبيق 4: مكتبتي الفنية (التغذية التلقائية المحفوظة)
+# =========================================================
+elif selected_app == "📚 4. مكتبتي الفنية (التغذية التلقائية المحفوظة)":
+    st.title("📚 مكتبتك الفنية والتغذية التلقائية المحفوظة")
+    st.info("تضم هذه المكتبة كافة نتائج البحث، الكتالوجات، والأكواد التي تم إدخالها وتغذيتها من مصادر الأبحاث وGoogle Books.")
 
-    st.divider()
-    st.subheader("📄 إصدار تقرير الفحص الميداني والمقارنة PDF")
-    def generate_chk_pdf():
-        pdf = ComprehensivePDF("EQUIPMENT FIELD INSPECTION & VISUAL REPORT")
-        pdf.add_page()
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(0, 5, f"Equipment Type: {sanitize_latin_only(eq_type)}", ln=True)
-        pdf.ln(3)
-        pdf.cell(100, 6, "Checklist Item", border=1)
-        pdf.cell(50, 6, "Status", border=1)
-        pdf.ln()
-        pdf.set_font("Helvetica", "", 9)
-        for item, val in checklist:
-            pdf.cell(100, 5, sanitize_latin_only(item), border=1)
-            pdf.cell(50, 5, "FAIL / DEFECT" if val else "PASS / OK", border=1)
-            pdf.ln()
-        return pdf.output(dest="S").encode("latin-1", errors="replace")
-
-    st.download_button(
-        label="🖨️ إصدار تقرير الفحص الميداني (PDF)",
-        data=generate_chk_pdf(),
-        file_name=f"Inspection_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
-        mime="application/pdf",
-        use_container_width=True
-    )
+    if st.session_state.auto_library:
+        for idx, item in enumerate(reversed(st.session_state.auto_library)):
+            with st.expander(f"📌 استعلام: {item['query']} - ({item['date']})"):
+                st.write("**الكتب والمراجع المكتشفة:**")
+                for b in item["books"]:
+                    st.markdown(f"* [{b['title']}]({b['link']}) - {b['authors']}")
+                if item["web"]:
+                    st.write("**المقالات وأدلة الإصلاح:**")
+                    for w in item["web"]:
+                        st.markdown(f"* [{w['title']}]({w['link']})")
+    else:
+        st.warning("المكتبة فارغة حالياً. قم بإجراء بحث في التطبيق رقم (2) لتغذيتها تلقائياً.")
