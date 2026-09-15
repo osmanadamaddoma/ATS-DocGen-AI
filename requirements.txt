@@ -16,4 +16,3 @@ fpdf
 Pillow
 matplotlib
 firebase-admin
-opencv-paython-headless
