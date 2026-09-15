@@ -371,7 +371,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
 
     st.divider()
 
-    # دالة توليد التقرير المضمونة والآمنة 100% والمتوافقة مع FPDF2
+    # دالة توليد التقرير المضمونة والآمنة ومتوافقة مع FPDF2
     def generate_full_pdf_bytes():
         pdf = ComprehensivePDF("COMPREHENSIVE MAINTENANCE REPORT")
         pdf.add_page()
@@ -430,7 +430,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             plt.close(fig1)
             buf_bar.seek(0)
             
-            # حفظ مؤقت للرسم البياني لإدراجه
             c_bar_path = f"temp_bar_{uuid.uuid4().hex}.png"
             with open(c_bar_path, "wb") as f:
                 f.write(buf_bar.read())
@@ -467,35 +466,45 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             except Exception:
                 pass
 
-        # إرجاع مخرجات الـ PDF بشكل آمن ومتوافق مع جميع إصدارات FPDF
         out = pdf.output()
         if isinstance(out, (bytes, bytearray)):
             return bytes(out)
         else:
             return out.encode('latin1')
 
-    # --- زر التجهيز والتنزيل المباشر لمنع الخطأ في الجوال ---
+    # --- دمج التجهيز والتنزيل في زر واحد ذكي لمنع الاختفاء في الجوال ---
     st.divider()
     
-    col_prep, col_down = st.columns([1, 2])
+    # توليد التقرير تلقائياً أو عند الضغط لضمان بقاء البيانات في الذاكرة المؤقتة
+    if "pdf_data" not in st.session_state:
+        st.session_state.pdf_data = None
+
+    col_prep, col_down = st.columns([1, 1])
     
     with col_prep:
-        if st.button("🔄 تجهيز ملف التقرير (PDF)", use_container_width=True):
-            with st.spinner("جاري إعداد التقرير والتأكد من البيانات..."):
+        if st.button("🔄 تحديث وتجهيز ملف (PDF)", use_container_width=True):
+            with st.spinner("جاري إعداد التقرير وتجهيز البيانات..."):
                 st.session_state.pdf_data = generate_full_pdf_bytes()
-                st.success("✅ تم تجهيز التقرير بنجاح! يمكنك التنزيل الآن.")
+                st.success("✅ تم التجهيز!")
+                st.rerun()
 
     with col_down:
-        if "pdf_data" in st.session_state and st.session_state.pdf_data:
+        # التحقق المباشر من وجود البيانات لضمان ظهور زر التنزيل فوراً للمستخدم
+        if st.session_state.pdf_data is not None:
             st.download_button(
-                label="🖨️ تنزيل التقرير الفني الشامل المعتمد (PDF)",
+                label="🖨️ اضغط هنا لتنزيل التقرير (PDF)",
                 data=st.session_state.pdf_data,
                 file_name=f"Comprehensive_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
         else:
-            st.info("💡 يرجى الضغط على 'تجهيز ملف التقرير' أولاً لتوليد الملف ثم تنزيله.")
+            # توليد التقرير في الخلفية تلقائياً لأول مرة لكي يظهر زر التنزيل مباشرة
+            try:
+                st.session_state.pdf_data = generate_full_pdf_bytes()
+                st.rerun()
+            except Exception:
+                st.info("💡 اضغط على زر 'تحديث وتجهيز ملف' للبدء.")
 
 # =========================================================
 # التطبيق 2: المساعد الذكي
