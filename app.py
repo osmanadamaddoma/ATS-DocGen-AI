@@ -8,7 +8,9 @@ import uuid
 from fpdf import FPDF
 import firebase_admin
 from firebase_admin import credentials, firestore
+import cv2
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from PIL import Image
 import plotly.express as px
@@ -46,7 +48,7 @@ except Exception:
     firebase_status = False
 
 # ---------------------------------------------------------
-# 2. إدارة معرف الجهاز والاشتراكات السحابية (7 أيام تجريبية + تفعيل)
+# 2. إدارة معرف الجهاز والاشتراكات السحابية
 # ---------------------------------------------------------
 if "device_id" not in st.session_state:
     query_params = st.query_params
@@ -134,6 +136,8 @@ def verify_and_apply_activation_code(code_str, dev_id):
         "ADDOMA-2026-PRO": {"days": 365, "name": "اشتراك سنوي (Yearly - 1 Year)"},
         "CLIENT-M-30D": {"days": 30, "name": "اشتراك شهري (Monthly - 30 Days)"},
         "TRIAL-EXT-7D": {"days": 7, "name": "تمديد تجريبي (7 Days Extension)"},
+        "CLIENT-M-881": {"days": 30, "name": "شركة النيل للصناعات الهندسية"},
+        "CLIENT-Y-992": {"days": 365, "name": "مصانع الحديد والصلب الوطنية"},
     }
     
     if code_str in default_codes:
@@ -176,7 +180,7 @@ client_name = f"مستخدم جهاز ({device_id[:8]})"
 # الشريط الجانبي الموحد لاختيار المهمة والتحقق
 # ---------------------------------------------------------
 st.sidebar.title("🛠️ منصة الدومة المتكاملة")
-st.sidebar.caption("إدارة المولدات، المساعد الذكي، وتقييم المعدات")
+st.sidebar.caption("إدارة المولدات، المساعد الذكي، والرؤية الحاسوبية للفحص")
 
 if firebase_status:
     st.sidebar.success("🔥 متصل بـ Firebase بنجاح")
@@ -190,7 +194,7 @@ app_mode = st.sidebar.selectbox(
     [
         "1. الصيانة التنبؤية للمولدات (Predictive Maintenance)",
         "2. المساعد الذكي الفني (AI Technical Assistant)",
-        "3. فحص وتقييم المعدات الصناعية (Equipment Audit)"
+        "3. فحص المعدات بالرؤية الحاسوبية (Industrial CV Equipment Inspection)"
     ]
 )
 
@@ -377,61 +381,99 @@ elif "2." in app_mode:
     st.title("🤖 المساعد الذكي الفني لأعطال المولدات وأنظمة التبريد")
     st.markdown("اسأل عن أكواد أعطال محركات بيركنز، كمبيوترات DSE، أو وحدات التبريد Porkka WIC.")
     
+    manual_file = st.sidebar.file_uploader("رفع الكتالوج اليدوي (Manual PDF/TXT)", type=["pdf", "txt"])
+    fault_image = st.sidebar.file_uploader("رفع صورة العطل من شاشة المولد", type=["png", "jpg", "jpeg"])
+
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = [
-            {"role": "assistant", "content": "مرحباً بك مهندس عثمان. أنا مساعدك الفني الذكي لصيانة المولدات وأنظمة التبريد. كيف يمكنني مساعدتك اليوم؟"}
+            {"role": "assistant", "content": f"مرحباً بك مهندس عثمان. أنا مساعدك الفني الذكي لصيانة المولدات وأنظمة التبريد. كيف يمكنني مساعدتك اليوم؟"}
         ]
         
     for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
             
+    if fault_image is not None:
+        st.image(fault_image, caption="صورة العطل المرفوعة من شاشة المولد", width=300)
+    if manual_file is not None:
+        st.info(f"📁 تم إرفاق الكتالوج: {manual_file.name}")
+
     user_query = st.chat_input("اكتب استفسارك الفني هنا (مثال: أسباب خطأ Failure to Start في بيركنز)...")
     if user_query:
         st.session_state.chat_history.append({"role": "user", "content": user_query})
         with st.chat_message("user"):
             st.markdown(user_query)
             
-        # استجابة ذكية تحليلية مبنية على السياق الهندسي
         q_lower = user_query.lower()
         if "start" in q_lower or "بدء" in q_lower or "تشغيل" in q_lower:
             reply = "🔧 **تشخيص عطل عدم الإقلاع (Failure to Start):**\n1. تحقق من وقود الخط ومحبس الإمداد.\n2. افحص فيوزات وحدة التحكم DSE 7320 / 8610.\n3. تأكد من سلامة حساس سرعة الدوران (Magnetic Speed Sensor) ونظافته."
         elif "wic" in q_lower or "تبريد" in q_lower or "ثلاجة" in q_lower:
-            reply = "❄️ **صيانة وحدات التبريد Porkka WIC (WIC 10 / WIC 40):**\n1. تحقق من قراءات وحدة تحكم Emerson وضبط صمام التمدد (Expansion Valve).\n2. تأكد من نظافة المبخر والمكثف وعدم وجود انسداد في الفلتر دรายر (Filter Drier).\n3. افحص شحنة الفريون وضغوط السحب والطرد."
+            reply = "❄️ **صيانة وحدات التبريد Porkka WIC (WIC 10 / WIC 40):**\n1. تحقق من قراءات وحدة تحكم Emerson وضبط صمام التمدد (Expansion Valve).\n2. تأكد من نظافة المبخر والمكثف وعدم وجود انسداد في الفلتر دلاير (Filter Drier).\n3. افحص شحنة الفريون وضغوط السحب والطرد."
         elif "perkins" in q_lower or "بيركنز" in q_lower:
             reply = "⚙️ **معلومات محركات Perkins (مثل سلسلة 2206C):**\n- تأكد من ضغط الزيت الطبيعي (2.5 إلى 4 بار).\n- افحص تمديدات وموصلات وحدة التحكم الإلكترونية (ECM) وضفيرة الأسلاك."
         else:
-            reply = f"💡 استناداً إلى خبرتك في صيانة المولدات والأنظمة الكهروميكانيكية: بالنسبة لـ ({user_query})، أنصح بمراجعة المخططات الكهربائية الخاصة بلوحة التحكم والقياس باستخدام متعد القياس (Multimeter) للتأكد من استمرارية الدوائر."
+            reply = f"💡 استناداً إلى خبرتك في صيانة المولدات والأنظمة الكهروميكانيكية: بالنسبة لـ ({user_query}), أنصح بمراجعة المخططات الكهربائية الخاصة بلوحة التحكم والقياس باستخدام متعد القياس (Multimeter) للتأكد من استمرارية الدوائر."
             
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
         with st.chat_message("assistant"):
             st.markdown(reply)
 
 # =========================================================
-# الخيار الثالث: فحص وتقييم المعدات الصناعية (Equipment Audit)
+# الخيار الثالث: فحص المعدات بالرؤية الحاسوبية (CV Inspection)
 # =========================================================
 else:
-    st.title("📋 نظام فحص وتقييم المعدات والمنشآت الصناعية")
-    st.markdown("إجراء قائمة تدقيق تقييمية (Audit Checklist) لخطوط الإنتاج، المولدات، والمعدات التالفة أو الخدمية.")
+    st.title("👁️ فحص المعدات الصناعية بالرؤية الحاسوبية (Industrial CV Inspection)")
+    st.markdown("أداة رؤية حاسوبية مصممة للفحص البصري التلقائي للمكونات الميكانيكية وأجزاء المحركات (المولدات، الفلاتر، الدوارات) للكشف عن العيوب الهيكلية والشقوق الدقيقة باستخدام OpenCV.")
     
-    col_a, col_b = st.columns(2)
-    site_name = col_a.text_input("اسم المنشأة / الموقع الصناعي", value="موقع التعدين - محطة التوليد الرئيسية")
-    auditor_name = col_b.text_input("اسم الفاحص / الاستشاري", value="مهندس عثمان آدم")
+    st.sidebar.header("⚙️ إعدادات معالجة الصور (OpenCV)")
+    blur_ksize = st.sidebar.slider("حجم غباش غاوس (Gaussian Blur Kernel)", min_value=1, max_value=15, value=5, step=2)
+    canny_thresh1 = st.sidebar.slider("عتبة Canny الأولى (Threshold 1)", min_value=10, max_value=200, value=50)
+    canny_thresh2 = st.sidebar.slider("عتبة Canny الثانية (Threshold 2)", min_value=50, max_value=300, value=150)
     
-    st.subheader("بنود قائمة الفحص الفني والتقييمي")
-    audit_items = [
-        {"Category": "Electrical", "Item": "لوحات التحكم والربط الآلي (DSE Synchronizing Panels)", "Status": "جيد", "Notes": "تعمل بكفاءة"},
-        {"Category": "Mechanical", "Item": "نظام حقن الوقود والفلاتر الأساسية", "Status": "يحتاج صيانة", "Notes": "استبدال الفلتر الأولي مطلوب"},
-        {"Category": "Cooling", "Item": "رادياتير التبريد والمراوح ونسبة السائل (ELC)", "Status": "جيد", "Notes": "المستوى طبيعي"},
-        {"Category": "Refrigeration", "Item": "وحدات التبريد Porkka WIC 10 / WIC 40", "Status": "ممتاز", "Notes": "درجات الحرارة مستقرة"},
-        {"Category": "Safety", "Item": "أنظمة الحماية الأرضية وفصل الطوارئ (Emergency Stop)", "Status": "جيد", "Notes": "تم الاختبار بنجاح"}
-    ]
+    uploaded_cv_image = st.file_uploader("رفع صورة القطعة الميكانيكية أو الفلتر للفحص الآلي", type=["png", "jpg", "jpeg"])
     
-    df_audit = pd.DataFrame(audit_items)
-    edited_audit = st.data_editor(df_audit, use_container_width=True, key="audit_editor")
-    
-    general_eval = st.text_area("التقييم العام والتوصيات الهندسية النهائية:", value="المعدات تعمل بصورة مرضية مع ضرورة تنفيذ جدول صيانة الفلاتر الدورية في الموعد القادم.")
-    
-    if st.button("🖨️ إصدار وحفظ تقرير التدقيق الفني", use_container_width=True):
-        st.success(f"✅ تم اعتماد تقرير الفحص للموقع: {site_name} بواسطة الاستشاري {auditor_name} بنجاح!")
-        st.info("💡 يمكنك العودة لنظام الصيانة التنبؤية أو المساعد الذكي في أي وقت عبر القائمة الجانبية.")
+    if uploaded_cv_image is not None:
+        image_bytes = uploaded_cv_image.read()
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img_cv = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img_cv is not None:
+            img_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
+            gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+            
+            # معالجة الرؤية الحاسوبية
+            blurred = cv2.GaussianBlur(gray, (blur_ksize, blur_ksize), 0)
+            edges = cv2.Canny(blurred, canny_thresh1, canny_thresh2)
+            
+            col_cv1, col_cv2 = st.columns(2)
+            with col_cv1:
+                st.subheader("الصورة الأصلية للمكون")
+                st.image(img_rgb, use_container_width=True)
+            with col_cv2:
+                st.subheader("نتائج كشف الحواف والعيوب (Canny Edges)")
+                st.image(edges, use_container_width=True, clamp=True)
+                
+            st.divider()
+            st.subheader("📊 تحليل خصائص المكون الفني")
+            edge_pixel_count = np.count_nonzero(edges)
+            total_pixels = edges.shape[0] * edges.shape[1]
+            anomaly_ratio = (edge_pixel_count / total_pixels) * 100
+            
+            m1, m2, m3 = st.columns(3)
+            m1.metric("إجمالي بكسلات الصورة", f"{total_pixels:,}")
+            m2.metric("كثافة الحواف والخطوط الهيكلية", f"{edge_pixel_count:,} px")
+            m3.metric("مؤشر التعقيد/العيوب الظاهرة", f"{anomaly_ratio:.2f}%")
+            
+            if anomaly_ratio > 15:
+                st.error("🔴 **تنبيه عالي:** تم رصد كثافة عالية في الحواف أو الشقوق السطحية، يوصى بالفحص اليدوي المجهري.")
+            elif anomaly_ratio > 5:
+                st.warning("⚠️ **تنبيه متوسط:** توجد بعض الخطوط أو التعرجات غير الاعتيادية على سطح القطعة.")
+            else:
+                st.success("🟢 **الحالة سليمة:** السطح متجانس وخالٍ من الشقوق الظاهرة البارزة ضمن النطاق المعتاد.")
+        else:
+            st.error("❌ تعذر قراءة الصورة المرفوعة. يرجى تجربة ملف آخر.")
+    else:
+        st.info("💡 يرجى رفع صورة لقطعة ميكانيكية، فلتر، أو ريشة مولد عبر زر الرفع أعلاه لبدء الفحص الآلي.")
+
+st.markdown("---")
+st.caption("© 2026 Osman Adam Addoma. All Rights Reserved. Unauthorized copying, modification, or distribution of this code or project structure is strictly prohibited.")
