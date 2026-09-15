@@ -343,7 +343,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         st.success("🟢 جميع المؤشرات التشغيلية ضمن الحدود الآمنة.")
 
     st.divider()
-    st.subheader("🛢️ جدول الصيانة التنبؤية والمدد الافتراضية المكتملة لقطع الغيار")
+    st.subheader("🛢️ جدول الصيانة التنبؤية المطابق تماماً للمواصفات الفنية المعتمدة")
 
     effective_hours = future_run_hours if future_run_hours > 0 else run_hours
     hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
@@ -355,22 +355,26 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     col_o2.metric("المدة المتبقية للخدمة", f"{max(0.0, hours_until_next_oil_change):.1f} hrs")
     col_o3.metric("نسبة استهلاك فترة الزيت", f"{oil_usage_pct:.0f}%")
 
-    # قاعدة البيانات المكتملة لجميع قطع الغيار بمددها الافتراضية
+    # قاعدة البيانات المعتمدة دقيقة حسب الجدول المرفق في الصورة (14 بنداً)
     base_parts_data = [
-        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Engine Oil & Filter", "العمر الافتراضي (ساعة)": float(oil_change_interval), "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
-        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Primary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
-        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Secondary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
-        {"تصنيف القطعة": "Air System", "قطع الغيار / الفلاتر": "Air Filter Element", "العمر الافتراضي (ساعة)": 1000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "Fan & Alternator Belt", "العمر الافتراضي (ساعة)": 2000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "ELC Coolant Fluid", "العمر الافتراضي (ساعة)": 3000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Fuel System", "قطع الغيار / الفلاتر": "Fuel Injectors (بخاخات)", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "Water Pump (مضخة الماء)", "العمر الافتراضي (ساعة)": 6000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Electrical", "قطع الغيار / الفلاتر": "Starter Battery", "العمر الافتراضي (ساعة)": 4000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Overhaul", "قطع الغيار / الفلاتر": "Turbocharger Kit", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Schedule Services (الصيانة الدورية)", "قطع الغيار / الفلاتر": "فلتر زيت (Oil Filter)", "العمر الافتراضي (ساعة)": 250.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
+        {"تصنيف القطعة": "Schedule Services (الصيانة الدورية)", "قطع الغيار / الفلاتر": "فلتر وقود - أولي (Primary Fuel Filter)", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
+        {"تصنيف القطعة": "Schedule Services (الصيانة الدورية)", "قطع الغيار / الفلاتر": "فلتر وقود - ثانوي (Secondary Fuel Filter)", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
+        {"تصنيف القطعة": "Air System (نظام الهواء)", "قطع الغيار / الفلاتر": "فلتر هواء (Air Filter)", "العمر الافتراضي (ساعة)": 1000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Fan Belt System (نظام التبريد)", "قطع الغيار / الفلاتر": "قشاط المروحة (Fan Belt)", "العمر الافتراضي (ساعة)": 2000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Coolant System (نظام التبريد)", "قطع الغيار / الفلاتر": "سائل تبريد (ELC Coolant)", "العمر الافتراضي (ساعة)": 3000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Feul System (نظام الوقود)", "قطع الغيار / الفلاتر": "بخاخات الوقود (Injectors Check)", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "النظام الكهربائي", "قطع الغيار / الفلاتر": "بطاريات (Batteries)", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Electric System (النظام الكهربائي)", "قطع الغيار / الفلاتر": "دينامو الشحن (Charging Alternator)", "العمر الافتراضي (ساعة)": 10000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Engine Motor (المحرك - ميكانيك)", "قطع الغيار / الفلاتر": "طقم عمرة رأس (Top Overhaul)", "العمر الافتراضي (ساعة)": 10000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Engine Motor (المحرك - ميكانيك)", "قطع الغيار / الفلاتر": "عمرة كاملة (Major Overhaul)", "العمر الافتراضي (ساعة)": 20000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Oilers System (نظام التزييت)", "قطع الغيار / الفلاتر": "مبرد الزيت (Oil Cooler Clean)", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "نظام التبريد", "قطع الغيار / الفلاتر": "مضخة الماء (Water Pump)", "العمر الافتراضي (ساعة)": 6000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "نظام الهواء", "قطع الغيار / الفلاتر": "تيربو (Turbocharger Check)", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
     ]
 
     df_parts_input = pd.DataFrame(base_parts_data)
-    edited_table = st.data_editor(df_parts_input, num_rows="dynamic", use_container_width=True, key="parts_editor_v2")
+    edited_table = st.data_editor(df_parts_input, num_rows="dynamic", use_container_width=True, key="parts_editor_v3")
 
     processed_rows = []
     for idx, row in edited_table.iterrows():
@@ -419,7 +423,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         st.plotly_chart(fig_pie, use_container_width=True)
 
     st.divider()
-    st.subheader("📄 إصدار وتنزيل التقرير الفني الشامل مع الرسوم البيانية الدائرية (PDF)")
+    st.subheader("📄 إصدار وتنزيل التقرير الفني الشامل المعتمد مع الرسوم البيانية (PDF)")
 
     def generate_full_pdf_bytes():
         pdf = ComprehensivePDF("COMPREHENSIVE MAINTENANCE & DIAGNOSTIC REPORT")
@@ -444,9 +448,9 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         pdf.cell(0, 5, f"- Remaining Hours to Change: {max(0.0, hours_until_next_oil_change)} hrs", ln=True)
         pdf.ln(3)
 
-        # 3. الجدول الكامل المحدث لقطع الغيار
+        # 3. الجدول الكامل المعتمد لقطع الغيار
         pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(0, 6, "2. Full Spare Parts Lifespan & Predictive Maintenance Schedule:", ln=True)
+        pdf.cell(0, 6, "2. Approved Full Spare Parts Lifespan & Maintenance Schedule:", ln=True)
         pdf.set_font("Helvetica", "B", 8)
         pdf.cell(45, 5, "Part Name", border=1)
         pdf.cell(25, 5, "Lifespan(h)", border=1)
@@ -464,14 +468,14 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.cell(35, 5, sanitize_latin_only(str(row["الحالة الفنية"])), border=1)
             pdf.ln()
 
-        # 4. إدراج الرسم البياني الدائري والشريطي داخل التقرير
+        # 4. إدراج الرسمين البيانيين (الشريطي والدائري) داخل صفحات التقرير
         try:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 11)
             pdf.cell(0, 6, "3. Visual Analytics & Predictive Maintenance Charts:", ln=True)
 
             # توليد رسم شريطي (Bar Chart)
-            fig1, ax1 = plt.subplots(figsize=(6.5, 2.8))
+            fig1, ax1 = plt.subplots(figsize=(6.5, 2.5))
             p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
             u_h = df_result["الساعات المنقضية (ساعة)"].values
             r_h = df_result["المدة المتبقية (ساعة)"].values
@@ -488,8 +492,8 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             temp_files.append(chart_path_bar)
             pdf.image(chart_path_bar, x=15, y=25, w=170)
 
-            # توليد وتضمين الرسم البياني الدائري (Pie Chart)
-            fig2, ax2 = plt.subplots(figsize=(5, 3))
+            # توليد وتضمين الرسم البياني الدائري (Pie Chart) في مساحة مناسبة
+            fig2, ax2 = plt.subplots(figsize=(5, 2.5))
             status_counts = df_result["الحالة الفنية"].value_counts()
             labels = [sanitize_latin_only(str(k)) for k in status_counts.index]
             ax2.pie(status_counts.values, labels=labels, autopct='%1.1f%%', colors=['#28a745', '#ffc107', '#dc3545'][:len(labels)])
@@ -500,7 +504,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             plt.savefig(chart_path_pie, dpi=200)
             plt.close(fig2)
             temp_files.append(chart_path_pie)
-            pdf.image(chart_path_pie, x=25, y=115, w=150)
+            pdf.image(chart_path_pie, x=25, y=110, w=150)
 
         except Exception as e:
             pass
@@ -512,9 +516,9 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         return pdf_bytes.encode("latin-1", errors="replace")
 
     st.download_button(
-        label="🖨️ إصدار التقرير الفني المكتمل مدمجاً بجدول القطع والرسوم البيانية الدائرية (PDF)",
+        label="🖨️ إصدار التقرير الفني المعتمد بالكامل (مع الجدول المكتمل والرسوم الدائرية والشريطية PDF)",
         data=generate_full_pdf_bytes(),
-        file_name=f"Comprehensive_Maintenance_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+        file_name=f"Comprehensive_Approved_Maintenance_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
         mime="application/pdf",
         use_container_width=True
     )
