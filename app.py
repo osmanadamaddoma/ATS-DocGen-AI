@@ -281,7 +281,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         oil_change_interval = st.number_input("الفترة القياسية للزيت (ساعة)", value=250.0, step=50.0)
         submit_btn = st.form_submit_button("تحديث وتحليل البيانات")
 
-    # ** قسم رفع وتنزيل صور المولد أو قطع الغيار الجديد **
+    # قسم رفع وتحميل الصور
     st.subheader("📷 إدارة وتوثيق صور المولد وقطع الغيار")
     uploaded_part_image = st.file_uploader("رفع صورة المولد أو قطعة الغيار للتقرير:", type=["png", "jpg", "jpeg"], key="gen_part_img")
     
@@ -290,18 +290,16 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         img_pil = Image.open(uploaded_part_image)
         st.image(img_pil, caption="معاينة الصورة المرفوعة", width=350)
         
-        # زر تحميل الصورة مباشرة للجهاز
         buf = io.BytesIO()
         img_pil.save(buf, format="PNG")
         st.download_button(
             label="⬇️ تحميل الصورة المرفوعة للجهاز",
             data=buf.getvalue(),
-            file_name=f"generator_part_image_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+            file_name=f"generator_part_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
             mime="image/png"
         )
         
-        # حفظ مؤقت لإدراجها في التقرير
-        saved_img_path = f"temp_uploaded_img_{datetime.now().timestamp()}.png"
+        saved_img_path = f"temp_uploaded_{uuid.uuid4().hex}.png"
         img_pil.save(saved_img_path)
 
     load_percentage = (load_kw / gen_kw) * 100 if gen_kw > 0 else 0
@@ -317,9 +315,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
 
     effective_hours = future_run_hours if future_run_hours > 0 else run_hours
     hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
-    hours_until_next_oil_change = oil_change_interval - hours_since_oil_change
 
-    # قاعدة البيانات المعتمدة كاملة (14 عنصراً)
     base_parts_data = [
         {"تصنيف القطعة": "Schedule Services (الصيانة الدورية)", "قطع الغيار / الفلاتر": "فلتر زيت (Oil Filter)", "العمر الافتراضي (ساعة)": 250.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
         {"تصنيف القطعة": "Schedule Services (الصيانة الدورية)", "قطع الغيار / الفلاتر": "فلتر وقود - أولي (Primary Fuel Filter)", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
@@ -338,7 +334,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     ]
 
     df_parts_input = pd.DataFrame(base_parts_data)
-    edited_table = st.data_editor(df_parts_input, num_rows="dynamic", use_container_width=True, key="parts_editor_v4")
+    edited_table = st.data_editor(df_parts_input, num_rows="dynamic", use_container_width=True, key="parts_editor_v5")
 
     processed_rows = []
     for idx, row in edited_table.iterrows():
@@ -348,7 +344,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         used = pd.to_numeric(row.get("الساعات المنقضية (ساعة)", 0), errors="coerce") or 0.0
         rem = life - used
         pct = (used / life) * 100 if life > 0 else 0
-        status = "EXPIRED (منتهي)" if rem <= 0 else ("WARNING (تحذير)" if pct >= 80 else "GOOD (جيدة)")
+        status = "EXPIRED" if rem <= 0 else ("WARNING" if pct >= 80 else "GOOD")
         processed_rows.append({
             "تصنيف القطعة": cat,
             "قطع الغيار / الفلاتر": part,
@@ -374,8 +370,10 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         st.plotly_chart(fig_pie, use_container_width=True)
 
     st.divider()
+
+    # ** دالة توليد الـ PDF الآمنة بدون أخطاء **
     def generate_full_pdf_bytes():
-        pdf = ComprehensivePDF("COMPREHENSIVE MAINTENANCE & REPORT")
+        pdf = ComprehensivePDF("COMPREHENSIVE MAINTENANCE REPORT")
         pdf.add_page()
         temp_files = []
 
@@ -385,12 +383,14 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         pdf.cell(0, 5, f"Capacity: {gen_kw} kW | Current Load: {load_kw} kW ({load_percentage:.1f}%)", ln=True)
         pdf.ln(3)
 
-        # تضمين الصورة في التقرير إذا تم رفعها
         if saved_img_path and os.path.exists(saved_img_path):
-            pdf.set_font("Helvetica", "B", 9)
-            pdf.cell(0, 5, "Attached Equipment / Part Photo:", ln=True)
-            pdf.image(saved_img_path, x=60, y=pdf.get_y(), w=90)
-            pdf.ln(50)
+            try:
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.cell(0, 5, "Attached Equipment / Part Photo:", ln=True)
+                pdf.image(saved_img_path, x=60, y=pdf.get_y(), w=90)
+                pdf.ln(55)
+            except Exception:
+                pass
 
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(0, 6, "Approved Spare Parts Lifespan & Maintenance Schedule:", ln=True)
@@ -411,7 +411,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.cell(35, 5, sanitize_latin_only(str(row["الحالة الفنية"])), border=1)
             pdf.ln()
 
-        # تضمين الرسوم البيانية في صفحات PDF
         try:
             pdf.add_page()
             fig1, ax1 = plt.subplots(figsize=(6.5, 2.5))
@@ -421,7 +420,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             ax1.set_title("Spare Parts Lifespan Overview", fontsize=9)
             plt.xticks(rotation=35, ha="right", fontsize=7)
             plt.tight_layout()
-            c_bar = f"t_bar_{datetime.now().timestamp()}.png"
+            c_bar = f"t_bar_{uuid.uuid4().hex}.png"
             plt.savefig(c_bar, dpi=200)
             plt.close(fig1)
             temp_files.append(c_bar)
@@ -432,7 +431,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             ax2.pie(sc.values, labels=[sanitize_latin_only(k) for k in sc.index], autopct='%1.1f%%', colors=['#28a745', '#ffc107', '#dc3545'])
             ax2.set_title("Parts Readiness Distribution (Pie Chart)", fontsize=9)
             plt.tight_layout()
-            c_pie = f"t_pie_{datetime.now().timestamp()}.png"
+            c_pie = f"t_pie_{uuid.uuid4().hex}.png"
             plt.savefig(c_pie, dpi=200)
             plt.close(fig2)
             temp_files.append(c_pie)
@@ -440,18 +439,28 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         except Exception:
             pass
 
-        pdf_bytes = pdf.output(dest="S")
+        # تصحيح طريقة الإخراج لتفادي أخطاء FPDF في التنزيل
+        pdf_out = pdf.output()
+        if isinstance(pdf_out, str):
+            pdf_bytes = pdf_out.encode("latin-1", errors="replace")
+        else:
+            pdf_bytes = bytes(pdf_out)
+
         for f in temp_files:
-            if os.path.exists(f): os.remove(f)
+            if os.path.exists(f): 
+                try: os.remove(f)
+                except Exception: pass
         if saved_img_path and os.path.exists(saved_img_path):
-            os.remove(saved_img_path)
+            try: os.remove(saved_img_path)
+            except Exception: pass
 
-        return pdf_bytes.encode("latin-1", errors="replace")
+        return pdf_bytes
 
+    # زر التحميل المباشر الآمن
     st.download_button(
         label="🖨️ إصدار وتنزيل التقرير الفني الشامل المعتمد (PDF) مع الصور والرسوم الدائرية",
         data=generate_full_pdf_bytes(),
-        file_name=f"Comprehensive_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+        file_name=f"Comprehensive_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
         mime="application/pdf",
         use_container_width=True
     )
