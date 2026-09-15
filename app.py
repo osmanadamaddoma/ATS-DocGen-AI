@@ -18,18 +18,44 @@ import streamlit as st
 # 0. إعدادات الصفحة الرئيسية
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="المجمع الصناعي الشامل - الصيانة والفحص والمساعد الذكي",
+    page_title="المجمع الصناعي الشامل - Addoma Trading Services",
     layout="wide",
 )
 
 # ---------------------------------------------------------
-# 1. تهيئة الاتصال بـ Firebase Firestore
+# 1. دالة تنظيف النصوص ومحرك تقارير PDF
+# ---------------------------------------------------------
+def sanitize_latin_only(text):
+    if not isinstance(text, str):
+        text = str(text)
+    clean_text = re.sub(r"[^\x00-\x7F]+", "", text).strip()
+    return clean_text if clean_text else "N/A"
+
+class ComprehensivePDF(FPDF):
+    def __init__(self, title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT"):
+        super().__init__()
+        self.report_title = title_text
+
+    def header(self):
+        self.set_font("Helvetica", "B", 13)
+        self.cell(0, 8, self.report_title, ln=True, align="C")
+        self.set_font("Helvetica", "I", 8)
+        self.cell(0, 4, "Addoma Trading Services - Engineering & Automation Platform", ln=True, align="C")
+        self.line(10, 20, 200, 20)
+        self.ln(5)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("Helvetica", "I", 8)
+        self.cell(0, 10, f"Page {self.page_no()} | System Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
+
+# ---------------------------------------------------------
+# 2. تهيئة الاتصال بـ Firebase Firestore
 # ---------------------------------------------------------
 @st.cache_resource
 def init_firebase():
     if not firebase_admin._apps:
         firebase_json_env = os.environ.get("FIREBASE_CREDENTIALS")
-        
         if firebase_json_env:
             cred_dict = json.loads(firebase_json_env)
             cred = credentials.Certificate(cred_dict)
@@ -39,7 +65,6 @@ def init_firebase():
             cred = credentials.Certificate(firebase_dict)
         else:
             cred = credentials.Certificate("firebase_key.json")
-            
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
@@ -51,7 +76,7 @@ except Exception as e:
     db = None
 
 # ---------------------------------------------------------
-# 2. إدارة التفعيل والاشتراكات السحابية
+# 3. إدارة المدد الزمنية للاشتراكات (أيام / شهور / سنوات)
 # ---------------------------------------------------------
 if "device_id" not in st.session_state:
     query_params = st.query_params
@@ -114,34 +139,14 @@ def update_device_subscription(dev_id, sub_expiry, plan_name):
         st.session_state.mock_device_db["subscription_expiry"] = sub_expiry
         st.session_state.mock_device_db["plan_type"] = plan_name
 
-def verify_and_apply_activation_code(code_str, dev_id):
-    code_str = code_str.strip().upper()
-    now = datetime.now()
-    
-    default_codes = {
-        "ADDOMA-2026-PRO": {"days": 365, "name": "اشتراك سنوي (Yearly - 1 Year)"},
-        "CLIENT-M-30D": {"days": 30, "name": "اشتراك شهري (Monthly - 30 Days)"},
-        "TRIAL-EXT-7D": {"days": 7, "name": "تمديد تجريبي (7 Days Extension)"},
-    }
-    
-    if code_str in default_codes:
-        cfg = default_codes[code_str]
-        expiry = now + timedelta(days=cfg["days"])
-        update_device_subscription(dev_id, expiry, cfg["name"])
-        return True, f"✅ تم تفعيل الاشتراك بنجاح: {cfg['name']}"
-        
-    return False, "❌ كود التفعيل غير صحيح."
-
 user_record = get_or_create_device_record(device_id)
 now = datetime.now()
 
 trial_exp = user_record.get("trial_expiry")
 sub_exp = user_record.get("subscription_expiry")
 
-if hasattr(trial_exp, "timestamp"):
-    trial_exp = datetime.fromtimestamp(trial_exp.timestamp())
-if sub_exp and hasattr(sub_exp, "timestamp"):
-    sub_exp = datetime.fromtimestamp(sub_exp.timestamp())
+if hasattr(trial_exp, "timestamp"): trial_exp = datetime.fromtimestamp(trial_exp.timestamp())
+if sub_exp and hasattr(sub_exp, "timestamp"): sub_exp = datetime.fromtimestamp(sub_exp.timestamp())
 
 is_sub_active = sub_exp and now < sub_exp
 is_trial_active = trial_exp and now < trial_exp
@@ -149,54 +154,81 @@ is_trial_active = trial_exp and now < trial_exp
 if is_sub_active:
     time_left = (sub_exp - now).days
     access_status = "paid"
-    plan_type = user_record.get("plan_type", "اشتراك مدفوع")
+    plan_type = user_record.get("plan_type", "اشتراك مفعل")
+    expiry_date_str = sub_exp.strftime("%Y-%m-%d")
 elif is_trial_active:
     time_left = (trial_exp - now).days
     access_status = "trial"
-    plan_type = "فترة تجريبية مجانية (7 أيام)"
+    plan_type = "فترة تجريبية (7 أيام)"
+    expiry_date_str = trial_exp.strftime("%Y-%m-%d")
 else:
     time_left = 0
     access_status = "expired"
     plan_type = "منتهي الصلاحية"
+    expiry_date_str = "منتهي"
 
-client_name = f"مستخدم جهاز ({device_id[:8]})"
+# ---------------------------------------------------------
+# لوحة عرض الاشتراكات وإدخال الأكواد الزمنية
+# ---------------------------------------------------------
+st.sidebar.header("🔐 تفاصيل الاشتراك والتفعيل")
 
-st.sidebar.header("🔐 بوابة التفعيل")
-input_code = st.sidebar.text_input("كود التفعيل:", type="password")
-if st.sidebar.button("تفعيل الكود"):
-    if input_code:
-        success, msg = verify_and_apply_activation_code(input_code, device_id)
-        if success:
-            st.sidebar.success(msg)
+st.sidebar.info(f"""
+📌 **حالة الحساب والاشتراك:**
+* **نوع الخطة:** {plan_type}
+* **تاريخ الانتهاء:** `{expiry_date_str}`
+* **المدة المتبقية:** **{time_left}** يوماً
+""")
+
+with st.sidebar.expander("🔑 إدخال كود التفعيل (أيام / شهور / سنوات)"):
+    input_code = st.text_input("أدخل كود التفعيل:", type="password")
+    if st.button("تفعيل الاشتراك"):
+        code_clean = input_code.strip().upper()
+        
+        duration_map = {
+            "ADDOMA-7D": (7, "اشتراك تجريبي (7 أيام)"),
+            "ADDOMA-30D": (30, "اشتراك شهري (1 شهر / 30 يوم)"),
+            "ADDOMA-90D": (90, "اشتراك 3 شهور (90 يوم)"),
+            "ADDOMA-180D": (180, "اشتراك 6 شهور (180 يوم)"),
+            "ADDOMA-1Y": (365, "اشتراك سنوي كامل (1 سنة / 365 يوم)"),
+            "ADDOMA-2026-PRO": (365, "اشتراك احترافي (1 سنة)"),
+        }
+        
+        if code_clean in duration_map:
+            days, p_name = duration_map[code_clean]
+            new_exp = now + timedelta(days=days)
+            update_device_subscription(device_id, new_exp, p_name)
+            st.success(f"✅ تم تفعيل: {p_name}")
             st.rerun()
         else:
-            st.sidebar.error(msg)
+            st.error("❌ كود تفعيل غير صحيح.")
+
+st.sidebar.caption("💡 **أكواد للتجربة:** `ADDOMA-30D` (شهر) | `ADDOMA-1Y` (سنة)")
 
 if access_status == "expired":
-    st.error("🔒 **النظام مقفل:** انتهت الفترة التجريبية. استخدم الكود `ADDOMA-2026-PRO` لتفعيل الوصول.")
+    st.error("🔒 **النظام مقفل:** انتهت الفترة التجريبية. يرجى التفعيل باستخدام كود اشتراك ساري.")
     st.stop()
 
 # ---------------------------------------------------------
-# 3. القائمة الرئيسية للتنقل بين التطبيقات الثلاثة
+# 4. قائمة اختيار التطبيق (3 في 1)
 # ---------------------------------------------------------
 st.sidebar.divider()
-st.sidebar.header("🛠️ قائمة التطبيقات المتاحة")
+st.sidebar.header("🛠️ التطبيقات المتاحة")
 selected_app = st.sidebar.radio(
-    "اختر التطبيق للعمل عليه:",
+    "اختر النظام المطلوب:",
     [
-        "⚙️ نظام الصيانة التنبؤية والمولدات",
-        "🤖 المساعد الذكي لتقارير الصيانة والتوجيه",
-        "🔍 نظام فحص المعدات وشجرة التشخيص"
+        "⚙️ 1. الصيانة التنبؤية والمولدات والرسوم البيانية",
+        "🤖 2. المساعد الذكي لتقارير الصيانة والتوجيه",
+        "🔍 3. نظام فحص المعدات وشجرة الأعطال"
     ]
 )
 st.sidebar.divider()
 
 # =========================================================
-# التطبيق 1: نظام الصيانة التنبؤية والمولدات
+# التطبيق 1: نظام الصيانة التنبؤية، الرسوم البيانية والتقرير الشامل
 # =========================================================
-if selected_app == "⚙️ نظام الصيانة التنبؤية والمولدات":
-    st.title("⚙️ نظام الصيانة التنبؤية والتقارير الشاملة للمولدات الصناعية")
-    
+if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات والرسوم البيانية":
+    st.title("⚙️ نظام الصيانة التنبؤية ومراقبة المولدات الصناعية")
+
     col_v1, col_v2 = st.sidebar.columns(2)
     v_min = col_v1.number_input("أدنى جهد (V Min)", value=380.0, step=5.0)
     v_max = col_v2.number_input("أقصى جهد (V Max)", value=420.0, step=5.0)
@@ -209,10 +241,10 @@ if selected_app == "⚙️ نظام الصيانة التنبؤية والمول
     amp_max_limit = st.sidebar.number_input("أقصى تيار (A Max)", value=400.0, step=10.0)
 
     with st.sidebar.form("generator_comprehensive_form"):
-        st.subheader("مدخلات التشغيل")
+        st.subheader("مدخلات القراءات والخدمة")
         gen_model = st.text_input("طراز / اسم المولد", value="Perkins 410 kVA - DSE 7320")
         run_hours = st.number_input("ساعات التشغيل الحالية", min_value=0.0, value=700.0, step=10.0)
-        future_run_hours = st.number_input("ساعات التشغيل المستهدفة القادمة", min_value=0.0, value=940.0, step=10.0)
+        future_run_hours = st.number_input("ساعات التشغيل المستهدفة", min_value=0.0, value=940.0, step=10.0)
         gen_kw = st.number_input("سعة المولد (kW)", min_value=5.0, value=410.0, step=10.0)
         load_kw = st.number_input("الحمولة الحالية (kW)", min_value=0.0, value=50.0, step=10.0)
         ambient_temp = st.number_input("الحرارة المحيطة (°C)", value=43.0, step=1.0)
@@ -226,8 +258,8 @@ if selected_app == "⚙️ نظام الصيانة التنبؤية والمول
         amperes = st.number_input("التيار (A)", value=118.0)
         pf = st.number_input("معامل القدرة (PF)", value=0.85)
 
-        last_oil_change_hours = st.number_input("ساعات آخر غيار زيت", value=460.0, step=10.0)
-        oil_change_interval = st.number_input("فترة غيار الزيت القياسية (ساعة)", value=250.0, step=50.0)
+        last_oil_change_hours = st.number_input("عداد آخر تغيير زيت وفلاتر", value=460.0, step=10.0)
+        oil_change_interval = st.number_input("الفترة القياسية للزيت (ساعة)", value=250.0, step=50.0)
 
         submit_btn = st.form_submit_button("تحديث وتحليل البيانات")
 
@@ -248,18 +280,22 @@ if selected_app == "⚙️ نظام الصيانة التنبؤية والمول
     col8.metric("التيار / معامل القدرة", f"{amperes}A | {pf}")
 
     range_alarms = []
-    if voltage < v_min or voltage > v_max: range_alarms.append(f"الجهد خارج النطاق: {voltage}V")
-    if freq < f_min or freq > f_max: range_alarms.append(f"التردد خارج النطاق: {freq}Hz")
-    if coolant_temp > temp_max_limit: range_alarms.append(f"ارتفاع حرارة المحرك: {coolant_temp}°C")
-    if amperes > amp_max_limit: range_alarms.append(f"ارتفاع الحمل الكهربائي: {amperes}A")
+    if voltage < v_min or voltage > v_max: range_alarms.append(f"تجاوز الجهد: ({voltage}V) النطاق المسموح ({v_min}V - {v_max}V)")
+    if freq < f_min or freq > f_max: range_alarms.append(f"تجاوز التردد: ({freq}Hz) النطاق المسموح ({f_min}Hz - {f_max}Hz)")
+    if coolant_temp > temp_max_limit: range_alarms.append(f"ارتفاع حرارة المحرك: ({coolant_temp}°C) تجاوز الحد ({temp_max_limit}°C)")
+    if amperes > amp_max_limit: range_alarms.append(f"ارتفاع الحمل الكهربائي: ({amperes}A) تجاوز الحد ({amp_max_limit}A)")
 
     if range_alarms:
         for alarm in range_alarms: st.error(f"🔴 {alarm}")
     else:
-        st.success("🟢 جميع المؤشرات التشغيلية ضمن النطاق الآمن.")
+        st.success("🟢 جميع المؤشرات التشغيلية ضمن الحدود الآمنة.")
 
+    # ---------------------------------------------------------
+    # خدمة غيار الزيت وتتبع العمر الافتراضي لقطع الغيار
+    # ---------------------------------------------------------
     st.divider()
-    st.subheader("🛢️ جدول خدمة زيت المحرك")
+    st.subheader("🛢️ جدول خدمة زيت المحرك والمدد الافتراضية للفلاتر وقطع الغيار")
+
     effective_hours = future_run_hours if future_run_hours > 0 else run_hours
     hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
     hours_until_next_oil_change = oil_change_interval - hours_since_oil_change
@@ -268,121 +304,254 @@ if selected_app == "⚙️ نظام الصيانة التنبؤية والمول
     col_o1, col_o2, col_o3 = st.columns(3)
     col_o1.metric("المدة المنقضية للزيت", f"{hours_since_oil_change:.1f} hrs")
     col_o2.metric("المدة المتبقية للخدمة", f"{max(0.0, hours_until_next_oil_change):.1f} hrs")
-    col_o3.metric("نسبة الاستهلاك", f"{oil_usage_pct:.0f}%")
+    col_o3.metric("نسبة استهلاك فترة الزيت", f"{oil_usage_pct:.0f}%")
 
-    st.divider()
-    st.subheader("🔧 العمر الافتراضي لقطع الغيار والفلاتر")
-    base_parts = [
-        {"قطع الغيار / الفلاتر": "Engine Oil & Filter", "العمر الافتراضي (ساعة)": float(oil_change_interval), "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
-        {"قطع الغيار / الفلاتر": "Air Filter", "العمر الافتراضي (ساعة)": 1000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"قطع الغيار / الفلاتر": "Fuel Filters", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
-        {"قطع الغيار / الفلاتر": "Fan Belt", "العمر الافتراضي (ساعة)": 2000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+    base_parts_data = [
+        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Engine Oil & Filter", "العمر الافتراضي (ساعة)": float(oil_change_interval), "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
+        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Primary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
+        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Secondary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
+        {"تصنيف القطعة": "Air System", "قطع الغيار / الفلاتر": "Air Filter", "العمر الافتراضي (ساعة)": 1000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "Fan Belt", "العمر الافتراضي (ساعة)": 2000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "ELC Coolant", "العمر الافتراضي (ساعة)": 3000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
     ]
-    df_parts = pd.DataFrame(base_parts)
-    df_parts["المدة المتبقية (ساعة)"] = df_parts["العمر الافتراضي (ساعة)"] - df_parts["الساعات المنقضية (ساعة)"]
-    st.dataframe(df_parts, use_container_width=True)
+
+    df_parts_input = pd.DataFrame(base_parts_data)
+    edited_table = st.data_editor(df_parts_input, num_rows="dynamic", use_container_width=True, key="parts_editor")
+
+    processed_rows = []
+    for idx, row in edited_table.iterrows():
+        cat = str(row.get("تصنيف القطعة", "Other"))
+        part = str(row.get("قطع الغيار / الفلاتر", "Part"))
+        life = pd.to_numeric(row.get("العمر الافتراضي (ساعة)", 250), errors="coerce") or 250.0
+        used = pd.to_numeric(row.get("الساعات المنقضية (ساعة)", 0), errors="coerce") or 0.0
+        rem = life - used
+        pct = (used / life) * 100 if life > 0 else 0
+
+        status = "EXPIRED (انقضاء المدة)" if rem <= 0 else ("WARNING (اقتراب الخدمة)" if pct >= 90 else "GOOD (جيدة)")
+        processed_rows.append({
+            "تصنيف القطعة": cat,
+            "قطع الغيار / الفلاتر": part,
+            "العمر الافتراضي (ساعة)": life,
+            "الساعات المنقضية (ساعة)": used,
+            "المدة المتبقية (ساعة)": max(0.0, rem),
+            "نسبة الاستهلاك": f"{pct:.0f}%",
+            "الحالة الفنية": status
+        })
+
+    df_result = pd.DataFrame(processed_rows)
+
+    # ---------------------------------------------------------
+    # الرسوم البيانية التفاعلية لأداء الآليات
+    # ---------------------------------------------------------
+    st.divider()
+    st.subheader("📊 رسومات وتأطير أداء الآليات وقطع الغيار")
+
+    chart_col1, chart_col2 = st.columns(2)
+    with chart_col1:
+        fig_bar = px.bar(
+            df_result,
+            x="قطع الغيار / الفلاتر",
+            y=["الساعات المنقضية (ساعة)", "المدة المتبقية (ساعة)"],
+            title="مقارنة الساعات المنقضية مقابل المتبقية لكل قطعة",
+            barmode="stack",
+            color_discrete_sequence=["#d9534f", "#28a745"]
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    with chart_col2:
+        fig_pie = px.pie(
+            df_result,
+            names="الحالة الفنية",
+            title="توزيع جاهزية ونسبة سلامة قطع الغيار",
+            color_discrete_sequence=["#28a745", "#ffc107", "#dc3545"]
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+    # ---------------------------------------------------------
+    # 🖨️ زر إصدار التقرير الشامل PDF مع الرسوم البيانية
+    # ---------------------------------------------------------
+    st.divider()
+    st.subheader("📄 إصدار وتنزيل التقرير الفني الشامل (PDF Full Report)")
+
+    def generate_full_pdf_bytes():
+        pdf = ComprehensivePDF("GENERATOR & PREDICTIVE MAINTENANCE REPORT")
+        pdf.add_page()
+        temp_files = []
+
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(0, 5, f"Generator Model: {sanitize_latin_only(gen_model)}", ln=True)
+        pdf.cell(0, 5, f"Total Run Hours: {run_hours} hrs | Target Hours: {future_run_hours} hrs", ln=True)
+        pdf.cell(0, 5, f"Capacity: {gen_kw} kW | Current Load: {load_kw} kW ({load_percentage:.1f}%)", ln=True)
+        pdf.cell(0, 5, f"Electrical: {voltage} V | {freq} Hz | {amperes} A | PF: {pf}", ln=True)
+        pdf.cell(0, 5, f"Mechanical: Coolant {coolant_temp} C | Oil Press {oil_press} Bar | Vib {vibration} mm/s", ln=True)
+        pdf.ln(3)
+
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(0, 6, "1. Oil & Filter Service Summary:", ln=True)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(0, 5, f"- Default Oil Change Interval: {oil_change_interval} hrs", ln=True)
+        pdf.cell(0, 5, f"- Hours Used on Oil: {hours_since_oil_change} hrs ({oil_usage_pct:.0f}%)", ln=True)
+        pdf.cell(0, 5, f"- Remaining Hours to Change: {max(0.0, hours_until_next_oil_change)} hrs", ln=True)
+        pdf.ln(3)
+
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(0, 6, "2. Predictive Maintenance & Parts Lifespan Table:", ln=True)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(45, 5, "Part Name", border=1)
+        pdf.cell(25, 5, "Lifespan(h)", border=1)
+        pdf.cell(25, 5, "Used(h)", border=1)
+        pdf.cell(25, 5, "Remaining(h)", border=1)
+        pdf.cell(35, 5, "Status", border=1)
+        pdf.ln()
+
+        pdf.set_font("Helvetica", "", 8)
+        for idx, row in df_result.iterrows():
+            pdf.cell(45, 5, sanitize_latin_only(str(row["قطع الغيار / الفلاتر"]))[:22], border=1)
+            pdf.cell(25, 5, str(row["العمر الافتراضي (ساعة)"]), border=1)
+            pdf.cell(25, 5, str(row["الساعات المنقضية (ساعة)"]), border=1)
+            pdf.cell(25, 5, str(row["المدة المتبقية (ساعة)"]), border=1)
+            pdf.cell(35, 5, sanitize_latin_only(str(row["الحالة الفنية"])), border=1)
+            pdf.ln()
+
+        # توليد الرسم البياني للأداء وإدراجه في التقرير
+        try:
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(0, 6, "3. Performance & Maintenance Visual Charts:", ln=True)
+
+            fig, ax = plt.subplots(figsize=(6.5, 3))
+            p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
+            u_h = df_result["الساعات المنقضية (ساعة)"].values
+            r_h = df_result["المدة المتبقية (ساعة)"].values
+
+            ax.bar(p_short, u_h, label="Used Hours", color="#d9534f")
+            ax.bar(p_short, r_h, bottom=u_h, label="Remaining Hours", color="#28a745")
+            ax.set_title("Parts Lifespan Overview (Hours)", fontsize=9)
+            plt.xticks(rotation=35, ha="right", fontsize=7)
+            plt.tight_layout()
+
+            chart_path = f"temp_chart_{datetime.now().timestamp()}.png"
+            plt.savefig(chart_path, dpi=200)
+            plt.close(fig)
+            temp_files.append(chart_path)
+
+            pdf.image(chart_path, x=15, y=30, w=170)
+        except Exception:
+            pass
+
+        pdf_bytes = pdf.output(dest="S")
+        for f in temp_files:
+            if os.path.exists(f): os.remove(f)
+
+        return pdf_bytes.encode("latin-1", errors="replace")
+
+    st.download_button(
+        label="🖨️ أصدار التقرير الفني الشامل والرسوم البيانية (PDF)",
+        data=generate_full_pdf_bytes(),
+        file_name=f"Full_Maintenance_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
 
 # =========================================================
 # التطبيق 2: المساعد الذكي لتقارير الصيانة والتوجيه
 # =========================================================
-elif selected_app == "🤖 المساعد الذكي لتقارير الصيانة والتوجيه":
-    st.title("🤖 المساعد الذكي لتشخيص الأعطال وإعداد التوجيهات الفنية")
-    st.write("أدخل وصف العطـل أو المشكلة الفنية للحصول على خطوات التشخيص والإصلاح الموصى بها.")
+elif selected_app == "🤖 2. المساعد الذكي لتقارير الصيانة والتوجيه":
+    st.title("🤖 المساعد الذكي لتشخيص الأعطال والتقارير الموجهة")
 
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+    if "ai_logs" not in st.session_state:
+        st.session_state.ai_logs = []
 
-    user_query = st.text_area("وصف العطل / الاستفسار الفني:", placeholder="مثال: محرك المولد يعمل ولكن لا يولد كهرباء، أو وجود دخان أسود كثيف...")
+    user_input = st.text_area("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: خروج دخان أسود عند تحميل المولد أكثر من 70%...")
 
-    col_btn1, col_btn2 = st.columns([1, 4])
-    if col_btn1.button("تحليل العطل 🔍", use_container_width=True):
-        if user_query:
-            # محاكاة تحليل العطل الذكي
-            response = ""
-            query_lower = user_query.lower()
-
-            if "دخان أسود" in query_lower or "black smoke" in query_lower:
-                response = """
-                **📋 التقرير التشخيصي: خروج دخان أسود كثيف**
-                1. **السبب المحتمل:** انسداد فلتر الهواء، زيادة تزويد الوقود (مشكلة بخاخات)، أو حمل زائد على المحرك.
-                2. **خطوات الإصلاح:**
-                   - تفقد ونظّف/استبدل فلتر الهواء.
-                   - افحص البخاخات ومضخة الوقود (Fuel Injectors & Injection Pump).
-                   - التأكد من عدم تجاوز الحمل الكلي للقدرة الاسمية.
-                """
-            elif "حرارة" in query_lower or "overheat" in query_lower:
-                response = """
-                **📋 التقرير التشخيصي: ارتفاع درجة حرارة المحرك**
-                1. **السبب المحتمل:** نقص سائل التبريد، ارتخاء سير المروحة، أو انسداد الراديتر.
-                2. **خطوات الإصلاح:**
-                   - افحص مستوى سائل التبريد (Coolant Level).
-                   - اضبط شد قشاط/سير المروحة (Fan Belt Tension).
-                   - نظف زعانف المشعاع (Radiator Fins) من الأتربة.
-                """
-            else:
-                response = f"""
-                **📋 التقرير التشخيصي العام للاستفسار:**
-                - **تحليل العطل:** تم استقبال البلاغ للتحقق من: "{user_query}".
-                - **الإجراء الموصى به:**
-                  1. إجراء الفحص الظاهري والتأكد من لوحة التحكم وقراءات الحساسات.
-                  2. مراجعة ضغط الزيت ودرجة الحرارة والجهد الكهربائي.
-                  3. التأكد من سلامة التوصيلات الكهربائية والفلاتر.
-                """
-
-            st.session_state.chat_history.append({"user": user_query, "assistant": response})
+    if st.button("تحليل العطل وإنشاء التقرير 🔍", use_container_width=True):
+        if user_input:
+            res_text = f"""
+            **📋 التقرير الفني التوجيهي:**
+            1. **طبيعة المشكلة:** {user_input}
+            2. **خطوات الفحص والتوجيه:**
+               - فحص مرشح الهواء ونسبة الانسداد.
+               - اختبار بخاخات الوقود وضغط مضخة الحقن.
+               - التأكد من جودة الديزل وعدم وجود خلط بالماء.
+            """
+            st.session_state.ai_logs.append({"query": user_input, "result": res_text, "date": datetime.now().strftime("%Y-%m-%d %H:%M")})
         else:
-            st.warning("يرجى كتابة وصف العطل أولاً.")
+            st.warning("يرجى كتابة تفاصيل العطل.")
+
+    for log in reversed(st.session_state.ai_logs):
+        st.info(f"📅 التاريخ: {log['date']}")
+        st.write(f"**العطل:** {log['query']}")
+        st.markdown(log['result'])
+        st.divider()
+
+    st.subheader("📄 إصدار تقرير الاستشارات PDF")
+    def generate_ai_pdf():
+        pdf = ComprehensivePDF("AI DIAGNOSTIC & MAINTENANCE REPORT")
+        pdf.add_page()
+        pdf.set_font("Helvetica", "", 9)
+        for log in st.session_state.ai_logs:
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(0, 5, f"Date: {log['date']}", ln=True)
+            pdf.set_font("Helvetica", "", 9)
+            pdf.cell(0, 5, f"Query: {sanitize_latin_only(log['query'])}", ln=True)
+            pdf.ln(3)
+        return pdf.output(dest="S").encode("latin-1", errors="replace")
+
+    st.download_button(
+        label="🖨️ إصدار تقرير الاستشارات الفنية (PDF)",
+        data=generate_ai_pdf(),
+        file_name=f"AI_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
+
+# =========================================================
+# التطبيق 3: فحص المعدات وشجرة الأعطال
+# =========================================================
+elif selected_app == "🔍 3. نظام فحص المعدات وشجرة الأعطال":
+    st.title("🔍 نظام فحص المعدات وشجرة التشخيص الميداني")
+
+    eq_type = st.selectbox("اختر المعدة للفحص:", ["مولد ديزل صناعي", "غرفة تبريد وتجميد WIC", "محرك كهربائي 3-Phase"])
+
+    checklist = []
+    if eq_type == "مولد ديزل صناعي":
+        c1 = st.checkbox("1. تسريب زيت أو وقود أسفل المحرك")
+        c2 = st.checkbox("2. انخفاض سائل التبريد (Coolant)")
+        c3 = st.checkbox("3. أطراف البطارية تحتاج نظافة/إحكام")
+        checklist = [("تسريب زيت/وقود", c1), ("انخفاض سائل التبريد", c2), ("أطراف البطارية", c3)]
+        if c1: st.error("🚨 **تأكيد:** افحص وجه الكارتير وفلاتر الزيت.")
+    elif eq_type == "غرفة تبريد وتجميد WIC":
+        r1 = st.checkbox("1. تكوّن الثلج على ملف المبخر (Evaporator)")
+        r2 = st.checkbox("2. توقف مروحة المكثف الخارجية")
+        checklist = [("تراكم الثلج", r1), ("مروحة المكثف", r2)]
+        if r1: st.error("🚨 **تأكيد:** افحص دورة الإذابة وسخانات Defrost.")
+    elif eq_type == "محرك كهربائي 3-Phase":
+        m1 = st.checkbox("1. ارتفاع حرارة جسم المحرك")
+        m2 = st.checkbox("2. صوت صرير في الرمان بلي")
+        checklist = [("ارتفاع الحرارة", m1), ("صوت الرمان بلي", m2)]
 
     st.divider()
-    st.subheader("📜 سجل التشخيص والاستشارات السابقة")
-    for chat in reversed(st.session_state.chat_history):
-        st.chat_message("user").write(chat["user"])
-        st.chat_message("assistant").write(chat["assistant"])
+    st.subheader("📄 إصدار تقرير الفحص الميداني PDF")
+    def generate_chk_pdf():
+        pdf = ComprehensivePDF("EQUIPMENT FIELD INSPECTION REPORT")
+        pdf.add_page()
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(0, 5, f"Equipment Type: {sanitize_latin_only(eq_type)}", ln=True)
+        pdf.ln(3)
+        pdf.cell(100, 6, "Checklist Item", border=1)
+        pdf.cell(50, 6, "Status", border=1)
+        pdf.ln()
+        pdf.set_font("Helvetica", "", 9)
+        for item, val in checklist:
+            pdf.cell(100, 5, sanitize_latin_only(item), border=1)
+            pdf.cell(50, 5, "FAIL / DEFECT" if val else "PASS / OK", border=1)
+            pdf.ln()
+        return pdf.output(dest="S").encode("latin-1", errors="replace")
 
-# =========================================================
-# التطبيق 3: نظام فحص المعدات وشجرة التشخيص
-# =========================================================
-elif selected_app == "🔍 نظام فحص المعدات وشجرة التشخيص":
-    st.title("🔍 نظام فحص المعدات البصري وقائمة مراجعة الأعطال (Checklist)")
-
-    st.subheader("📋 قائمة الفحص الميداني للمعدة (Inspection Checklist)")
-
-    equipment_type = st.selectbox("اختر نوع المعدة للفحص:", ["مولد ديزل صناعي", "غرفة تبريد وتجميد", "محرك كهربائي 3-Phase"])
-
-    if equipment_type == "مولد ديزل صناعي":
-        c1 = st.checkbox("1. تسريب زيت أو وقود تحت المحرك")
-        c2 = st.checkbox("2. انخفاض مستوى سائل التبريد (Radiator Coolant)")
-        c3 = st.checkbox("3. ضعف أو تأكل كوابل البطارية")
-        c4 = st.checkbox("4. انسداد أو اتساخ فلتر الهواء")
-        c5 = st.checkbox("5. وجود اهتزازات غير طبيعية أثناء التشغيل")
-
-        st.divider()
-        st.subheader("🌳 شجرة القرار والتوجيه التلقائي (Fault Tree Navigation)")
-        if c1:
-            st.error("⚠️ **تنبيه تسريب:** افحص وجه الكارتير، فلتر الزيت، وأنابيب الوقود قبل البدء.")
-        if c2:
-            st.warning("⚠️ **تنبيه التبريد:** قُم بتعبئة خزان التبريد بسائل ELC معتمد وتفقد خرطوم الردياتير.")
-        if c3:
-            st.warning("⚠️ **تنبيه الكهرباء:** قم بتنظيف أطراف البطارية وإحكام التوصيل وافحص دينامو الشحن.")
-        if not c1 and not c2 and not c3 and not c4 and not c5:
-            st.success("🟢 جميع بنود الفحص الظاهري سليمة وجاهزة للتشغيل.")
-
-    elif equipment_type == "غرفة تبريد وتجميد":
-        r1 = st.checkbox("1. تكوّن ثلج على ملف المبخر (Evaporator Coils)")
-        r2 = st.checkbox("2. ارتفاع ضغط السحب (Low Pressure Cutout Triggered)")
-        r3 = st.checkbox("3. توقف مروحة المكثف الخارجية")
-
-        if r1:
-            st.error("🚨 **عطل التجميد:** افحص دورة الإذابة (Defrost Cycle) وسخانات الذوبان.")
-        if r3:
-            st.error("🚨 **عطل التبريد:** تحقق من الكونتاكتور والموتور الخاص بمروحة المكثف.")
-
-    elif equipment_type == "محرك كهربائي 3-Phase":
-        m1 = st.checkbox("1. ارتفاع حرارة جسم المحرك بشكل غير طبيعي")
-        m2 = st.checkbox("2. صوت صرير أو ضوضاء من الرولمان بلي (Bearings)")
-        m3 = st.checkbox("3. عدم توازن الأمبير بين الأوجه الثلاثة (Phase Imbalance)")
-
-        if m1 or m3:
-            st.error("🚨 **خطر احتراق الملفات:** افحص جهد الفازات وقس مقاومة العزل (Megger Test).")
-        if m2:
-            st.warning("🔧 **صيانة ميكانيكية:** يلزم تشحيم أو استبدال رولمان البلي.")
+    st.download_button(
+        label="🖨️ إصدار تقرير الفحص الميداني (PDF)",
+        data=generate_chk_pdf(),
+        file_name=f"Inspection_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
