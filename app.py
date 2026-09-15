@@ -371,11 +371,10 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
 
     st.divider()
 
-    # دالة توليد التقرير المضمونة والآمنة 100%
+    # دالة توليد التقرير المضمونة والآمنة 100% باستخدام الذاكرة المؤقتة BytesIO
     def generate_full_pdf_bytes():
         pdf = ComprehensivePDF("COMPREHENSIVE MAINTENANCE REPORT")
         pdf.add_page()
-        temp_files = []
 
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(0, 5, f"Generator Model: {sanitize_latin_only(gen_model)}", ln=True)
@@ -383,6 +382,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         pdf.cell(0, 5, f"Capacity: {gen_kw} kW | Current Load: {load_kw} kW ({load_percentage:.1f}%)", ln=True)
         pdf.ln(3)
 
+        # إضافة صورة المولد أو قطعة الغيار المرفوعة من الذاكرة
         if saved_img_path and os.path.exists(saved_img_path):
             try:
                 pdf.set_font("Helvetica", "B", 9)
@@ -392,6 +392,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             except Exception:
                 pass
 
+        # إضافة جدول قطع الغيار
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(0, 6, "Approved Spare Parts Lifespan & Maintenance Schedule:", ln=True)
         pdf.set_font("Helvetica", "B", 8)
@@ -411,8 +412,11 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.cell(35, 5, sanitize_latin_only(str(row["الحالة الفنية"])), border=1)
             pdf.ln()
 
+        # إضافة الرسوم البيانية باستخدام BytesIO مباشرة بدون ملفات مؤقتة
         try:
             pdf.add_page()
+            
+            # الرسم البياني الشريطي
             fig1, ax1 = plt.subplots(figsize=(6.5, 2.5))
             p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
             ax1.bar(p_short, df_result["الساعات المنقضية (ساعة)"].values, label="Used", color="#d9534f")
@@ -420,52 +424,74 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             ax1.set_title("Spare Parts Lifespan Overview", fontsize=9)
             plt.xticks(rotation=35, ha="right", fontsize=7)
             plt.tight_layout()
-            c_bar = f"t_bar_{uuid.uuid4().hex}.png"
-            plt.savefig(c_bar, dpi=200)
+            
+            buf_bar = io.BytesIO()
+            plt.savefig(buf_bar, format='png', dpi=200)
             plt.close(fig1)
-            temp_files.append(c_bar)
-            pdf.image(c_bar, x=15, y=20, w=170)
+            buf_bar.seek(0)
+            
+            # حفظ مؤقت للرسم البياني لإدراجه
+            c_bar_path = f"temp_bar_{uuid.uuid4().hex}.png"
+            with open(c_bar_path, "wb") as f:
+                f.write(buf_bar.read())
+            pdf.image(c_bar_path, x=15, y=20, w=170)
+            if os.path.exists(c_bar_path):
+                os.remove(c_bar_path)
 
+            # الرسم البياني الدائري
             fig2, ax2 = plt.subplots(figsize=(5, 2.5))
             sc = df_result["الحالة الفنية"].value_counts()
             ax2.pie(sc.values, labels=[sanitize_latin_only(k) for k in sc.index], autopct='%1.1f%%', colors=['#28a745', '#ffc107', '#dc3545'])
             ax2.set_title("Parts Readiness Distribution (Pie Chart)", fontsize=9)
             plt.tight_layout()
-            c_pie = f"t_pie_{uuid.uuid4().hex}.png"
-            plt.savefig(c_pie, dpi=200)
+            
+            buf_pie = io.BytesIO()
+            plt.savefig(buf_pie, format='png', dpi=200)
             plt.close(fig2)
-            temp_files.append(c_pie)
-            pdf.image(c_pie, x=25, y=105, w=150)
+            buf_pie.seek(0)
+
+            c_pie_path = f"temp_pie_{uuid.uuid4().hex}.png"
+            with open(c_pie_path, "wb") as f:
+                f.write(buf_pie.read())
+            pdf.image(c_pie_path, x=25, y=105, w=150)
+            if os.path.exists(c_pie_path):
+                os.remove(c_pie_path)
+
         except Exception:
             pass
 
-        # استخراج مخرجات PDF بشكل نقي ومتوافق مع النظم
-        pdf_output = pdf.output()
-        if isinstance(pdf_output, str):
-            final_bytes = pdf_output.encode("latin-1", errors="replace")
-        elif isinstance(pdf_output, (bytes, bytearray)):
-            final_bytes = bytes(pdf_output)
-        else:
-            final_bytes = b""
-
-        for f in temp_files:
-            if os.path.exists(f): 
-                try: os.remove(f)
-                except Exception: pass
+        # تنظيف صورة المولد المرفوعة المؤقتة
         if saved_img_path and os.path.exists(saved_img_path):
-            try: os.remove(saved_img_path)
-            except Exception: pass
+            try:
+                os.remove(saved_img_path)
+            except Exception:
+                pass
 
-        return final_bytes
+        # إرجاع البايتات النقية للتقرير
+        return bytes(pdf.output())
 
-    # زر التحميل الفعال والآمن
-    st.download_button(
-        label="🖨️ إصدار وتنزيل التقرير الفني الشامل المعتمد (PDF) مع الصور والرسوم البيانية",
-        data=generate_full_pdf_bytes(),
-        file_name=f"Comprehensive_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-        mime="application/pdf",
-        use_container_width=True
-    )
+    # --- زر التجهيز والتنزيل المباشر لمنع الخطأ في الجوال ---
+    st.divider()
+    
+    col_prep, col_down = st.columns([1, 2])
+    
+    with col_prep:
+        if st.button("🔄 تجهيز ملف التقرير (PDF)", use_container_width=True):
+            with st.spinner("جاري إعداد التقرير والتأكد من البيانات..."):
+                st.session_state.pdf_data = generate_full_pdf_bytes()
+                st.success("✅ تم تجهيز التقرير بنجاح! يمكنك التنزيل الآن.")
+
+    with col_down:
+        if "pdf_data" in st.session_state and st.session_state.pdf_data:
+            st.download_button(
+                label="🖨️ تنزيل التقرير الفني الشامل المعتمد (PDF)",
+                data=st.session_state.pdf_data,
+                file_name=f"Comprehensive_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+        else:
+            st.info("💡 يرجى الضغط على 'تجهيز ملف التقرير' أولاً لتوليد الملف ثم تنزيله.")
 
 # =========================================================
 # التطبيق 2: المساعد الذكي
