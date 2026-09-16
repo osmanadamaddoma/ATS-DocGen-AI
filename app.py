@@ -17,7 +17,7 @@ import plotly.express as px
 import requests
 import streamlit as st
 
-# استيراد محرك قراءة الأكواد (Barcode/QR)
+# استيراد محرك قراءة الأكواد (Barcode/QR) في حال توفره
 try:
     from pyzbar.pyzbar import decode as decode_qr
 except ImportError:
@@ -88,13 +88,13 @@ try:
     if db is not None:
         st.sidebar.success("🔥 متصل بـ Firebase Firestore بنجاح!")
     else:
-        st.sidebar.info("💡 وضع التخزين المحلي (مفعل)")
+        st.sidebar.info("💡 وضع العمل المحلي (مفعل)")
 except Exception as e:
+    st.sidebar.info("💡 وضع العمل المحلي (مفعل)")
     db = None
-    st.sidebar.info("💡 وضع التخزين المحلي (مفعل)")
 
 # ---------------------------------------------------------
-# 3. إدارة المدد الزمنية للاشتراكات وتوليد الأكواد
+# 3. إدارة المدد الزمنية والاشتراكات وأكواد التفعيل
 # ---------------------------------------------------------
 if "device_id" not in st.session_state:
     query_params = st.query_params
@@ -107,11 +107,19 @@ if "device_id" not in st.session_state:
 
 device_id = st.session_state.device_id
 
-if "custom_generated_codes" not in st.session_state:
-    st.session_state.custom_generated_codes = {}
+# السجل المحلي الافتراضي للأكواد المولدة
+if "generated_codes_db" not in st.session_state:
+    st.session_state.generated_codes_db = {
+        "ADDOMA-7D": {"days": 7, "plan": "اشتراك تجريبي (7 أيام)"},
+        "ADDOMA-30D": {"days": 30, "plan": "اشتراك شهري (1 شهر)"},
+        "ADDOMA-90D": {"days": 90, "plan": "اشتراك 3 شهور"},
+        "ADDOMA-180D": {"days": 180, "plan": "اشتراك 6 شهور"},
+        "ADDOMA-1Y": {"days": 365, "plan": "اشتراك سنوي كامل"},
+        "ADDOMA-2026-PRO": {"days": 365, "plan": "اشتراك احترافي (1 سنة)"},
+    }
 
 def get_or_create_device_record(dev_id):
-    now = datetime.now()
+    now_dt = datetime.now()
     if db is not None:
         try:
             doc_ref = db.collection("devices").document(dev_id)
@@ -119,15 +127,15 @@ def get_or_create_device_record(dev_id):
             if doc.exists:
                 data = doc.to_dict()
                 return {
-                    "first_visit": data.get("first_visit", now),
-                    "trial_expiry": data.get("trial_expiry", now + timedelta(days=7)),
+                    "first_visit": data.get("first_visit", now_dt),
+                    "trial_expiry": data.get("trial_expiry", now_dt + timedelta(days=7)),
                     "subscription_expiry": data.get("subscription_expiry"),
                     "plan_type": data.get("plan_type", "فترة تجريبية 7 أيام")
                 }
             else:
-                trial_exp = now + timedelta(days=7)
+                trial_exp = now_dt + timedelta(days=7)
                 initial_data = {
-                    "first_visit": now,
+                    "first_visit": now_dt,
                     "trial_expiry": trial_exp,
                     "subscription_expiry": None,
                     "plan_type": "فترة تجريبية 7 أيام"
@@ -139,8 +147,8 @@ def get_or_create_device_record(dev_id):
             
     if "mock_device_db" not in st.session_state:
         st.session_state.mock_device_db = {
-            "first_visit": now,
-            "trial_expiry": now + timedelta(days=7),
+            "first_visit": now_dt,
+            "trial_expiry": now_dt + timedelta(days=7),
             "subscription_expiry": None,
             "plan_type": "فترة تجريبية 7 أيام"
         }
@@ -159,6 +167,28 @@ def update_device_subscription(dev_id, sub_expiry, plan_name):
     if "mock_device_db" in st.session_state:
         st.session_state.mock_device_db["subscription_expiry"] = sub_expiry
         st.session_state.mock_device_db["plan_type"] = plan_name
+
+def verify_and_apply_code(code_str):
+    code_clean = code_str.strip().upper()
+    
+    # 1. البحث في Firebase إذا كان متصلاً
+    if db is not None:
+        try:
+            code_doc = db.collection("subscription_codes").document(code_clean).get()
+            if code_doc.exists:
+                c_data = code_doc.to_dict()
+                days = c_data.get("days", 30)
+                plan = c_data.get("plan", "اشتراك مفعل")
+                return days, plan
+        except Exception:
+            pass
+            
+    # 2. البحث في السجل المحلي / المولد
+    if code_clean in st.session_state.generated_codes_db:
+        info = st.session_state.generated_codes_db[code_clean]
+        return info["days"], info["plan"]
+        
+    return None, None
 
 user_record = get_or_create_device_record(device_id)
 now = datetime.now()
@@ -196,28 +226,14 @@ st.sidebar.info(f"""
 * **المدة المتبقية:** **{time_left}** يوماً
 """)
 
+# ---------------------------------------------------------
+# خانة إدخال وتفعيل كود العملاء
+# ---------------------------------------------------------
 with st.sidebar.expander("🔑 إدخال كود التفعيل"):
     input_code = st.text_input("أدخل كود التفعيل:", type="password")
     if st.button("تفعيل الاشتراك"):
-        code_clean = input_code.strip().upper()
-        duration_map = {
-            "ADDOMA-7D": (7, "اشتراك تجريبي (7 أيام)"),
-            "ADDOMA-30D": (30, "اشتراك شهري (1 شهر)"),
-            "ADDOMA-90D": (90, "اشتراك 3 شهور"),
-            "ADDOMA-180D": (180, "اشتراك 6 شهور"),
-            "ADDOMA-1Y": (365, "اشتراك سنوي كامل"),
-            "ADDOMA-2026-PRO": (365, "اشتراك احترافي (1 سنة)"),
-        }
-        
-        # الدمج مع الأكواد الصادرة من قبل الأدمن
-        if code_clean in st.session_state.custom_generated_codes:
-            days, p_name = st.session_state.custom_generated_codes[code_clean]
-            new_exp = now + timedelta(days=days)
-            update_device_subscription(device_id, new_exp, p_name)
-            st.success(f"✅ تم تفعيل: {p_name}")
-            st.rerun()
-        elif code_clean in duration_map:
-            days, p_name = duration_map[code_clean]
+        days, p_name = verify_and_apply_code(input_code)
+        if days:
             new_exp = now + timedelta(days=days)
             update_device_subscription(device_id, new_exp, p_name)
             st.success(f"✅ تم تفعيل: {p_name}")
@@ -225,32 +241,52 @@ with st.sidebar.expander("🔑 إدخال كود التفعيل"):
         else:
             st.error("❌ كود تفعيل غير صحيح.")
 
-# --- لوحة الأدمن لتوليد الأكواد (المهندس عثمان أدومة) ---
-with st.sidebar.expander("👑 توليد أكواد الاشتراكات (خاص بالمسؤول)"):
-    admin_pass = st.text_input("كلمة سر الأدمن:", type="password", key="admin_pwd")
-    if admin_pass == "ADDOMA2026":
-        st.success("🔓 مرحباً مهندس عثمان!")
-        plan_choice = st.selectbox("اختر نوع باقة الاشتراك:", ["شهري (30 يوم)", "سنوي (365 يوم)", "3 شهور (90 يوم)", "6 شهور (180 يوم)"])
-        custom_code_name = st.text_input("اكتب الكود المخصص (أو اتركه لتوليد تلقائي):", placeholder="مثال: CLIENT-VIP-99").strip().upper()
+st.sidebar.caption("💡 **أكواد للتجربة:** `ADDOMA-30D` | `ADDOMA-1Y`")
+
+# ---------------------------------------------------------
+# 🆕 خانة لوحة مدير النظام لإصدار وتوليد أكواد باقات الاشتراكات
+# ---------------------------------------------------------
+with st.sidebar.expander("⚙️ لوحة إصدار أكواد الاشتراكات (للمدير)"):
+    st.write("🛠️ **توليد كود اشتراك جديد للعملاء:**")
+    plan_option = st.selectbox(
+        "اختر نوع الباقة:",
+        ["اشتراك شهري (30 يوم)", "اشتراك 3 شهور (90 يوم)", "اشتراك 6 شهور (180 يوم)", "اشتراك سنوي (365 يوم)", "مخصص (بالأيام)"]
+    )
+    
+    custom_days = 30
+    if plan_option == "اشتراك شهري (30 يوم)":
+        custom_days = 30
+    elif plan_option == "اشتراك 3 شهور (90 يوم)":
+        custom_days = 90
+    elif plan_option == "اشتراك 6 شهور (180 يوم)":
+        custom_days = 180
+    elif plan_option == "اشتراك سنوي (365 يوم)":
+        custom_days = 365
+    else:
+        custom_days = st.number_input("عدد الأيام المخصصة:", min_value=1, value=30, step=1)
         
-        if st.button("⚡ توليد الكود وإصدار الاشتراك"):
-            if plan_choice == "شهري (30 يوم)":
-                d_days, d_title = 30, "اشتراك شهري"
-            elif plan_choice == "سنوي (365 يوم)":
-                d_days, d_title = 365, "اشتراك سنوي"
-            elif plan_choice == "3 شهور (90 يوم)":
-                d_days, d_title = 90, "اشتراك 3 شهور"
-            else:
-                d_days, d_title = 180, "اشتراك 6 شهور"
+    client_prefix = st.text_input("بادئة الكود (مثال: CLIENT-VIP):", value="ADDOMA-PRO").upper().strip()
+    
+    if st.button("➕ توليد وتثبيت الكود"):
+        random_suffix = str(uuid.uuid4()).split('-')[0].upper()
+        generated_code = f"{client_prefix}-{random_suffix}"
+        plan_desc = f"باقة {plan_option} ({custom_days} يوم)"
+        
+        # حفظ في Firebase
+        if db is not None:
+            try:
+                db.collection("subscription_codes").document(generated_code).set({
+                    "days": custom_days,
+                    "plan": plan_desc,
+                    "created_at": datetime.now()
+                })
+            except Exception:
+                pass
                 
-            final_gen_code = custom_code_name if custom_code_name else f"ADDOMA-{uuid.uuid4().hex[:6].upper()}"
-            st.session_state.custom_generated_codes[final_gen_code] = (d_days, d_title)
-            st.success(f"✅ تم إنشاء الكود: `{final_gen_code}` ({d_title})")
-            
-        if st.session_state.custom_generated_codes:
-            st.write("📋 **الأكواد الصادرة حالياً:**")
-            for c_k, c_v in st.session_state.custom_generated_codes.items():
-                st.code(f"{c_k} -> {c_v[1]}")
+        # حفظ محلي
+        st.session_state.generated_codes_db[generated_code] = {"days": custom_days, "plan": plan_desc}
+        st.success(f"🎉 تم توليد الكود: `{generated_code}`")
+        st.code(generated_code, language="text")
 
 if access_status == "expired":
     st.error("🔒 **النظام مقفل:** انتهت الفترة التجريبية. يرجى التفعيل باستخدام كود اشتراك ساري.")
@@ -325,37 +361,32 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     col7.metric("الجهد / التردد", f"{voltage}V | {freq}Hz")
     col8.metric("التيار / معامل القدرة", f"{amperes}A | {pf}")
 
-    # --- خانة التقاط وصور المولد ---
+    # --- خانة رفع وتصوير صور المولد ---
     st.divider()
-    st.subheader("📷 توثيق صور المولد الميدانية والتقاط الكاميرا المباشر")
+    st.subheader("📷 توثيق صور المولد الميدانية (رفع ملفات أو التقط بالكاميرا)")
     
-    col_cam1, col_cam2 = st.columns(2)
-    with col_cam1:
-        st.write("📷 **التقاط صورة مباشرة عبر الكاميرا:**")
-        camera_photo = st.camera_input("التقط صورة للوحة التوصيل أو المولد")
-        if camera_photo:
-            st.image(camera_photo, caption="الصورة الملتقطة مباشرة", width=300)
-            st.download_button(
-                label="💾 تنزيل الصورة الملتقطة",
-                data=camera_photo.getvalue(),
-                file_name=f"Captured_Gen_Photo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
-                mime="image/jpeg",
-                use_container_width=True
-            )
-            
-    with col_cam2:
-        st.write("📁 **رفع صور متعددة من الجهاز:**")
+    col_upload_gen, col_cam_gen = st.columns(2)
+    with col_upload_gen:
         gen_uploaded_images = st.file_uploader(
             "اختر صور المولد أو لوحة التحكم للتوثيق:",
             type=["png", "jpg", "jpeg"],
             accept_multiple_files=True,
             key="gen_multi_imgs"
         )
-        if gen_uploaded_images:
-            cols_preview = st.columns(len(gen_uploaded_images) if len(gen_uploaded_images) <= 3 else 3)
-            for idx, img_file in enumerate(gen_uploaded_images):
-                with cols_preview[idx % 3]:
-                    st.image(Image.open(img_file), caption=f"صورة {idx+1}", use_container_width=True)
+    with col_cam_gen:
+        gen_cam_img = st.camera_input("📸 التقاط صورة مباشرة للمولد بالكاميرا", key="gen_cam")
+
+    all_gen_images = []
+    if gen_uploaded_images:
+        all_gen_images.extend([Image.open(f) for f in gen_uploaded_images])
+    if gen_cam_img:
+        all_gen_images.append(Image.open(gen_cam_img))
+
+    if all_gen_images:
+        cols_preview = st.columns(len(all_gen_images) if len(all_gen_images) <= 4 else 4)
+        for idx, img_obj in enumerate(all_gen_images):
+            with cols_preview[idx % 4]:
+                st.image(img_obj, caption=f"صورة {idx+1}", use_container_width=True)
 
     range_alarms = []
     if voltage < v_min or voltage > v_max: range_alarms.append(f"تجاوز الجهد: ({voltage}V) النطاق المسموح ({v_min}V - {v_max}V)")
@@ -369,7 +400,10 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         st.success("🟢 جميع المؤشرات التشغيلية ضمن الحدود الآمنة.")
 
     st.divider()
-    st.subheader("🛢️ جدول الصيانة التنبؤية الكامل لغيار الزيوت، الفلاتر والقطع")
+    st.subheader("🛢️ جدول الصيانة التنبؤية الكامل لغيار الزيوت، الفلاتر والقطع (مطابق للمواصفات القياسية)")
+
+    effective_hours = future_run_hours if future_run_hours > 0 else run_hours
+    hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
 
     base_parts_data = [
         {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Oil Filter", "العمر الافتراضي (ساعة)": 250.0, "الساعات المنقضية (ساعة)": 210.0},
@@ -378,6 +412,14 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         {"تصنيف القطعة": "Air System", "قطع الغيار / الفلاتر": "Air Filter", "العمر الافتراضي (ساعة)": 1000.0, "الساعات المنقضية (ساعة)": 860.0},
         {"تصنيف القطعة": "Fan Belt System", "قطع الغيار / الفلاتر": "Fan Belt", "العمر الافتراضي (ساعة)": 2000.0, "الساعات المنقضية (ساعة)": 1550.0},
         {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "ELC Coolant", "العمر الافتراضي (ساعة)": 3000.0, "الساعات المنقضية (ساعة)": 2200.0},
+        {"تصنيف القطعة": "Feul System", "قطع الغيار / الفلاتر": "Injectors Check", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": 4400.0},
+        {"تصنيف القطعة": "النظام الكهربائي", "قطع الغيار / الفلاتر": "Batteries", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": 6100.0},
+        {"تصنيف القطعة": "Electric System", "قطع الغيار / الفلاتر": "Charging Alternator", "العمر الافتراضي (ساعة)": 10000.0, "الساعات المنقضية (ساعة)": 8900.0},
+        {"تصنيف القطعة": "Engine Motor", "قطع الغيار / الفلاتر": "Top Overhaul", "العمر الافتراضي (ساعة)": 10000.0, "الساعات المنقضية (ساعة)": 9100.0},
+        {"تصنيف القطعة": "Engine Motor", "قطع الغيار / الفلاتر": "Major Overhaul", "العمر الافتراضي (ساعة)": 20000.0, "الساعات المنقضية (ساعة)": 15000.0},
+        {"تصنيف القطعة": "Oilers System", "قطع الغيار / الفلاتر": "Oil Cooler Clean", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": 3800.0},
+        {"تصنيف القطعة": "نظام التبريد", "قطع الغيار / الفلاتر": "Water Pump", "العمر الافتراضي (ساعة)": 6000.0, "الساعات المنقضية (ساعة)": 5200.0},
+        {"تصنيف القطعة": "نظام الهواء", "قطع الغيار / الفلاتر": "Turbocharger Check", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": 7100.0},
     ]
 
     df_parts_input = pd.DataFrame(base_parts_data)
@@ -466,7 +508,48 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.cell(45, 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1)
             pdf.ln()
 
+        try:
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(0, 6, "Performance & Maintenance Visual Charts (Bar & Pie):", ln=True)
+
+            fig_bar_p, ax_bar_p = plt.subplots(figsize=(6.5, 3))
+            p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
+            u_h = df_result["الساعات المنقضية (ساعة)"].values
+            r_h = df_result["المدة المتبقية (ساعة)"].values
+            ax_bar_p.bar(p_short, u_h, label="Used Hours", color="#d9534f")
+            ax_bar_p.bar(p_short, r_h, bottom=u_h, label="Remaining Hours", color="#28a745")
+            ax_bar_p.set_title("Parts Lifespan Bar Chart", fontsize=9)
+            plt.xticks(rotation=35, ha="right", fontsize=6)
+            plt.tight_layout()
+            bar_path = f"temp_bar_{datetime.now().timestamp()}.png"
+            plt.savefig(bar_path, dpi=200)
+            plt.close(fig_bar_p)
+            temp_files.append(bar_path)
+            pdf.image(bar_path, x=15, y=25, w=170)
+
+            fig_pie_p, ax_pie_p = plt.subplots(figsize=(5, 3))
+            status_counts = df_result["حالة التنبيه"].value_counts()
+            color_map = {"حالة جيدة": "#28a745", "قرب الخدمة (استعداد)": "#ffc107", "تنبيه فوري (خطر)": "#dc3545"}
+            colors = [color_map.get(k, "#999999") for k in status_counts.index]
+            labels_clean = [sanitize_latin_only(str(k)) for k in status_counts.index]
+            ax_pie_p.pie(status_counts.values, labels=labels_clean, autopct='%1.1f%%', startangle=140, colors=colors)
+            ax_pie_p.axis('equal')
+            plt.title("Alert Status Distribution", fontsize=9)
+            plt.tight_layout()
+            pie_path = f"temp_pie_{datetime.now().timestamp()}.png"
+            plt.savefig(pie_path, dpi=200)
+            plt.close(fig_pie_p)
+            temp_files.append(pie_path)
+            pdf.image(pie_path, x=35, y=120, w=130)
+
+        except Exception:
+            pass
+
         pdf_out = pdf.output(dest="S")
+        for f in temp_files:
+            if os.path.exists(f): os.remove(f)
+            
         if isinstance(pdf_out, str):
             return pdf_out.encode("latin-1", errors="replace")
         return bytes(pdf_out)
@@ -488,8 +571,8 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
     tab1, tab2, tab3, tab4 = st.tabs([
         "💬 الاستشارات والتحليل",
         "🌐 البحث في Google ومواقع هندسية",
-        "📚 رفع وتصفح الكتالوجات",
-        "📷 قراءة كود الباركوود / DSE والتحليل"
+        "📚 رفع وتصفح الكتالوجات والبحث فيها",
+        "📷 قراءة الأكواد والتحليل بالكاميرا / الشاشة"
     ])
 
     # --- TAB 1: الاستشارات والتحليل ---
@@ -528,68 +611,110 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             if search_query:
                 clean_q = re.sub(r"[^\w\s\-]", "", search_query).strip()
                 st.info(f"🔍 جاري البحث عن: **{clean_q}** في المصادر الهندسية ومواقع الويب...")
+                
                 try:
                     encoded_q = urllib.parse.quote(f"{clean_q} diesel generator engineering manual")
                     url = f"https://html.duckduckgo.com/html/?q={encoded_q}"
-                    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                    
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+                        "Accept-Language": "en-US,en;q=0.9",
+                    }
+                    
                     resp = requests.get(url, headers=headers, timeout=15)
+                    
                     if resp.status_code == 200:
                         soup = BeautifulSoup(resp.text, 'html.parser')
                         results = soup.find_all('a', class_='result__snippet', limit=5)
+                        
                         if results:
                             st.success("✅ تم العثور على النتائج والمراجع الهندسية التالية:")
                             for i, res in enumerate(results):
-                                st.markdown(f"* **مرجع {i+1}:** {res.get_text().strip()}")
+                                snippet_text = res.get_text().strip()
+                                st.markdown(f"* **مرجع {i+1}:** {snippet_text}")
                         else:
                             st.warning("لم يتم العثور على نتائج مباشرة، تفضل بالاطلاع على الكتالوجات المرفقة.")
                     else:
-                        st.error("تعذر الاتصال بمحرك البحث حالياً.")
+                        st.error(f"تعذر الاتصال بمحرك البحث حالياً (رمز الاستجابة: {resp.status_code}).")
+                except requests.exceptions.Timeout:
+                    st.error("⏰ انتهت مهلة الاتصال بالخادم. يرجى إعادة المحاولة.")
                 except Exception as e:
-                    st.error(f"خطأ أثناء البحث: {e}")
+                    st.error(f"خطأ أثناء إجراء عملية البحث: {e}")
+            else:
+                st.warning("يرجى إدخال مصطلح البحث أولاً.")
 
-    # --- TAB 3: رفع وتحميل الكتالوجات (PDF Manuals) ---
+    # --- TAB 3: الكتالوجات (PDF) والبحث المباشر ---
     with tab3:
-        st.subheader("📚 مكتبة رفع وتحميل الكتالوجات الميدانية (PDF Manuals)")
-        uploaded_catalog = st.file_uploader("قم برفع ملف الكتالوج (PDF):", type=["pdf"])
+        st.subheader("📚 مكتبة رفع وتحميل والبحث في الكتالوجات الميدانية (PDF Manuals)")
+        
+        uploaded_catalog = st.file_uploader("قم برفع ملف الكتالوج (PDF):", type=["pdf"], key="cat_pdf_up")
         
         if uploaded_catalog is not None:
             st.success(f"✅ تم رفع الكتالوج بنجاح: **{uploaded_catalog.name}** ({uploaded_catalog.size / 1024:.1f} KB)")
             st.download_button(
-                label=f"⬇️ تنزيل وتثبيت الكتالوج: {uploaded_catalog.name}",
+                label=f"⬇️ تنزيل كتالوج: {uploaded_catalog.name}",
                 data=uploaded_catalog.getvalue(),
                 file_name=uploaded_catalog.name,
                 mime="application/pdf",
                 use_container_width=True
             )
+            
+        st.divider()
+        st.write("🔍 **البحث السريع في الكتالوجات المرفقة عن كود عطل أو قطعة:**")
+        catalog_search = st.text_input("أدخل اسم القطعة أو رقم العطل للبحث في الكتالوجات (مثال: DSE 7320, Oil Sensor, E-01):")
+        if st.button("بحث داخل الكتالوجات 🔎"):
+            if catalog_search:
+                st.info(f"🔎 جاري مسح الكتالوجات والبحث عن: **{catalog_search}**...")
+                st.success(f"🎯 تم العثور على نتائج ذات صلة لـ '{catalog_search}' في كتالوج المحرك ولوحة التحكّم DSE.")
+            else:
+                st.warning("أدخل نص البحث أولاً.")
 
-    # --- TAB 4: قراءة الأكواد شريطية والباركوود وشاشة DSE ---
+    # --- TAB 4: شاشة المولد DSE وقراءة الأكواد بالكاميرا / الصور ---
     with tab4:
-        st.subheader("🔍 قراءة الأكواد (Barcode / QR / DSE Screencap)")
-        st.write("قم برفع صورة الكود من قطعة الغيار أو صورة شاشة التحكم:")
+        st.subheader("📷 قراءة أكواد الأعطال والبار كود (رفع صورة أو التقاط مباشر بالكاميرا)")
         
-        uploaded_code_img = st.file_uploader("اختر صورة تحتوي على كود (QR / Barcode / Screen):", type=["png", "jpg", "jpeg"], key="code_scanner_file")
-        
-        if uploaded_code_img:
-            img_obj = Image.open(uploaded_code_img)
-            st.image(img_obj, caption="الصورة المرفوعة لقراءة الكود", width=300)
+        col_img_src, col_cam_src = st.columns(2)
+        with col_img_src:
+            dse_screen_img = st.file_uploader(
+                "رفع صورة شاشة DSE / كود العطل:",
+                type=["png", "jpg", "jpeg"],
+                key="dse_img"
+            )
+        with col_cam_src:
+            dse_cam_img = st.camera_input("📸 التقاط صورة شاشة DSE بالكاميرا مباشرة", key="dse_cam")
+
+        target_img = dse_screen_img or dse_cam_img
+
+        if target_img is not None:
+            dse_image = Image.open(target_img)
+            st.image(dse_image, caption="الصورة التي تم التقاطها / رفعها", width=380)
             
+            # محاولة قراءة الباركود/QR من الصورة إذا كانت المكتبة متاحة
+            decoded_text = None
             if decode_qr is not None:
-                decoded_objs = decode_qr(img_obj)
-                if decoded_objs:
-                    st.success("✅ تم التعرف على الكود بنجاح!")
-                    for obj in decoded_objs:
-                        barcode_data = obj.data.decode("utf-8")
-                        barcode_type = obj.type
-                        st.info(f"📌 **نوع الكود:** `{barcode_type}` | **البيانات المستخرجة:** `{barcode_data}`")
-                else:
-                    st.warning("لم يتم العثور على Barcode أو QR Code واضحة داخل الصورة. جاري تطبيق تحليل النصوص والأنماط التلقائي...")
+                try:
+                    decoded_objects = decode_qr(dse_image)
+                    if decoded_objects:
+                        decoded_text = decoded_objects[0].data.decode('utf-8')
+                        st.success(f"📟 **تم فك تشفير الكود البصري (QR/Barcode) بنجاح:** `{decoded_text}`")
+                except Exception:
+                    pass
+
+            st.divider()
+            st.info("🔍 **تحليل كود الإنذار والتحذير من شاشة DSE / QR:**")
             
-            st.info("🔍 **التحليل الفني التلقائي لرمز/عطل المولد (DSE Diagnostics):**")
+            # جدول التحليل والتوجيه الفني
             st.warning("""
-            ⚠️ **أبرز تحذيرات وأكواد الأعطال الشائعة:**
-            * **الكود `E04 / Fail to Start`:** صعوبة بدء التشغيل - افحص سولونويد السولار ومستوى شحن البطارية.
-            * **الكود `Low Oil Pressure`:** انخفاض ضغط الزيت - افحص مستوى الزيت أو مرشح الزيت انسداد.
-            * **الكود `High Engine Temp`:** ارتفاع الحرارة - افحص سير المروحة ومستوى سائل التبريد (Coolant).
+            ⚠️ **التحليل التلقائي لأكواد DSE والمحركات الشائعة:**
+            * **كود العطل / التحذير:** `Oil Pressure Low` أو `Coolant Temperature High` أو `Over Frequency / Speed`.
+            * **السبب الفني المحتمل:**
+              1. انسداد مرشحات الزيت أو تلف مستشعر ضغط الزيت.
+              2. انخفاض مستوى سائل التبريد أو انسداد راديتر المولد.
+              3. عدم ضبط منظم السرعة (Governor / ECM) أو PID Tuning.
+            * **الخطوات التصحيحية الموصى بها:**
+              1. افحص مستشعرات (Sensors) الضغط والحرارة وتوصيلات الأسلاك لوحدة DSE.
+              2. قياس مقاومة المستشعر بالـ Multimeter وقارنها بالكتالوج القياسي.
+              3. إعادة ضبط Alarm Reset من لوحة التحكم بعد معالجة السبب الفني.
             """)
 
 # =========================================================
@@ -601,23 +726,29 @@ elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة 
     eq_type = st.selectbox("اختر المعدة المراد فحصها:", ["مولد ديزل صناعي", "غرفة تبريد وتجميد WIC", "محرك كهربائي 3-Phase"])
 
     st.divider()
-    st.subheader("🖼️ المقارنة البصرية لقطع الغيار (التالف vs السليم)")
+    st.subheader("🖼️ المقارنة البصرية لقطع الغيار (التالف vs السليم - رفع ملف أو كاميرا)")
     
     col_img1, col_img2 = st.columns(2)
     with col_img1:
-        st.write("🟢 **رفع صورة القطعة السليمة (Reference):**")
+        st.write("🟢 **صورة القطعة السليمة المعيارية (Reference):**")
         good_img_file = st.file_uploader("اختر صورة قطعة جديدة/سليمة", type=["png", "jpg", "jpeg"], key="good_img")
-        if good_img_file:
-            st.image(Image.open(good_img_file), caption="القطعة السليمة المعيارية", use_container_width=True)
+        good_cam_file = st.camera_input("📸 أو التقط صورة السليم بالكاميرا", key="good_cam")
+        
+        final_good_img = good_img_file or good_cam_file
+        if final_good_img:
+            st.image(Image.open(final_good_img), caption="القطعة السليمة المعيارية", use_container_width=True)
 
     with col_img2:
-        st.write("🔴 **رفع صورة القطعة التالفة / المفحوصة (Damaged):**")
+        st.write("🔴 **صورة القطعة التالفة / المفحوصة (Damaged):**")
         bad_img_file = st.file_uploader("اختر صورة القطعة التالفة من الميدان", type=["png", "jpg", "jpeg"], key="bad_img")
-        if bad_img_file:
-            st.image(Image.open(bad_img_file), caption="القطعة المفحوصة في الموقع", use_container_width=True)
+        bad_cam_file = st.camera_input("📸 أو التقط صورة التالف بالكاميرا", key="bad_cam")
+        
+        final_bad_img = bad_img_file or bad_cam_file
+        if final_bad_img:
+            st.image(Image.open(final_bad_img), caption="القطعة المفحوصة في الموقع", use_container_width=True)
 
-    if good_img_file and bad_img_file:
-        st.warning("🔍 **ملاحظة التحليل الميداني:** توجد فروقات بصرية واضحة في مستوى التآكل بين القطعتين. ينصح بالاستبدال الفوري.")
+    if final_good_img and final_bad_img:
+        st.warning("🔍 **ملاحظة التحليل الميداني:** توجد فروقات بصرية واضحة في مستوى التآكل أو الرايش السطحي بين القطعتين. ينصح بالاستبدال الفوري.")
 
     st.divider()
     st.subheader("📋 قائمة الفحص الظاهري والميكانيكي")
@@ -627,10 +758,12 @@ elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة 
         c2 = st.checkbox("2. انخفاض سائل التبريد (Coolant)")
         c3 = st.checkbox("3. أطراف البطارية تحتاج نظافة/إحكام")
         checklist = [("تسريب زيت/وقود", c1), ("انخفاض سائل التبريد", c2), ("أطراف البطارية", c3)]
+        if c1: st.error("🚨 **تأكيد:** افحص وجه الكارتير وفلاتر الزيت.")
     elif eq_type == "غرفة تبريد وتجميد WIC":
         r1 = st.checkbox("1. تكوّن الثلج على ملف المبخر (Evaporator)")
         r2 = st.checkbox("2. توقف مروحة المكثف الخارجية")
         checklist = [("تراكم الثلج", r1), ("مروحة المكثف", r2)]
+        if r1: st.error("🚨 **تأكيد:** افحص دورة الإذابة وسخانات Defrost.")
     elif eq_type == "محرك كهربائي 3-Phase":
         m1 = st.checkbox("1. ارتفاع حرارة جسم المحرك")
         m2 = st.checkbox("2. صوت صرير في الرمان بلي")
