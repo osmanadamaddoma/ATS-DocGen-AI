@@ -18,3 +18,12 @@ matplotlib
 firebase-admin
 opencv-python-headless
 reportlab
+streamlit
+pandas
+plotly
+matplotlib
+fpdf2
+firebase-admin
+Pillow
+beautifulsoup4
+requests
