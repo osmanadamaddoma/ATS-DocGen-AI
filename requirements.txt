@@ -10,4 +10,4 @@ matplotlib
 scikit-learn
 supabase
 openpyxl
-
+beautifulsoup4
