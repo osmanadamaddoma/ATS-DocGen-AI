@@ -171,7 +171,6 @@ def update_device_subscription(dev_id, sub_expiry, plan_name):
 def verify_and_apply_code(code_str):
     code_clean = code_str.strip().upper()
     
-    # 1. البحث في Firebase إذا كان متصلاً
     if db is not None:
         try:
             code_doc = db.collection("subscription_codes").document(code_clean).get()
@@ -183,7 +182,6 @@ def verify_and_apply_code(code_str):
         except Exception:
             pass
             
-    # 2. البحث في السجل المحلي / المولد
     if code_clean in st.session_state.generated_codes_db:
         info = st.session_state.generated_codes_db[code_clean]
         return info["days"], info["plan"]
@@ -218,17 +216,13 @@ else:
     plan_type = "منتهي الصلاحية"
     expiry_date_str = "منتهي"
 
-st.sidebar.header("🔐 تفاصيل الاشتراك والتفعيل")
-st.sidebar.info(f"""
-📌 **حالة الحساب والاشتراك:**
-* **نوع الخطة:** {plan_type}
-* **تاريخ الانتهاء:** `{expiry_date_str}`
-* **المدة المتبقية:** **{time_left}** يوماً
-""")
+st.sidebar.markdown("💡")
+st.sidebar.markdown("### **وضع العمل المحلي (مفعل)**")
+st.sidebar.markdown("---")
+st.sidebar.markdown("🔐 تفاصيل الاشتراك والتفعيل")
+st.sidebar.markdown("📌")
+st.sidebar.markdown(f""" **حالة الحساب والاشتراك:** * **نوع الخطة:** {plan_type} * **تاريخ الانتهاء:** `{expiry_date_str}` * **المدة المتبقية:** **{time_left}** يوماً """)
 
-# ---------------------------------------------------------
-# خانة إدخال وتفعيل كود العملاء
-# ---------------------------------------------------------
 with st.sidebar.expander("🔑 إدخال كود التفعيل"):
     input_code = st.text_input("أدخل كود التفعيل:", type="password")
     if st.button("تفعيل الاشتراك"):
@@ -241,11 +235,8 @@ with st.sidebar.expander("🔑 إدخال كود التفعيل"):
         else:
             st.error("❌ كود تفعيل غير صحيح.")
 
-st.sidebar.caption("💡 **أكواد للتجربة:** `ADDOMA-30D` | `ADDOMA-1Y`")
+st.sidebar.markdown("💡 **أكواد للتجربة:** `ADDOMA-30D` | `ADDOMA-1Y`")
 
-# ---------------------------------------------------------
-# 🆕 خانة لوحة مدير النظام لإصدار وتوليد أكواد باقات الاشتراكات
-# ---------------------------------------------------------
 with st.sidebar.expander("⚙️ لوحة إصدار أكواد الاشتراكات (للمدير)"):
     st.write("🛠️ **توليد كود اشتراك جديد للعملاء:**")
     plan_option = st.selectbox(
@@ -272,7 +263,6 @@ with st.sidebar.expander("⚙️ لوحة إصدار أكواد الاشتراك
         generated_code = f"{client_prefix}-{random_suffix}"
         plan_desc = f"باقة {plan_option} ({custom_days} يوم)"
         
-        # حفظ في Firebase
         if db is not None:
             try:
                 db.collection("subscription_codes").document(generated_code).set({
@@ -283,7 +273,6 @@ with st.sidebar.expander("⚙️ لوحة إصدار أكواد الاشتراك
             except Exception:
                 pass
                 
-        # حفظ محلي
         st.session_state.generated_codes_db[generated_code] = {"days": custom_days, "plan": plan_desc}
         st.success(f"🎉 تم توليد الكود: `{generated_code}`")
         st.code(generated_code, language="text")
@@ -296,7 +285,7 @@ if access_status == "expired":
 # 4. قائمة اختيار التطبيق
 # ---------------------------------------------------------
 st.sidebar.divider()
-st.sidebar.header("🛠️ التطبيقات المتاحة")
+st.sidebar.markdown("🛠️ التطبيقات المتاحة")
 selected_app = st.sidebar.radio(
     "اختر النظام المطلوب:",
     [
@@ -361,7 +350,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     col7.metric("الجهد / التردد", f"{voltage}V | {freq}Hz")
     col8.metric("التيار / معامل القدرة", f"{amperes}A | {pf}")
 
-    # --- خانة رفع وتصوير صور المولد ---
     st.divider()
     st.subheader("📷 توثيق صور المولد الميدانية (رفع ملفات أو التقط بالكاميرا)")
     
@@ -582,14 +570,7 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
 
         if st.button("تحليل العطل وإنشاء التقرير 🔍", use_container_width=True):
             if user_input:
-                res_text = f"""
-                **📋 التقرير الفني التوجيهي:**
-                1. **طبيعة المشكلة:** {user_input}
-                2. **خطوات الفحص والتوجيه:**
-                   - فحص مرشح الهواء ونسبة الانسداد.
-                   - اختبار بخاخات الوقود وضغط مضخة الحقن.
-                   - التأكد من جودة الديزل وعدم وجود خلط بالماء.
-                """
+                res_text = f""" **📋 التقرير الفني التوجيهي:** 1. **طبيعة المشكلة:** {user_input} 2. **خطوات الفحص والتوجيه:** - فحص مرشح الهواء ونسبة الانسداد. - اختبار بخاخات الوقود وضغط مضخة الحقن. - التأكد من جودة الديزل وعدم وجود خلط بالماء. """
                 if "ai_logs" not in st.session_state: st.session_state.ai_logs = []
                 st.session_state.ai_logs.append({"query": user_input, "result": res_text, "date": datetime.now().strftime("%Y-%m-%d %H:%M")})
             else:
@@ -647,16 +628,28 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
     with tab3:
         st.subheader("📚 مكتبة رفع وتحميل والبحث في الكتالوجات الميدانية (PDF Manuals)")
         
-        uploaded_catalog = st.file_uploader("قم برفع ملف الكتالوج (PDF):", type=["pdf"], key="cat_pdf_up")
-        
+        col_up_cat, col_cam_cat = st.columns(2)
+        with col_up_cat:
+            uploaded_catalog = st.file_uploader("رفع ملف كتالوج (PDF):", type=["pdf"], key="cat_pdf_up")
+        with col_cam_cat:
+            camera_catalog_img = st.camera_input("📸 التقاط صورة لصفحة الكتالوج بالكاميرا", key="cat_cam")
+
+        all_cat_files = []
         if uploaded_catalog is not None:
-            st.success(f"✅ تم رفع الكتالوج بنجاح: **{uploaded_catalog.name}** ({uploaded_catalog.size / 1024:.1f} KB)")
+            all_cat_files.append((uploaded_catalog.name, uploaded_catalog.getvalue(), "pdf"))
+        if camera_catalog_img is not None:
+            cam_bytes = camera_catalog_img.getvalue()
+            all_cat_files.append((f"catalog_cam_{datetime.now().strftime('%H%M%S')}.jpg", cam_bytes, "image"))
+
+        for fname, fbytes, ftype in all_cat_files:
+            st.success(f"✅ تم تحميل العنصر بنجاح: **{fname}** ({len(fbytes) / 1024:.1f} KB)")
             st.download_button(
-                label=f"⬇️ تنزيل كتالوج: {uploaded_catalog.name}",
-                data=uploaded_catalog.getvalue(),
-                file_name=uploaded_catalog.name,
-                mime="application/pdf",
-                use_container_width=True
+                label=f"⬇️ تنزيل: {fname}",
+                data=fbytes,
+                file_name=fname,
+                mime="application/pdf" if ftype == "pdf" else "image/jpeg",
+                use_container_width=True,
+                key=f"dl_{fname}"
             )
             
         st.divider()
@@ -689,7 +682,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             dse_image = Image.open(target_img)
             st.image(dse_image, caption="الصورة التي تم التقاطها / رفعها", width=380)
             
-            # محاولة قراءة الباركود/QR من الصورة إذا كانت المكتبة متاحة
             decoded_text = None
             if decode_qr is not None:
                 try:
@@ -703,19 +695,7 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             st.divider()
             st.info("🔍 **تحليل كود الإنذار والتحذير من شاشة DSE / QR:**")
             
-            # جدول التحليل والتوجيه الفني
-            st.warning("""
-            ⚠️ **التحليل التلقائي لأكواد DSE والمحركات الشائعة:**
-            * **كود العطل / التحذير:** `Oil Pressure Low` أو `Coolant Temperature High` أو `Over Frequency / Speed`.
-            * **السبب الفني المحتمل:**
-              1. انسداد مرشحات الزيت أو تلف مستشعر ضغط الزيت.
-              2. انخفاض مستوى سائل التبريد أو انسداد راديتر المولد.
-              3. عدم ضبط منظم السرعة (Governor / ECM) أو PID Tuning.
-            * **الخطوات التصحيحية الموصى بها:**
-              1. افحص مستشعرات (Sensors) الضغط والحرارة وتوصيلات الأسلاك لوحدة DSE.
-              2. قياس مقاومة المستشعر بالـ Multimeter وقارنها بالكتالوج القياسي.
-              3. إعادة ضبط Alarm Reset من لوحة التحكم بعد معالجة السبب الفني.
-            """)
+            st.warning(""" ⚠️ **التحليل التلقائي لأكواد DSE والمحركات الشائعة:** * **كود العطل / التحذير:** `Oil Pressure Low` أو `Coolant Temperature High` أو `Over Frequency / Speed`. * **السبب الفني المحتمل:** 1. انسداد مرشحات الزيت أو تلف مستشعر ضغط الزيت. 2. انخفاض مستوى سائل التبريد أو انسداد راديتر المولد. 3. عدم ضبط منظم السرعة (Governor / ECM) أو PID Tuning. * **الخطوات التصحيحية الموصى بها:** 1. افحص مستشعرات (Sensors) الضغط والحرارة وتوصيلات الأسلاك لوحدة DSE. 2. قياس مقاومة المستشعر بالـ Multimeter وقارنها بالكتالوج القياسي. 3. إعادة ضبط Alarm Reset من لوحة التحكم بعد معالجة السبب الفني. """)
 
 # =========================================================
 # التطبيق 3: فحص المعدات والمقارنة البصرية (تالف / سليم)
