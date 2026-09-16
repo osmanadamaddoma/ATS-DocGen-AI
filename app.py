@@ -60,7 +60,7 @@ class ComprehensivePDF(FPDF):
         self.cell(0, 5, f"Page {self.page_no()} | System Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
 
 # ---------------------------------------------------------
-# 2. تهيئة الاتصال بـ Firebase Firestore
+# 2. تهيئة الاتصال بـ Firebase Firestore (مع التنظيف التلقائي للمفتاح)
 # ---------------------------------------------------------
 @st.cache_resource
 def init_firebase():
@@ -71,18 +71,29 @@ def init_firebase():
             cred = credentials.Certificate(cred_dict)
         elif "firebase" in st.secrets:
             firebase_dict = dict(st.secrets["firebase"])
-            firebase_dict["private_key"] = firebase_dict["private_key"].replace("\\n", "\n")
+            pk = str(firebase_dict.get("private_key", ""))
+            
+            # معالجة الأسطر الجديدة وإصلاح رموز التشفير تلقائياً
+            if "\\n" in pk:
+                pk = pk.replace("\\n", "\n")
+            
+            firebase_dict["private_key"] = pk.strip()
             cred = credentials.Certificate(firebase_dict)
-        else:
+        elif os.path.exists("firebase_key.json"):
             cred = credentials.Certificate("firebase_key.json")
+        else:
+            return None
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
 try:
     db = init_firebase()
-    st.sidebar.success("🔥 متصل بـ Firebase Firestore بنجاح!")
+    if db is not None:
+        st.sidebar.success("🔥 متصل بـ Firebase Firestore بنجاح!")
+    else:
+        st.sidebar.info("💡 وضع التخزين المحلي (مفعل)")
 except Exception as e:
-    st.sidebar.error(f"⚠️ وضع العمل المحلي: {e}")
+    st.sidebar.warning(f"⚠️ وضع العمل المحلي: {e}")
     db = None
 
 # ---------------------------------------------------------
@@ -517,12 +528,10 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
         
         if st.button("بحث في المصادر الهندسية 🔍", use_container_width=True):
             if search_query:
-                # 1. تنظيف النص الإدخالي من أي رموز غير مرغوبة
                 clean_q = re.sub(r"[^\w\s\-]", "", search_query).strip()
                 st.info(f"🔍 جاري البحث عن: **{clean_q}** في المصادر الهندسية ومواقع الويب...")
                 
                 try:
-                    # 2. تشكيل رابط البحث مع تعيين ترويسة متصفح واسعة الحظر وزيادة المهلة الزمانية
                     encoded_q = urllib.parse.quote(f"{clean_q} diesel generator engineering manual")
                     url = f"https://html.duckduckgo.com/html/?q={encoded_q}"
                     
@@ -531,7 +540,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                         "Accept-Language": "en-US,en;q=0.9",
                     }
                     
-                    # 3. إرسال الطلب مع مهلة 15 ثانية وتفعيل إمكانية المتابعة الفورية
                     resp = requests.get(url, headers=headers, timeout=15)
                     
                     if resp.status_code == 200:
