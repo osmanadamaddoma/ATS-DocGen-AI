@@ -17,7 +17,7 @@ import plotly.express as px
 import requests
 import streamlit as st
 
-# استيراد محرك قراءة الأكواد (Barcode/QR) في حال توفره
+# استيراد محرك قراءة الأكواد (QR/Barcode) في حال توفره
 try:
     from pyzbar.pyzbar import decode as decode_qr
 except ImportError:
@@ -313,7 +313,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     effective_hours = future_run_hours if future_run_hours > 0 else run_hours
     hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
 
-    # جدول الخصائص الكامل مطابق تماماً للصورة المرفقة
     base_parts_data = [
         {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Oil Filter", "العمر الافتراضي (ساعة)": 250.0, "الساعات المنقضية (ساعة)": 210.0},
         {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Primary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": 430.0},
@@ -417,13 +416,11 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.cell(45, 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1)
             pdf.ln()
 
-        # إضافة صفحة الرسوم البيانية للـ PDF
         try:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 11)
             pdf.cell(0, 6, "Performance & Maintenance Visual Charts (Bar & Pie):", ln=True)
 
-            # رسم عمودي
             fig_bar_p, ax_bar_p = plt.subplots(figsize=(6.5, 3))
             p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
             u_h = df_result["الساعات المنقضية (ساعة)"].values
@@ -439,7 +436,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             temp_files.append(bar_path)
             pdf.image(bar_path, x=15, y=25, w=170)
 
-            # رسم دائري
             fig_pie_p, ax_pie_p = plt.subplots(figsize=(5, 3))
             status_counts = df_result["حالة التنبيه"].value_counts()
             color_map = {"حالة جيدة": "#28a745", "قرب الخدمة (استعداد)": "#ffc107", "تنبيه فوري (خطر)": "#dc3545"}
@@ -458,11 +454,19 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         except Exception:
             pass
 
-        pdf_bytes = pdf.output(dest="S")
+        # استخراج النتائج كبايتات بشكل آمن ومتوافق مع إصدارات fpdf2
+        raw_output = pdf.output(dest="S")
+        if isinstance(raw_output, str):
+            pdf_bytes = raw_output.encode("latin-1", errors="replace")
+        elif isinstance(raw_output, bytearray):
+            pdf_bytes = bytes(raw_output)
+        else:
+            pdf_bytes = raw_output
+
         for f in temp_files:
             if os.path.exists(f): os.remove(f)
 
-        return pdf_bytes.encode("latin-1", errors="replace")
+        return pdf_bytes
 
     st.download_button(
         label="🖨️ إصدار التقرير الفني الشامل والرسوم البيانية (PDF)",
@@ -485,7 +489,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
         "📷 شاشة المولد DSE وقراءة الأكواد"
     ])
 
-    # --- TAB 1: الاستشارات والتحليل ---
     with tab1:
         st.subheader("💡 تحليل العطل واستخراج التقرير")
         user_input = st.text_area("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: ارتفاع حرارة المحرك مع انخفاض ضغط الزيت...")
@@ -512,7 +515,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                 st.markdown(log['result'])
                 st.divider()
 
-    # --- TAB 2: البحث في Google ومواقع هندسية ---
     with tab2:
         st.subheader("🌐 محرك البحث الهندسي (Google & Engineering Sites)")
         search_query = st.text_input("أدخل كلمات البحث التقنية (مثال: Perkins 2206C ECM wiring diagram):")
@@ -521,7 +523,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             if search_query:
                 st.info(f"🔍 جاري البحث عن: **{search_query}** في المصادر الهندسية ومواقع الويب...")
                 try:
-                    # محاكاة بحث عبر محرك بحث عام واستخراج النتائج الهندسية
                     encoded_q = urllib.parse.quote(search_query + " diesel generator engineering manual")
                     url = f"https://html.duckduckgo.com/html/?q={encoded_q}"
                     headers = {"User-Agent": "Mozilla/5.0"}
@@ -529,7 +530,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                     if resp.status_code == 200:
                         soup = BeautifulSoup(resp.text, 'html.parser')
                         results = soup.find_all('a', class_='result__snippet', limit=5)
-                        titles = soup.find_all('a', class_='result__url', limit=5)
                         
                         if results:
                             st.success("✅ تم العثور على النتائج والمراجع الهندسية التالية:")
@@ -545,7 +545,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             else:
                 st.warning("يرجى إدخال مصطلح البحث أولاً.")
 
-    # --- TAB 3: الكتالوجات (PDF) ---
     with tab3:
         st.subheader("📚 مكتبة رفع وتحميل الكتالوجات الميدانية (PDF Manuals)")
         uploaded_catalog = st.file_uploader("قم برفع ملف الكتالوج (PDF):", type=["pdf"])
@@ -560,7 +559,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                 use_container_width=True
             )
 
-    # --- TAB 4: شاشة المولد DSE وقراءة الأكواد ---
     with tab4:
         st.subheader("📷 رفع صورة شاشة المولد (DSE Controller Screen)")
         dse_screen_img = st.file_uploader("قم برفع صورة شاشة لوحة تحكم DSE (تظهر فيها أكواد التحذير والإنذار):", type=["png", "jpg", "jpeg"], key="dse_img")
@@ -570,7 +568,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             st.image(dse_image, caption="صورة شاشة وحدة التحكم DSE المرفوعة", width=350)
             
             st.info("🔍 **تحليل كود الإنذار والتحذير من شاشة DSE:**")
-            # محاكاة كشف الأكواد الشائعة في وحدات Deep Sea Electronics (مثل DSE 7320 / 8610)
             st.warning("""
             ⚠️ **التحليل التلقائي لأكواد DSE الشائعة:**
             * **Warning Code (التحذير):** `Oil Pressure Low` أو `Coolant Temperature High` أو `Charging Alternator Fail`.
@@ -642,7 +639,13 @@ elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة 
             pdf.cell(100, 5, sanitize_latin_only(item), border=1)
             pdf.cell(50, 5, "FAIL / DEFECT" if val else "PASS / OK", border=1)
             pdf.ln()
-        return pdf.output(dest="S").encode("latin-1", errors="replace")
+            
+        raw_output = pdf.output(dest="S")
+        if isinstance(raw_output, str):
+            return raw_output.encode("latin-1", errors="replace")
+        elif isinstance(raw_output, bytearray):
+            return bytes(raw_output)
+        return raw_output
 
     st.download_button(
         label="🖨️ إصدار تقرير الفحص الميداني (PDF)",
