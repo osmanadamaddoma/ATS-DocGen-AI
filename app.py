@@ -313,7 +313,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     effective_hours = future_run_hours if future_run_hours > 0 else run_hours
     hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
 
-    # جدول الخصائص الكامل مطابق تماماً للصورة المرفقة
     base_parts_data = [
         {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Oil Filter", "العمر الافتراضي (ساعة)": 250.0, "الساعات المنقضية (ساعة)": 210.0},
         {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Primary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": 430.0},
@@ -417,13 +416,11 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.cell(45, 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1)
             pdf.ln()
 
-        # إضافة صفحة الرسوم البيانية للـ PDF
         try:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 11)
             pdf.cell(0, 6, "Performance & Maintenance Visual Charts (Bar & Pie):", ln=True)
 
-            # رسم عمودي
             fig_bar_p, ax_bar_p = plt.subplots(figsize=(6.5, 3))
             p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
             u_h = df_result["الساعات المنقضية (ساعة)"].values
@@ -439,7 +436,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             temp_files.append(bar_path)
             pdf.image(bar_path, x=15, y=25, w=170)
 
-            # رسم دائري
             fig_pie_p, ax_pie_p = plt.subplots(figsize=(5, 3))
             status_counts = df_result["حالة التنبيه"].value_counts()
             color_map = {"حالة جيدة": "#28a745", "قرب الخدمة (استعداد)": "#ffc107", "تنبيه فوري (خطر)": "#dc3545"}
@@ -488,7 +484,7 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
     # --- TAB 1: الاستشارات والتحليل ---
     with tab1:
         st.subheader("💡 تحليل العطل واستخراج التقرير")
-        user_input = st.text_area("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: ارتفاع حرارة المحرك مع انخفاض ضغط الزيت...")
+        user_input = st.text_input("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: ارتفاع حرارة المحرك مع انخفاض ضغط الزيت...")
 
         if st.button("تحليل العطل وإنشاء التقرير 🔍", use_container_width=True):
             if user_input:
@@ -512,6 +508,35 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                 st.markdown(log['result'])
                 st.divider()
 
+        # زر طباعة تقرير الاستشارة الذكية PDF
+        st.subheader("📄 إصدار تقرير الاستشارة الفنية الذكية (PDF)")
+        def generate_ai_consult_pdf():
+            pdf = ComprehensivePDF("AI TECHNICAL CONSULTATION & DIAGNOSTIC REPORT")
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(0, 6, "AI Technical Logs & Diagnostics:", ln=True)
+            pdf.ln(2)
+            if "ai_logs" in st.session_state and st.session_state.ai_logs:
+                for idx, log in enumerate(st.session_state.ai_logs):
+                    pdf.set_font("Helvetica", "B", 9)
+                    pdf.cell(0, 5, f"Record #{idx+1} - Date: {log['date']}", ln=True)
+                    pdf.set_font("Helvetica", "", 8)
+                    pdf.multi_cell(0, 5, f"Query/Fault: {sanitize_latin_only(log['query'])}")
+                    pdf.multi_cell(0, 5, f"Diagnostic: {sanitize_latin_only(log['result'])}")
+                    pdf.ln(3)
+            else:
+                pdf.set_font("Helvetica", "", 9)
+                pdf.cell(0, 5, "No recent consultations recorded.", ln=True)
+            return pdf.output(dest="S").encode("latin-1", errors="replace")
+
+        st.download_button(
+            label="🖨️ طباعة تقرير الاستشارات الفنية (PDF)",
+            data=generate_ai_consult_pdf(),
+            file_name=f"AI_Consultation_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+
     # --- TAB 2: البحث في Google ومواقع هندسية ---
     with tab2:
         st.subheader("🌐 محرك البحث الهندسي (Google & Engineering Sites)")
@@ -521,7 +546,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             if search_query:
                 st.info(f"🔍 جاري البحث عن: **{search_query}** في المصادر الهندسية ومواقع الويب...")
                 try:
-                    # محاكاة بحث عبر محرك بحث عام واستخراج النتائج الهندسية
                     encoded_q = urllib.parse.quote(search_query + " diesel generator engineering manual")
                     url = f"https://html.duckduckgo.com/html/?q={encoded_q}"
                     headers = {"User-Agent": "Mozilla/5.0"}
@@ -529,7 +553,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                     if resp.status_code == 200:
                         soup = BeautifulSoup(resp.text, 'html.parser')
                         results = soup.find_all('a', class_='result__snippet', limit=5)
-                        titles = soup.find_all('a', class_='result__url', limit=5)
                         
                         if results:
                             st.success("✅ تم العثور على النتائج والمراجع الهندسية التالية:")
@@ -570,7 +593,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             st.image(dse_image, caption="صورة شاشة وحدة التحكم DSE المرفوعة", width=350)
             
             st.info("🔍 **تحليل كود الإنذار والتحذير من شاشة DSE:**")
-            # محاكاة كشف الأكواد الشائعة في وحدات Deep Sea Electronics (مثل DSE 7320 / 8610)
             st.warning("""
             ⚠️ **التحليل التلقائي لأكواد DSE الشائعة:**
             * **Warning Code (التحذير):** `Oil Pressure Low` أو `Coolant Temperature High` أو `Charging Alternator Fail`.
