@@ -60,7 +60,7 @@ class ComprehensivePDF(FPDF):
         self.cell(0, 5, f"Page {self.page_no()} | System Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
 
 # ---------------------------------------------------------
-# 2. تهيئة الاتصال بـ Firebase Firestore (مع التنظيف التلقائي للمفتاح)
+# 2. تهيئة الاتصال بـ Firebase Firestore
 # ---------------------------------------------------------
 @st.cache_resource
 def init_firebase():
@@ -71,29 +71,18 @@ def init_firebase():
             cred = credentials.Certificate(cred_dict)
         elif "firebase" in st.secrets:
             firebase_dict = dict(st.secrets["firebase"])
-            pk = str(firebase_dict.get("private_key", ""))
-            
-            # معالجة الأسطر الجديدة وإصلاح رموز التشفير تلقائياً
-            if "\\n" in pk:
-                pk = pk.replace("\\n", "\n")
-            
-            firebase_dict["private_key"] = pk.strip()
+            firebase_dict["private_key"] = firebase_dict["private_key"].replace("\\n", "\n")
             cred = credentials.Certificate(firebase_dict)
-        elif os.path.exists("firebase_key.json"):
-            cred = credentials.Certificate("firebase_key.json")
         else:
-            return None
+            cred = credentials.Certificate("firebase_key.json")
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
 try:
     db = init_firebase()
-    if db is not None:
-        st.sidebar.success("🔥 متصل بـ Firebase Firestore بنجاح!")
-    else:
-        st.sidebar.info("💡 وضع التخزين المحلي (مفعل)")
+    st.sidebar.success("🔥 متصل بـ Firebase Firestore بنجاح!")
 except Exception as e:
-    st.sidebar.warning(f"⚠️ وضع العمل المحلي: {e}")
+    st.sidebar.error(f"⚠️ وضع العمل المحلي: {e}")
     db = None
 
 # ---------------------------------------------------------
@@ -292,7 +281,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     col7.metric("الجهد / التردد", f"{voltage}V | {freq}Hz")
     col8.metric("التيار / معامل القدرة", f"{amperes}A | {pf}")
 
-    # --- خانة رفع صور متعددة للمولد ---
     st.divider()
     st.subheader("📷 توثيق صور المولد الميدانية (رفع صور متعددة)")
     gen_uploaded_images = st.file_uploader(
@@ -490,8 +478,8 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
     tab1, tab2, tab3, tab4 = st.tabs([
         "💬 الاستشارات والتحليل",
         "🌐 البحث في Google ومواقع هندسية",
-        "📚 رفع وتصفح الكتالوجات",
-        "📷 شاشة المولد DSE وقراءة الأكواد"
+        "📚 مكتبة الكتالوجات (رفع وتحميل)",
+        "📷 مكتبة الصور وشاشات الأعطال (رفع وتحميل)"
     ])
 
     # --- TAB 1: الاستشارات والتحليل ---
@@ -530,22 +518,18 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             if search_query:
                 clean_q = re.sub(r"[^\w\s\-]", "", search_query).strip()
                 st.info(f"🔍 جاري البحث عن: **{clean_q}** في المصادر الهندسية ومواقع الويب...")
-                
                 try:
                     encoded_q = urllib.parse.quote(f"{clean_q} diesel generator engineering manual")
                     url = f"https://html.duckduckgo.com/html/?q={encoded_q}"
-                    
                     headers = {
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
                         "Accept-Language": "en-US,en;q=0.9",
                     }
-                    
                     resp = requests.get(url, headers=headers, timeout=15)
                     
                     if resp.status_code == 200:
                         soup = BeautifulSoup(resp.text, 'html.parser')
                         results = soup.find_all('a', class_='result__snippet', limit=5)
-                        
                         if results:
                             st.success("✅ تم العثور على النتائج والمراجع الهندسية التالية:")
                             for i, res in enumerate(results):
@@ -564,37 +548,68 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
 
     # --- TAB 3: الكتالوجات (PDF) ---
     with tab3:
-        st.subheader("📚 مكتبة رفع وتحميل الكتالوجات الميدانية (PDF Manuals)")
-        uploaded_catalog = st.file_uploader("قم برفع ملف الكتالوج (PDF):", type=["pdf"])
+        st.subheader("📚 مكتبة إدارة الكتالوجات (رفع وتحميل PDF)")
+        # السماح برفع عدة ملفات معاً
+        uploaded_catalogs = st.file_uploader(
+            "قم برفع ملفات الكتالوجات الهندسية (PDF):", 
+            type=["pdf"], 
+            accept_multiple_files=True
+        )
         
-        if uploaded_catalog is not None:
-            st.success(f"✅ تم رفع الكتالوج بنجاح: **{uploaded_catalog.name}** ({uploaded_catalog.size / 1024:.1f} KB)")
-            st.download_button(
-                label=f"⬇️ تنزيل كتالوج: {uploaded_catalog.name}",
-                data=uploaded_catalog.getvalue(),
-                file_name=uploaded_catalog.name,
-                mime="application/pdf",
-                use_container_width=True
-            )
+        if uploaded_catalogs:
+            for idx, catalog in enumerate(uploaded_catalogs):
+                col_text, col_btn = st.columns([3, 1])
+                with col_text:
+                    st.success(f"✅ تم الرفع: **{catalog.name}** ({catalog.size / 1024:.1f} KB)")
+                with col_btn:
+                    # زر تحميل الكتالوج المحفوظ
+                    st.download_button(
+                        label="⬇️ تنزيل الملف",
+                        data=catalog.getvalue(),
+                        file_name=catalog.name,
+                        mime="application/pdf",
+                        key=f"dl_cat_{idx}_{catalog.name}",
+                        use_container_width=True
+                    )
 
-    # --- TAB 4: شاشة المولد DSE وقراءة الأكواد ---
+    # --- TAB 4: شاشة المولد DSE وقراءة الأكواد وصور الأعطال ---
     with tab4:
-        st.subheader("📷 رفع صورة شاشة المولد (DSE Controller Screen)")
-        dse_screen_img = st.file_uploader("قم برفع صورة شاشة لوحة تحكم DSE (تظهر فيها أكواد التحذير والإنذار):", type=["png", "jpg", "jpeg"], key="dse_img")
+        st.subheader("📷 مكتبة إدارة الصور (رفع وتحميل الصور الميدانية)")
+        # السماح برفع عدة صور معاً
+        uploaded_images = st.file_uploader(
+            "قم برفع صور شاشات التحكم (DSE) أو الأعطال الميدانية:", 
+            type=["png", "jpg", "jpeg"], 
+            accept_multiple_files=True,
+            key="dse_img_uploader"
+        )
 
-        if dse_screen_img is not None:
-            dse_image = Image.open(dse_screen_img)
-            st.image(dse_image, caption="صورة شاشة وحدة التحكم DSE المرفوعة", width=350)
-            
-            st.info("🔍 **تحليل كود الإنذار والتحذير من شاشة DSE:**")
-            st.warning("""
-            ⚠️ **التحليل التلقائي لأكواد DSE الشائعة:**
-            * **Warning Code (التحذير):** `Oil Pressure Low` أو `Coolant Temperature High` أو `Charging Alternator Fail`.
-            * **الخطوات التصحيحية الموصى بها:**
-              1. تحقق من مستوى الزيت وسائل التبريد في المحرك فوراً.
-              2. افحص حساسية مستشعرات (Sensors) الضغط والحرارة وتوصيلات الأسلاك لوحدة DSE.
-              3. إعادة ضبط الكود من لوحة التحكم بعد إزالة سبب العطل الفني.
-            """)
+        if uploaded_images:
+            for idx, img_file in enumerate(uploaded_images):
+                img_obj = Image.open(img_file)
+                
+                col_img, col_info = st.columns([1, 2])
+                with col_img:
+                    st.image(img_obj, caption=f"المرفق: {img_file.name}", width=250)
+                
+                with col_info:
+                    st.info("🔍 **تحليل مبدئي للصورة المرفوعة:**")
+                    st.write("""
+                    * **التحذيرات الشائعة للوحة DSE:** `Low Oil Pressure`, `High Coolant Temp`
+                    * يرجى فحص الحساسات (Sensors) ومراجعة التوصيلات.
+                    """)
+                    
+                    # تحويل الصورة إلى بايتات للتمكن من تحميلها مجدداً
+                    img_byte_arr = io.BytesIO()
+                    img_obj.save(img_byte_arr, format=img_obj.format or 'PNG')
+                    
+                    st.download_button(
+                        label=f"⬇️ تنزيل الصورة ({img_file.name})",
+                        data=img_byte_arr.getvalue(),
+                        file_name=img_file.name,
+                        mime=f"image/{img_obj.format.lower() if img_obj.format else 'png'}",
+                        key=f"dl_img_{idx}_{img_file.name}"
+                    )
+                st.divider()
 
 # =========================================================
 # التطبيق 3: فحص المعدات والمقارنة البصرية (تالف / سليم)
