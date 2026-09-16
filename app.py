@@ -17,7 +17,7 @@ import plotly.express as px
 import requests
 import streamlit as st
 
-# استيراد محرك قراءة الأكواد (QR/Barcode) في حال توفره
+# استيراد محرك قراءة الأكواد (Barcode/QR) في حال توفره
 try:
     from pyzbar.pyzbar import decode as decode_qr
 except ImportError:
@@ -283,9 +283,9 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
 
     # --- خانة رفع صور متعددة للمولد ---
     st.divider()
-    st.subheader("📷 توثيق صور المولد الميدانية (رفع صور متعددة)")
+    st.subheader("📷 توثيق صور المولد والآليات الميدانية (رفع صور متعددة)")
     gen_uploaded_images = st.file_uploader(
-        "اختر صور المولد أو لوحة التحكم للتوثيق:",
+        "اختر صور المولد، اللوحة، أو قطع الغيار للتثبيت في التقرير:",
         type=["png", "jpg", "jpeg"],
         accept_multiple_files=True,
         key="gen_multi_imgs"
@@ -416,11 +416,13 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.cell(45, 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1)
             pdf.ln()
 
+        # إضافة صفحة الرسوم البيانية للـ PDF
         try:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 11)
             pdf.cell(0, 6, "Performance & Maintenance Visual Charts (Bar & Pie):", ln=True)
 
+            # رسم عمودي
             fig_bar_p, ax_bar_p = plt.subplots(figsize=(6.5, 3))
             p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
             u_h = df_result["الساعات المنقضية (ساعة)"].values
@@ -436,6 +438,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             temp_files.append(bar_path)
             pdf.image(bar_path, x=15, y=25, w=170)
 
+            # رسم دائري
             fig_pie_p, ax_pie_p = plt.subplots(figsize=(5, 3))
             status_counts = df_result["حالة التنبيه"].value_counts()
             color_map = {"حالة جيدة": "#28a745", "قرب الخدمة (استعداد)": "#ffc107", "تنبيه فوري (خطر)": "#dc3545"}
@@ -454,14 +457,36 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         except Exception:
             pass
 
-        # استخراج النتائج كبايتات بشكل آمن ومتوافق مع إصدارات fpdf2
-        raw_output = pdf.output(dest="S")
-        if isinstance(raw_output, str):
-            pdf_bytes = raw_output.encode("latin-1", errors="replace")
-        elif isinstance(raw_output, bytearray):
-            pdf_bytes = bytes(raw_output)
+        # تضمين الصور المرفوعة للمولد داخل ملف الـ PDF إذا وجدت
+        if gen_uploaded_images:
+            try:
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 11)
+                pdf.cell(0, 6, "Field Documentation & Machine Photos:", ln=True)
+                y_offset = 25
+                for i, img_file in enumerate(gen_uploaded_images):
+                    img_path = f"temp_gen_img_{i}_{datetime.now().timestamp()}.png"
+                    im = Image.open(img_file)
+                    im.save(img_path)
+                    temp_files.append(img_path)
+                    
+                    if y_offset > 220:
+                        pdf.add_page()
+                        y_offset = 25
+                    
+                    pdf.image(img_path, x=30, y=y_offset, w=150)
+                    y_offset += 85
+            except Exception:
+                pass
+
+        # إصدار وتجهيز بايتات ملف الـ PDF بالتوافق مع الإصدارات الحديثة لـ fpdf2
+        pdf_output = pdf.output(dest="S")
+        if isinstance(pdf_output, str):
+            pdf_bytes = pdf_output.encode("latin-1", errors="replace")
+        elif isinstance(pdf_output, bytearray):
+            pdf_bytes = bytes(pdf_output)
         else:
-            pdf_bytes = raw_output
+            pdf_bytes = pdf_output
 
         for f in temp_files:
             if os.path.exists(f): os.remove(f)
@@ -640,12 +665,12 @@ elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة 
             pdf.cell(50, 5, "FAIL / DEFECT" if val else "PASS / OK", border=1)
             pdf.ln()
             
-        raw_output = pdf.output(dest="S")
-        if isinstance(raw_output, str):
-            return raw_output.encode("latin-1", errors="replace")
-        elif isinstance(raw_output, bytearray):
-            return bytes(raw_output)
-        return raw_output
+        pdf_output = pdf.output(dest="S")
+        if isinstance(pdf_output, str):
+            return pdf_output.encode("latin-1", errors="replace")
+        elif isinstance(pdf_output, bytearray):
+            return bytes(pdf_output)
+        return pdf_output
 
     st.download_button(
         label="🖨️ إصدار تقرير الفحص الميداني (PDF)",
