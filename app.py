@@ -313,6 +313,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     effective_hours = future_run_hours if future_run_hours > 0 else run_hours
     hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
 
+    # جدول الخصائص الكامل مطابق تماماً للصورة المرفقة
     base_parts_data = [
         {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Oil Filter", "العمر الافتراضي (ساعة)": 250.0, "الساعات المنقضية (ساعة)": 210.0},
         {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Primary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": 430.0},
@@ -416,11 +417,13 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.cell(45, 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1)
             pdf.ln()
 
+        # إضافة صفحة الرسوم البيانية للـ PDF
         try:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 11)
             pdf.cell(0, 6, "Performance & Maintenance Visual Charts (Bar & Pie):", ln=True)
 
+            # رسم عمودي
             fig_bar_p, ax_bar_p = plt.subplots(figsize=(6.5, 3))
             p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
             u_h = df_result["الساعات المنقضية (ساعة)"].values
@@ -436,6 +439,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             temp_files.append(bar_path)
             pdf.image(bar_path, x=15, y=25, w=170)
 
+            # رسم دائري
             fig_pie_p, ax_pie_p = plt.subplots(figsize=(5, 3))
             status_counts = df_result["حالة التنبيه"].value_counts()
             color_map = {"حالة جيدة": "#28a745", "قرب الخدمة (استعداد)": "#ffc107", "تنبيه فوري (خطر)": "#dc3545"}
@@ -484,7 +488,7 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
     # --- TAB 1: الاستشارات والتحليل ---
     with tab1:
         st.subheader("💡 تحليل العطل واستخراج التقرير")
-        user_input = st.text_input("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: ارتفاع حرارة المحرك مع انخفاض ضغط الزيت...")
+        user_input = st.text_area("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: ارتفاع حرارة المحرك مع انخفاض ضغط الزيت...")
 
         if st.button("تحليل العطل وإنشاء التقرير 🔍", use_container_width=True):
             if user_input:
@@ -508,31 +512,32 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                 st.markdown(log['result'])
                 st.divider()
 
-        # زر طباعة تقرير الاستشارة الذكية PDF
-        st.subheader("📄 إصدار تقرير الاستشارة الفنية الذكية (PDF)")
-        def generate_ai_consult_pdf():
-            pdf = ComprehensivePDF("AI TECHNICAL CONSULTATION & DIAGNOSTIC REPORT")
+        # إضافة زر إصدار طباعة التقارير هنا في الاستشارات والتحليل
+        st.divider()
+        st.subheader("📄 إصدار وتنزيل تقرير الاستشارات والتحليل (PDF)")
+        def generate_consultation_pdf():
+            pdf = ComprehensivePDF("AI CONSULTATION & DIAGNOSTIC REPORT")
             pdf.add_page()
-            pdf.set_font("Helvetica", "B", 10)
-            pdf.cell(0, 6, "AI Technical Logs & Diagnostics:", ln=True)
-            pdf.ln(2)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(0, 6, "Consultation & Troubleshooting Logs:", ln=True)
+            pdf.ln(3)
+            pdf.set_font("Helvetica", "", 10)
             if "ai_logs" in st.session_state and st.session_state.ai_logs:
                 for idx, log in enumerate(st.session_state.ai_logs):
                     pdf.set_font("Helvetica", "B", 9)
-                    pdf.cell(0, 5, f"Record #{idx+1} - Date: {log['date']}", ln=True)
-                    pdf.set_font("Helvetica", "", 8)
-                    pdf.multi_cell(0, 5, f"Query/Fault: {sanitize_latin_only(log['query'])}")
-                    pdf.multi_cell(0, 5, f"Diagnostic: {sanitize_latin_only(log['result'])}")
+                    pdf.cell(0, 5, f"Log #{idx+1} - Date: {log['date']}", ln=True)
+                    pdf.set_font("Helvetica", "", 9)
+                    pdf.multi_cell(0, 5, f"Query: {sanitize_latin_only(log['query'])}")
+                    pdf.multi_cell(0, 5, f"Result:\n{sanitize_latin_only(log['result'])}")
                     pdf.ln(3)
             else:
-                pdf.set_font("Helvetica", "", 9)
-                pdf.cell(0, 5, "No recent consultations recorded.", ln=True)
+                pdf.cell(0, 5, "No consultation logs recorded yet.", ln=True)
             return pdf.output(dest="S").encode("latin-1", errors="replace")
 
         st.download_button(
-            label="🖨️ طباعة تقرير الاستشارات الفنية (PDF)",
-            data=generate_ai_consult_pdf(),
-            file_name=f"AI_Consultation_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+            label="🖨️ إصدار طباعة تقارير الاستشارات والتحليل (PDF)",
+            data=generate_consultation_pdf(),
+            file_name=f"Consultation_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
             mime="application/pdf",
             use_container_width=True
         )
@@ -602,6 +607,28 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
               3. إعادة ضبط الكود من لوحة التحكم بعد إزالة سبب العطل الفني.
             """)
 
+            # زر إصدار طباعة التقارير الخاص بتحليل شاشة DSE
+            st.divider()
+            st.subheader("📄 إصدار وتنزيل تقرير تحليل شاشة DSE (PDF)")
+            def generate_dse_pdf():
+                pdf = ComprehensivePDF("DSE CONTROLLER SCREEN DIAGNOSTIC REPORT")
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 11)
+                pdf.cell(0, 6, "DSE Controller Screen Analysis & Alarms:", ln=True)
+                pdf.ln(3)
+                pdf.set_font("Helvetica", "", 10)
+                pdf.multi_cell(0, 5, sanitize_latin_only("Detected Warning Codes: Oil Pressure Low / Coolant Temperature High."))
+                pdf.multi_cell(0, 5, sanitize_latin_only("Recommended Actions: Check oil and coolant levels immediately. Inspect sensor wiring and connections."))
+                return pdf.output(dest="S").encode("latin-1", errors="replace")
+
+            st.download_button(
+                label="🖨️ إصدار طباعة تقرير تحليل شاشة DSE (PDF)",
+                data=generate_dse_pdf(),
+                file_name=f"DSE_Analysis_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+
 # =========================================================
 # التطبيق 3: فحص المعدات والمقارنة البصرية (تالف / سليم)
 # =========================================================
@@ -667,7 +694,7 @@ elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة 
         return pdf.output(dest="S").encode("latin-1", errors="replace")
 
     st.download_button(
-        label="🖨️ إصدار تقرير الفحص الميداني (PDF)",
+        label="🖨️ إصدار طباعة تقرير الفحص الميداني (PDF)",
         data=generate_chk_pdf(),
         file_name=f"Inspection_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
         mime="application/pdf",
