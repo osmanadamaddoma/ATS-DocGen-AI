@@ -34,6 +34,7 @@ st.set_page_config(
 def sanitize_latin_only(text):
     if not isinstance(text, str):
         text = str(text)
+    # إزالة أي حروف غير لاتينية (مثل العربية) لتجنب أخطاء ترميز PDF
     clean_text = re.sub(r"[^\x00-\x7F]+", "", text).strip()
     return clean_text if clean_text else "N/A"
 
@@ -46,14 +47,16 @@ class ComprehensivePDF(FPDF):
         self.set_font("Helvetica", "B", 13)
         self.cell(0, 8, self.report_title, ln=True, align="C")
         self.set_font("Helvetica", "I", 8)
-        self.cell(0, 4, "Addoma Trading Services (الدومة للخدمات التجارية) - Engineering Platform", ln=True, align="C")
+        # تم الاكتفاء باللغة الإنجليزية لتجنب خطأ UnicodeEncodeError
+        self.cell(0, 4, "Addoma Trading Services - Engineering Platform", ln=True, align="C")
         self.line(10, 20, 200, 20)
         self.ln(5)
 
     def footer(self):
         self.set_y(-15)
         self.set_font("Helvetica", "I", 8)
-        self.cell(0, 5, "Prepared by: Osman Adam Addoma (عثمان آدم أدومة)", ln=True, align="C")
+        # تم الاكتفاء باللغة الإنجليزية لتجنب خطأ UnicodeEncodeError
+        self.cell(0, 5, "Prepared by: Osman Adam Addoma", ln=True, align="C")
         self.cell(0, 5, f"Page {self.page_no()} | System Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
 
 # ---------------------------------------------------------
@@ -175,9 +178,10 @@ else:
     expiry_date_str = "منتهي"
 
 # ---------------------------------------------------------
-# لوحة عرض الاشتراكات
+# لوحة عرض الاشتراكات وإدخال الأكواد الزمنية
 # ---------------------------------------------------------
 st.sidebar.header("🔐 تفاصيل الاشتراك والتفعيل")
+
 st.sidebar.info(f"""
 📌 **حالة الحساب والاشتراك:**
 * **نوع الخطة:** {plan_type}
@@ -207,6 +211,8 @@ with st.sidebar.expander("🔑 إدخال كود التفعيل"):
             st.rerun()
         else:
             st.error("❌ كود تفعيل غير صحيح.")
+
+st.sidebar.caption("💡 **أكواد للتجربة:** `ADDOMA-30D` (شهر) | `ADDOMA-1Y` (سنة)")
 
 if access_status == "expired":
     st.error("🔒 **النظام مقفل:** انتهت الفترة التجريبية. يرجى التفعيل باستخدام كود اشتراك ساري.")
@@ -315,7 +321,6 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     ]
 
     df_parts_input = pd.DataFrame(base_parts_data)
-    # استخدام width="stretch" بدلاً من use_container_width
     edited_table = st.data_editor(df_parts_input, num_rows="dynamic", width="stretch", key="parts_editor")
 
     processed_rows = []
@@ -442,7 +447,8 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         label="🖨️ إصدار التقرير الفني الشامل والرسوم البيانية (PDF)",
         data=generate_full_pdf_bytes(),
         file_name=f"Full_Maintenance_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
-        mime="application/pdf"
+        mime="application/pdf",
+        use_container_width=True
     )
 
 # =========================================================
@@ -458,7 +464,7 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
         st.subheader("💡 تحليل العطل واستخراج التقرير")
         user_input = st.text_area("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: ارتفاع حرارة المحرك مع انخفاض ضغط الزيت...")
 
-        if st.button("تحليل العطل وإنشاء التقرير 🔍"):
+        if st.button("تحليل العطل وإنشاء التقرير 🔍", use_container_width=True):
             if user_input:
                 res_text = f"""
                 **📋 التقرير الفني التوجيهي:**
@@ -497,7 +503,8 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                 label="🖨️ إصدار تقرير الاستشارات الفنية (PDF)",
                 data=generate_ai_pdf(),
                 file_name=f"AI_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf"
+                mime="application/pdf",
+                use_container_width=True
             )
 
     # --- TAB 2: الكتالوجات (PDF) ---
@@ -511,7 +518,8 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                 label=f"⬇️ تنزيل كتالوج: {uploaded_catalog.name}",
                 data=uploaded_catalog.getvalue(),
                 file_name=uploaded_catalog.name,
-                mime="application/pdf"
+                mime="application/pdf",
+                use_container_width=True
             )
 
     # --- TAB 3: قراءة الأكواد (QR/Barcode) ---
@@ -521,8 +529,7 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
 
         if uploaded_code_img is not None:
             image = Image.open(uploaded_code_img)
-            # استبدال المعاملات القديمة لضبط عرض الصورة
-            st.image(image, caption="الصورة المرفوعة للقطعة/الكود", width="stretch")
+            st.image(image, caption="الصورة المرفوعة للقطعة/الكود", width=300)
             
             if decode_qr is not None:
                 decoded_objects = decode_qr(image)
@@ -540,13 +547,7 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
 elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة البصرية (تالف/سليم)":
     st.title("🔍 نظام فحص المعدات والمقارنة البصرية لقطع الغيار")
 
-    # إضافة المعدات المحددة الخاصة بالعمل
-    eq_type = st.selectbox("اختر المعدة المراد فحصها:", [
-        "مولد ديزل صناعي (Perkins/Cummins)", 
-        "غرفة تبريد Porkka WIC 10", 
-        "غرفة تبريد Porkka WIC 40", 
-        "محرك كهربائي 3-Phase"
-    ])
+    eq_type = st.selectbox("اختر المعدة المراد فحصها:", ["مولد ديزل صناعي", "غرفة تبريد وتجميد WIC", "محرك كهربائي 3-Phase"])
 
     st.divider()
     st.subheader("🖼️ المقارنة البصرية لقطع الغيار (التالف vs السليم)")
@@ -570,28 +571,24 @@ elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة 
     st.divider()
     st.subheader("📋 قائمة الفحص الظاهري والميكانيكي")
     checklist = []
-    
-    if "مولد" in eq_type:
+    if eq_type == "مولد ديزل صناعي":
         c1 = st.checkbox("1. تسريب زيت أو وقود أسفل المحرك")
         c2 = st.checkbox("2. انخفاض سائل التبريد (Coolant)")
         c3 = st.checkbox("3. أطراف البطارية تحتاج نظافة/إحكام")
         checklist = [("تسريب زيت/وقود", c1), ("انخفاض سائل التبريد", c2), ("أطراف البطارية", c3)]
         if c1: st.error("🚨 **تأكيد:** افحص وجه الكارتير وفلاتر الزيت.")
-    
-    elif "غرفة تبريد" in eq_type:
+    elif eq_type == "غرفة تبريد وتجميد WIC":
         r1 = st.checkbox("1. تكوّن الثلج على ملف المبخر (Evaporator)")
         r2 = st.checkbox("2. توقف مروحة المكثف الخارجية")
         checklist = [("تراكم الثلج", r1), ("مروحة المكثف", r2)]
         if r1: st.error("🚨 **تأكيد:** افحص دورة الإذابة وسخانات Defrost.")
-    
-    elif "محرك" in eq_type:
+    elif eq_type == "محرك كهربائي 3-Phase":
         m1 = st.checkbox("1. ارتفاع حرارة جسم المحرك")
         m2 = st.checkbox("2. صوت صرير في الرمان بلي")
         checklist = [("ارتفاع الحرارة", m1), ("صوت الرمان بلي", m2)]
 
     st.divider()
     st.subheader("📄 إصدار تقرير الفحص الميداني والمقارنة PDF")
-    
     def generate_chk_pdf():
         pdf = ComprehensivePDF("EQUIPMENT FIELD INSPECTION & VISUAL REPORT")
         pdf.add_page()
@@ -612,5 +609,6 @@ elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة 
         label="🖨️ إصدار تقرير الفحص الميداني (PDF)",
         data=generate_chk_pdf(),
         file_name=f"Inspection_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
-        mime="application/pdf"
+        mime="application/pdf",
+        use_container_width=True
     )
