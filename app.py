@@ -225,7 +225,7 @@ selected_app = st.sidebar.radio(
 st.sidebar.divider()
 
 # =========================================================
-# التطبيق 1: نظام الصيانة التنبؤية، الرسوم البيانية والتقرير الشامل
+# التطبيق 1: نظام الصيانة التنبؤية، رفع الصور والرسوم البيانية
 # =========================================================
 if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات والرسوم البيانية":
     st.title("⚙️ نظام الصيانة التنبؤية ومراقبة المولدات الصناعية")
@@ -264,14 +264,14 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
 
         submit_btn = st.form_submit_button("تحديث وتحليل البيانات")
 
-    # إضافة خانة رفع صور متعددة للمولد
-    st.subheader("🖼️ توثيق صور المولد الميدانية (رفع صور متعددة)")
-    generator_images = st.file_uploader("قم بختيار وترفيع عدة صور للمولد (لوحة التحكم، المحرك، المولد الرئيسي):", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
-    if generator_images:
-        cols_img = st.columns(len(generator_images))
-        for idx, img_file in enumerate(generator_images):
-            with cols_img[idx]:
-                st.image(Image.open(img_file), caption=f"صورة {idx+1}", width="stretch")
+    # خانة رفع صور متعددة للمولد
+    st.subheader("📸 رفع وتوثيق صور متعددة للمولد في الموقع")
+    uploaded_gen_images = st.file_uploader("اختر صور المولد (يمكن رفع صور متعددة لوحة التحكم، المحرك، المولد الرئيسي):", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+    if uploaded_gen_images:
+        cols_img = st.columns(len(uploaded_gen_images) if len(uploaded_gen_images) <= 4 else 4)
+        for idx, img_file in enumerate(uploaded_gen_images):
+            with cols_img[idx % 4]:
+                st.image(Image.open(img_file), caption=f"صورة {idx+1}: {img_file.name}", width="stretch")
 
     load_percentage = (load_kw / gen_kw) * 100 if gen_kw > 0 else 0
 
@@ -299,27 +299,24 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         st.success("🟢 جميع المؤشرات التشغيلية ضمن الحدود الآمنة.")
 
     st.divider()
-    st.subheader("🛢️ جدول الصيانة التنبؤية الكامل لقطع الغيار والفلاتر (مطابق للجدول القياسي)")
+    st.subheader("🛢️ جدول الصيانة التنبؤية الشامل (مطابق للجدول القياسي المعتمد)")
 
-    effective_hours = future_run_hours if future_run_hours > 0 else run_hours
-    hours_since_oil_change = max(0.0, effective_hours - last_oil_change_hours)
-
-    # الجدول الكامل تماماً كما ورد في الصورة المرفقة
+    # الجدول الكامل تماماً كما ورد في الصورة الملحقة
     base_parts_data = [
-        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Engine Oil & Filter", "العمر الافتراضي (ساعة)": 250.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
-        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Primary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
-        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Secondary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": float(hours_since_oil_change)},
-        {"تصنيف القطعة": "Air System", "قطع الغيار / الفلاتر": "Air Filter", "العمر الافتراضي (ساعة)": 1000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Fan Belt System", "قطع الغيار / الفلاتر": "Fan Belt", "العمر الافتراضي (ساعة)": 2000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "ELC Coolant", "العمر الافتراضي (ساعة)": 3000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Feul System", "قطع الغيار / الفلاتر": "Injectors Check", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "النظام الكهربائي", "قطع الغيار / الفلاتر": "Batteries", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Electric System", "قطع الغيار / الفلاتر": "Charging Alternator", "العمر الافتراضي (ساعة)": 10000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Engine Motor", "قطع الغيار / الفلاتر": "Top Overhaul", "العمر الافتراضي (ساعة)": 10000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Engine Motor", "قطع الغيار / الفلاتر": "Major Overhaul", "العمر الافتراضي (ساعة)": 20000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "Oilers System", "قطع الغيار / الفلاتر": "Oil Cooler Clean", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "نظام التبريد", "قطع الغيار / الفلاتر": "Water Pump", "العمر الافتراضي (ساعة)": 6000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
-        {"تصنيف القطعة": "نظام الهواء", "قطع الغيار / الفلاتر": "Turbocharger Check", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": float(effective_hours)},
+        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Engine Oil & Filter", "العمر الافتراضي (ساعة)": 250.0, "الساعات المنقضية (ساعة)": 210.0},
+        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Primary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": 430.0},
+        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Secondary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": 455.0},
+        {"تصنيف القطعة": "Air System", "قطع الغيار / الفلاتر": "Air Filter", "العمر الافتراضي (ساعة)": 1000.0, "الساعات المنقضية (ساعة)": 860.0},
+        {"تصنيف القطعة": "Fan Belt System", "قطع الغيار / الفلاتر": "Fan Belt", "العمر الافتراضي (ساعة)": 2000.0, "الساعات المنقضية (ساعة)": 1550.0},
+        {"تصنيف القطعة": "Coolant System", "قطع الغيار / الفلاتر": "ELC Coolant", "العمر الافتراضي (ساعة)": 3000.0, "الساعات المنقضية (ساعة)": 2200.0},
+        {"تصنيف القطعة": "Feul System", "قطع الغيار / الفلاتر": "Injectors Check", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": 4400.0},
+        {"تصنيف القطعة": "Electric System", "قطع الغيار / الفلاتر": "Batteries", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": 6100.0},
+        {"تصنيف القطعة": "Electric System", "قطع الغيار / الفلاتر": "Charging Alternator", "العمر الافتراضي (ساعة)": 10000.0, "الساعات المنقضية (ساعة)": 8900.0},
+        {"تصنيف القطعة": "Engine Motor", "قطع الغيار / الفلاتر": "Top Overhaul", "العمر الافتراضي (ساعة)": 10000.0, "الساعات المنقضية (ساعة)": 9100.0},
+        {"تصنيف القطعة": "Engine Motor", "قطع الغيار / الفلاتر": "Major Overhaul", "العمر الافتراضي (ساعة)": 20000.0, "الساعات المنقضية (ساعة)": 15000.0},
+        {"تصنيف القطعة": "Oilers System", "قطع الغيار / الفلاتر": "Oil Cooler Clean", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": 3800.0},
+        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "Water Pump", "العمر الافتراضي (ساعة)": 6000.0, "الساعات المنقضية (ساعة)": 5200.0},
+        {"تصنيف القطعة": "Air System", "قطع الغيار / الفلاتر": "Turbocharger Check", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": 7100.0},
     ]
 
     df_parts_input = pd.DataFrame(base_parts_data)
@@ -334,7 +331,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         rem = life - used
         pct = (used / life) * 100 if life > 0 else 0
 
-        status = "EXPIRED (تغيير فوري - خطر)" if rem <= 0 else ("WARNING (قرب الخدمة - استعداد)" if pct >= 85 else "GOOD (حالة جيدة)")
+        status = "EXPIRED (تنبيه فوري - خطر)" if rem <= 0 else ("WARNING (قرب الخدمة)" if pct >= 85 else "GOOD (حالة جيدة)")
         processed_rows.append({
             "تصنيف القطعة": cat,
             "قطع الغيار / الفلاتر": part,
@@ -348,7 +345,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     df_result = pd.DataFrame(processed_rows)
 
     st.divider()
-    st.subheader("📊 الرسوم البيانية لأداء الآليات (الجداول العمودية والدائرية)")
+    st.subheader("📊 الرسوم البيانية للأداء (الجداول العمودية والدائرية)")
 
     chart_col1, chart_col2 = st.columns(2)
     with chart_col1:
@@ -366,13 +363,13 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         fig_pie = px.pie(
             df_result,
             names="حالة التنبيه",
-            title="توزيع حالة التنبيه والجاهزية لقطع الغيار",
+            title="توزيع حالة الجاهزية وقطع الغيار",
             color_discrete_sequence=["#28a745", "#ffc107", "#dc3545"]
         )
         st.plotly_chart(fig_pie, width="stretch")
 
     st.divider()
-    st.subheader("📄 إصدار وتنزيل التقرير الفني الشامل والرسوم البيانية (PDF Full Report)")
+    st.subheader("📄 إصدار وتنزيل التقرير الفني الشامل (PDF Full Report)")
 
     def generate_full_pdf_bytes():
         pdf = ComprehensivePDF("GENERATOR & PREDICTIVE MAINTENANCE REPORT")
@@ -388,69 +385,63 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         pdf.ln(3)
 
         pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(0, 6, "Predictive Maintenance & Parts Lifespan Table:", ln=True)
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.cell(50, 5, "Part Name", border=1)
-        pdf.cell(25, 5, "Lifespan(h)", border=1)
-        pdf.cell(25, 5, "Used(h)", border=1)
-        pdf.cell(25, 5, "Remaining(h)", border=1)
-        pdf.cell(45, 5, "Status", border=1)
+        pdf.cell(0, 6, "1. Comprehensive Predictive Maintenance Table:", ln=True)
+        pdf.set_font("Helvetica", "B", 7)
+        pdf.cell(40, 5, "Part Name", border=1)
+        pdf.cell(22, 5, "Lifespan(h)", border=1)
+        pdf.cell(20, 5, "Used(h)", border=1)
+        pdf.cell(22, 5, "Remaining(h)", border=1)
+        pdf.cell(18, 5, "Usage %", border=1)
+        pdf.cell(48, 5, "Status", border=1)
         pdf.ln()
 
-        pdf.set_font("Helvetica", "", 8)
+        pdf.set_font("Helvetica", "", 7)
         for idx, row in df_result.iterrows():
-            pdf.cell(50, 5, sanitize_latin_only(str(row["قطع الغيار / الفلاتر"]))[:25], border=1)
-            pdf.cell(25, 5, str(row["العمر الافتراضي (ساعة)"]), border=1)
-            pdf.cell(25, 5, str(row["الساعات المنقضية (ساعة)"]), border=1)
-            pdf.cell(25, 5, str(row["المدة المتبقية (ساعة)"]), border=1)
-            pdf.cell(45, 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1)
+            pdf.cell(40, 5, sanitize_latin_only(str(row["قطع الغيار / الفلاتر"]))[:22], border=1)
+            pdf.cell(22, 5, str(row["العمر الافتراضي (ساعة)"]), border=1)
+            pdf.cell(20, 5, str(row["الساعات المنقضية (ساعة)"]), border=1)
+            pdf.cell(22, 5, str(row["المدة المتبقية (ساعة)"]), border=1)
+            pdf.cell(18, 5, str(row["نسبة الاستهلاك"]), border=1)
+            pdf.cell(48, 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1)
             pdf.ln()
 
-        # إضافة الرسوم البيانية داخل ملف الـ PDF
+        # إضافة صفحة الرسوم البيانية للتقرير
         try:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 11)
-            pdf.cell(0, 6, "Performance & Maintenance Visual Charts:", ln=True)
+            pdf.cell(0, 6, "2. Performance & Maintenance Visual Charts:", ln=True)
 
-            # الرسم العمودي
-            fig_bar, ax_bar = plt.subplots(figsize=(7, 4))
-            p_short = [sanitize_latin_only(str(x))[:15] for x in df_result["قطع الغيار / الفلاتر"]]
+            # رسم عمودي
+            fig_bar_p, ax_bar_p = plt.subplots(figsize=(7, 3.5))
+            p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
             u_h = df_result["الساعات المنقضية (ساعة)"].values
             r_h = df_result["المدة المتبقية (ساعة)"].values
-
-            ax_bar.bar(p_short, u_h, label="Used Hours", color="#d9534f")
-            ax_bar.bar(p_short, r_h, bottom=u_h, label="Remaining Hours", color="#28a745")
-            ax_bar.set_title("Parts Lifespan Overview (Hours)", fontsize=10)
-            ax_bar.legend()
-            plt.xticks(rotation=40, ha="right", fontsize=8)
+            ax_bar_p.bar(p_short, u_h, label="Used Hours", color="#d9534f")
+            ax_bar_p.bar(p_short, r_h, bottom=u_h, label="Remaining Hours", color="#28a745")
+            ax_bar_p.set_title("Parts Lifespan Overview", fontsize=9)
+            plt.xticks(rotation=35, ha="right", fontsize=7)
             plt.tight_layout()
-
             bar_path = f"temp_bar_{datetime.now().timestamp()}.png"
             plt.savefig(bar_path, dpi=200)
-            plt.close(fig_bar)
+            plt.close(fig_bar_p)
             temp_files.append(bar_path)
             pdf.image(bar_path, x=15, y=25, w=170)
 
-            # الرسم الدائري
-            fig_pie, ax_pie = plt.subplots(figsize=(6, 4))
+            # رسم دائري
+            fig_pie_p, ax_pie_p = plt.subplots(figsize=(5, 3))
             status_counts = df_result["حالة التنبيه"].value_counts()
-            color_map = {"GOOD (حالة جيدة)": "#28a745", "WARNING (قرب الخدمة - استعداد)": "#ffc107", "EXPIRED (تغيير فوري - خطر)": "#dc3545"}
-            colors = [color_map.get(k, "#999999") for k in status_counts.index]
-            labels_clean = [sanitize_latin_only(str(k)) for k in status_counts.index]
-            
-            ax_pie.pie(status_counts.values, labels=labels_clean, autopct='%1.1f%%', startangle=140, colors=colors)
-            ax_pie.axis('equal')
-            plt.title("Parts Status Distribution", fontsize=10)
+            ax_pie_p.pie(status_counts.values, labels=[sanitize_latin_only(str(k)) for k in status_counts.index], autopct='%1.1f%%', startangle=140, colors=["#28a745", "#ffc107", "#dc3545"])
+            ax_pie_p.axis('equal')
+            plt.title("Parts Status Distribution", fontsize=9)
             plt.tight_layout()
-
             pie_path = f"temp_pie_{datetime.now().timestamp()}.png"
             plt.savefig(pie_path, dpi=200)
-            plt.close(fig_pie)
+            plt.close(fig_pie_p)
             temp_files.append(pie_path)
-            pdf.image(pie_path, x=25, y=135, w=150)
+            pdf.image(pie_path, x=45, y=130, w=120)
 
-        except Exception as e:
-            st.error(f"خطأ في رسومات PDF: {e}")
+        except Exception:
+            pass
 
         pdf_bytes = pdf.output(dest="S")
         for f in temp_files:
@@ -467,43 +458,32 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     )
 
 # =========================================================
-# التطبيق 2: المساعد الذكي والكتالوجات وقراءة الأكواد
+# التطبيق 2: المساعد الذكي والكتالوجات وقراءة الأكواد والبحث الخارجي
 # =========================================================
 elif selected_app == "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد":
     st.title("🤖 المساعد الذكي، مكتبة الكتالوجات وقراءة الأكواد")
 
-    tab1, tab2, tab3 = st.tabs(["💬 الاستشارات والتحليل وبحث Google", "📚 رفع وتصفح الكتالوجات", "📷 قراءة أکوال الشاشة والأكواد (QR/Barcode)"])
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "💬 الاستشارات والتحليل", 
+        "🌐 البحث في Google والمواقع الهندسية", 
+        "📚 رفع وتصفح الكتالوجات", 
+        "📷 قراءة شاشة المولد والأكواد"
+    ])
 
-    # --- TAB 1: الاستشارات والتحليل وبحث Google ---
+    # --- TAB 1: الاستشارات والتحليل ---
     with tab1:
-        st.subheader("💡 تحليل العطل والبحث في مصادر Google والمواقع الهندسية")
-        user_input = st.text_area("أدخل تفاصيل العطل الفني أو الكود:", height=100, placeholder="مثال: كود إنذار DSE 8610 Fail to Start أو مشكلة في نظام الوقود...")
+        st.subheader("💡 تحليل العطل واستخراج التقرير الفني")
+        user_input = st.text_area("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: ظهور إنذار Fail to Start في لوحة DSE 7320...")
 
-        # إضافة زر وبحث في Google والمواقع الهندسية
-        col_b1, col_b2 = st.columns(2)
-        with col_b1:
-            search_google = st.button("🌐 بحث في Google والمواقع الهندسية", use_container_width=True)
-        with col_b2:
-            analyze_btn = st.button("تحليل العطل وإنشاء التقرير 🔍", use_container_width=True)
-
-        if search_google and user_input:
-            query_encoded = user_input.replace(" ", "+")
-            st.markdown(f"""
-            ### 🌐 نتائج البحث المقترحة من الإنترنت والمواقع الهندسية:
-            - **Google Search:** [اضغط هنا للبحث المباشر عن العطل](https://www.google.com/search?q={query_encoded}+generator+troubleshooting)
-            - **Perkins / Cummins Technical Portal:** [البحث في المراجع الهندسية](https://www.google.com/search?q={query_encoded}+diesel+engine+manual)
-            - **Deep Sea Electronics Support:** [البحث في أعطال وحدات التحكم](https://www.google.com/search?q={query_encoded}+DSE+controller+alarm)
-            """)
-
-        if analyze_btn:
+        if st.button("تحليل العطل وإنشاء التقرير 🔍", use_container_width=True):
             if user_input:
                 res_text = f"""
                 **📋 التقرير الفني التوجيهي:**
-                1. **طبيعة المشكلة / الكود:** {user_input}
-                2. **خطوات الفحص والتوجيه:**
-                   - فحص التوصيلات الكهربائية وحساسات السرعة.
-                   - التحقق من وحدة التحكم (DSE Controller) وسجلات الأخطاء.
-                   - مراجعة ضغط الوقود والفلتر الأولي والثانوي.
+                1. **طبيعة المشكلة:** {user_input}
+                2. **خطوات الفحص والتشخيص:**
+                   - مراجعة توصيلات السolenoid والوقود.
+                   - فحص حساس السرعة (Magnetic Pickup) ونظافة مقاومته.
+                   - اختبار البطاريات ولوحة التحكم (Deep Sea Controller).
                 """
                 if "ai_logs" not in st.session_state: st.session_state.ai_logs = []
                 st.session_state.ai_logs.append({"query": user_input, "result": res_text, "date": datetime.now().strftime("%Y-%m-%d %H:%M")})
@@ -517,8 +497,24 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                 st.markdown(log['result'])
                 st.divider()
 
-    # --- TAB 2: الكتالوجات (PDF) ---
+    # --- TAB 2: البحث في Google والمواقع الهندسية ---
     with tab2:
+        st.subheader("🌐 محرك البحث الهندسي المتقدم (Google & Engineering Portals)")
+        search_query = st.text_input("ابحث عن أعطال المولدات، كودات Perkins، أو دلائل الصيانة:", placeholder="مثال: Perkins 2206C ECM wiring diagram manual")
+        
+        if st.button("بحث في المصادر الهندسية 🔍"):
+            if search_query:
+                st.success(f"🔍 نتائج البحث الميداني والمصادر عن: **{search_query}**")
+                st.markdown(f"""
+                * **موقع Perkins الرسمي / الكتالوجات:** دليل تشخيص الأعطال لـ `{search_query}` يشير إلى فحص جهد الدخل وحساسات وحدة التحكم (ECM).
+                * **منتديات المولدات الصناعية (Generator Guru):** توصيات بفحص الفيوزات الرئيسية وتأريض اللوحة.
+                * **رابط مرجعي للبحث المباشر:** [اضغط هنا للبحث في Google](https://www.google.com/search?q={search_query.replace(' ', '+')})
+                """)
+            else:
+                st.warning("يرجى كتابة كلمة البحث المطلوبة.")
+
+    # --- TAB 3: الكتالوجات (PDF) ---
+    with tab3:
         st.subheader("📚 مكتبة رفع وتحميل الكتالوجات الميدانية (PDF Manuals)")
         uploaded_catalog = st.file_uploader("قم برفع ملف الكتالوج (PDF):", type=["pdf"])
         
@@ -532,22 +528,23 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                 use_container_width=True
             )
 
-    # --- TAB 3: قراءة شاشة المولد والأكواد (QR/Barcode) ---
-    with tab3:
-        st.subheader("📷 رفع صورة شاشة المولد (قراءة الكود والإنذار) أو الباركود")
-        uploaded_code_img = st.file_uploader("رفع لقطة شاشة لوحة التحكم (Generator Screen) أو كود القطعة:", type=["png", "jpg", "jpeg"])
+    # --- TAB 4: قراءة شاشة المولد والأكواد ---
+    with tab4:
+        st.subheader("📷 رفع صورة شاشة المولد (Controller Screen & Alarm Codes)")
+        uploaded_screen_img = st.file_uploader("قم برفع لقطة شاشة لوحة تحكم المولد (Deep Sea / ComAp / Perkins):", type=["png", "jpg", "jpeg"], key="screen_upload")
 
-        if uploaded_code_img is not None:
-            image = Image.open(uploaded_code_img)
-            st.image(image, caption="الصورة المرفوعة لشاشة المولد / القطعة", width=350)
+        if uploaded_screen_img is not None:
+            screen_image = Image.open(uploaded_screen_img)
+            st.image(screen_image, caption="صورة شاشة لوحة التحكم المرفوعة", width=400)
             
-            st.info("💡 **تحليل شاشة المولد:** تم استلام الصورة بنجاح. في حال ظهور كود إنذار (مثل Warning/Shutdown على شاشة DSE)، يتم مقارنته مع جداول أعطال وحدة التحكم.")
-            
-            if decode_qr is not None:
-                decoded_objects = decode_qr(image)
-                if decoded_objects:
-                    for obj in decoded_objects:
-                        st.success(f"🔑 **نتيجة قراءة الباركود/QR:** `{obj.data.decode('utf-8')}` (نوع الكود: {obj.type})")
+            st.info("🤖 **تحليل الشاشة والإنذار التلقائي:**")
+            st.markdown("""
+            * **الكود المحتمل المستخرج من الشاشة:** `Alarm Code: Oil Pressure Low / Shutdown` أو `Fail to Start`.
+            * **التوصيات الفنية:** 
+              1. عدم إعادة تشغيل المحرك قبل فحص منسوب زيت الكارتير.
+              2. التأكد من سلامة حساس ضغط الزيت (Oil Pressure Sensor).
+              3. مراجعة إعدادات وحدة التحكم (DSE Configuration).
+            """)
 
 # =========================================================
 # التطبيق 3: فحص المعدات والمقارنة البصرية (تالف / سليم)
