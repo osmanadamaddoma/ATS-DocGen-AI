@@ -27,3 +27,12 @@ firebase-admin
 Pillow
 beautifulsoup4
 requests
+streamlit==1.38.0
+pandas==2.2.2
+numpy==1.26.4
+plotly==5.22.0
+fpdf2==2.7.8
+firebase-admin==6.5.0
+requests==2.31.0
+pillow==10.3.0
+matplotlib==3.8.4
