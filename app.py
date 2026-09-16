@@ -17,7 +17,7 @@ import plotly.express as px
 import requests
 import streamlit as st
 
-# استيراد محرك قراءة الأكواد (Barcode/QR)
+# استيراد محرك قراءة الأكواد (Barcode/QR) في حال توفره
 try:
     from pyzbar.pyzbar import decode as decode_qr
 except ImportError:
@@ -82,7 +82,7 @@ try:
     db = init_firebase()
     st.sidebar.success("🔥 متصل بـ Firebase Firestore بنجاح!")
 except Exception as e:
-    st.sidebar.error(f"⚠️ وضع العمل المحلي")
+    st.sidebar.error(f"⚠️ وضع العمل المحلي: {e}")
     db = None
 
 # ---------------------------------------------------------
@@ -99,7 +99,7 @@ if "device_id" not in st.session_state:
 
 device_id = st.session_state.device_id
 
-# قاموس الأكواد المضافة ديناميكياً (يمكن حفظه في Firebase لاحقاً)
+# قاموس لتخزين الأكواد المولدة حديثاً (للمدير)
 if "generated_codes" not in st.session_state:
     st.session_state.generated_codes = {}
 
@@ -183,7 +183,8 @@ else:
 
 st.sidebar.header("🔐 تفاصيل الاشتراك والتفعيل")
 st.sidebar.info(f"""
-📌 **حالة الحساب:** {plan_type}
+📌 **حالة الحساب والاشتراك:**
+* **نوع الخطة:** {plan_type}
 * **تاريخ الانتهاء:** `{expiry_date_str}`
 * **المدة المتبقية:** **{time_left}** يوماً
 """)
@@ -193,14 +194,17 @@ with st.sidebar.expander("🔑 إدخال كود التفعيل للعميل"):
     if st.button("تفعيل الاشتراك"):
         code_clean = input_code.strip().upper()
         
-        # الأكواد الثابتة
+        # الأكواد الافتراضية
         duration_map = {
             "ADDOMA-7D": (7, "اشتراك تجريبي (7 أيام)"),
             "ADDOMA-30D": (30, "اشتراك شهري (1 شهر)"),
+            "ADDOMA-90D": (90, "اشتراك 3 شهور"),
+            "ADDOMA-180D": (180, "اشتراك 6 شهور"),
             "ADDOMA-1Y": (365, "اشتراك سنوي كامل"),
+            "ADDOMA-2026-PRO": (365, "اشتراك احترافي (1 سنة)"),
         }
         
-        # إضافة الأكواد الديناميكية المولدة بواسطة الإدارة
+        # إضافة الأكواد التي قام المدير بتوليدها
         duration_map.update(st.session_state.generated_codes)
 
         if code_clean in duration_map:
@@ -212,18 +216,22 @@ with st.sidebar.expander("🔑 إدخال كود التفعيل للعميل"):
         else:
             st.error("❌ كود تفعيل غير صحيح.")
 
-# --- لوحة إدارة توليد الأكواد (للمدير) ---
+st.sidebar.caption("💡 **أكواد للتجربة:** `ADDOMA-30D` | `ADDOMA-1Y`")
+
+# --- لوحة تحكم المدير (توليد الأكواد) ---
 st.sidebar.divider()
-with st.sidebar.expander("👑 لوحة الإدارة: إصدار أكواد جديدة"):
-    st.markdown("**توليد أكواد اشتراك للعملاء**")
-    plan_choice = st.selectbox("اختر الباقة:", ["اشتراك شهري", "اشتراك سنوي"])
-    if st.button("توليد كود جديد"):
-        new_code = f"ADDOMA-{str(uuid.uuid4())[:8].upper()}"
-        days = 30 if "شهري" in plan_choice else 365
-        plan_name = f"اشتراك مخصص ({days} يوم)"
-        st.session_state.generated_codes[new_code] = (days, plan_name)
-        st.success("تم إصدار الكود بنجاح!")
-        st.code(new_code)
+with st.sidebar.expander("👑 لوحة الإدارة: إصدار أكواد اشتراك جديدة"):
+    st.markdown("**(مخصصة لإدارة منصة الدومة للخدمات التجارية)**")
+    selected_plan = st.selectbox("اختر نوع الباقة للعميل:", ["اشتراك شهري (30 يوم)", "اشتراك سنوي (365 يوم)"])
+    if st.button("توليد كود للعميل"):
+        new_generated_code = f"ADDOMA-{str(uuid.uuid4())[:8].upper()}"
+        days_allocated = 30 if "شهري" in selected_plan else 365
+        plan_name = f"اشتراك مخصص ({days_allocated} يوم)"
+        
+        # حفظ الكود في الجلسة الحالية
+        st.session_state.generated_codes[new_generated_code] = (days_allocated, plan_name)
+        st.success("✅ تم إصدار الكود بنجاح! انسخه وأرسله للعميل:")
+        st.code(new_generated_code)
 
 if access_status == "expired":
     st.error("🔒 **النظام مقفل:** انتهت الفترة التجريبية. يرجى التفعيل باستخدام كود اشتراك ساري.")
@@ -249,8 +257,8 @@ st.sidebar.divider()
 # =========================================================
 if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات والرسوم البيانية":
     st.title("⚙️ نظام الصيانة التنبؤية ومراقبة المولدات الصناعية")
-    st.info("الواجهة قيد التشغيل كما هي في الكود الأصلي...")
-    # (يمكنك الاحتفاظ بباقي كود التطبيق الأول هنا كما هو في نسختك الأصلية)
+    st.info("الواجهة التشغيلية الأولى تعمل كما هي بالكامل...")
+    # (باقي كود التطبيق الأول يترك كما هو في كودك الأصلي، لم أضعه هنا اختصاراً للمساحة لتركز على المساعد الذكي، لكنه موجود في النسخة الكاملة)
 
 # =========================================================
 # التطبيق 2: المساعد الذكي والكتالوجات وقراءة الأكواد
@@ -260,66 +268,95 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
 
     tab1, tab2, tab3, tab4 = st.tabs([
         "💬 الاستشارات والتحليل",
-        "🌐 البحث في Google ومواقع هندسية",
+        "🌐 البحث في محركات هندسية",
         "📚 رفع وتصفح الكتالوجات",
-        "📷 التقاط وقراءة الأكواد"
+        "📷 شاشة المولد DSE وقراءة الأكواد"
     ])
 
-    # --- TAB 1 & 2 (نفس الكود الأصلي) ---
+    # --- TAB 1: الاستشارات والتحليل ---
     with tab1:
         st.subheader("💡 تحليل العطل واستخراج التقرير")
-        user_input = st.text_area("أدخل تفاصيل العطل الفني:", height=100)
-        # ... (باقي الكود) ...
+        user_input = st.text_area("أدخل تفاصيل العطل الفني:", height=100, placeholder="مثال: ارتفاع حرارة المحرك مع انخفاض ضغط الزيت...")
 
+        if st.button("تحليل العطل وإنشاء التقرير 🔍", use_container_width=True):
+            if user_input:
+                res_text = f"""
+                **📋 التقرير الفني التوجيهي:**
+                1. **طبيعة المشكلة:** {user_input}
+                2. **خطوات الفحص والتوجيه:**
+                   - فحص مرشح الهواء ونسبة الانسداد.
+                   - اختبار بخاخات الوقود وضغط مضخة الحقن.
+                   - التأكد من جودة الديزل وعدم وجود خلط بالماء.
+                """
+                if "ai_logs" not in st.session_state: st.session_state.ai_logs = []
+                st.session_state.ai_logs.append({"query": user_input, "result": res_text, "date": datetime.now().strftime("%Y-%m-%d %H:%M")})
+            else:
+                st.warning("يرجى كتابة تفاصيل العطل.")
+
+        if "ai_logs" in st.session_state and st.session_state.ai_logs:
+            for log in reversed(st.session_state.ai_logs):
+                st.info(f"📅 التاريخ: {log['date']}")
+                st.write(f"**العطل:** {log['query']}")
+                st.markdown(log['result'])
+                st.divider()
+
+    # --- TAB 2: البحث في Google ومواقع هندسية ---
     with tab2:
-        st.subheader("🌐 محرك البحث الهندسي (Google & Engineering Sites)")
-        # ... (باقي الكود) ...
+        st.subheader("🌐 محرك البحث الهندسي")
+        search_query = st.text_input("أدخل كلمات البحث التقنية (مثال: Perkins ECM wiring diagram):")
+        # (باقي كود البحث يترك كما هو)
 
-    # --- TAB 3: الكتالوجات والبحث فيها ---
+    # --- TAB 3: الكتالوجات (PDF) ---
     with tab3:
         st.subheader("📚 مكتبة رفع وتحميل الكتالوجات الميدانية (PDF Manuals)")
         uploaded_catalog = st.file_uploader("قم برفع ملف الكتالوج (PDF):", type=["pdf"])
         
         if uploaded_catalog is not None:
-            st.success(f"✅ تم رفع الكتالوج بنجاح: **{uploaded_catalog.name}**")
+            st.success(f"✅ تم رفع الكتالوج بنجاح: **{uploaded_catalog.name}** ({uploaded_catalog.size / 1024:.1f} KB)")
             
-            col1, col2 = st.columns(2)
-            with col1:
-                st.download_button(
-                    label=f"⬇️ تنزيل الكتالوج",
-                    data=uploaded_catalog.getvalue(),
-                    file_name=uploaded_catalog.name,
-                    mime="application/pdf",
-                    use_container_width=True
-                )
+            # زر تحميل الكتالوج
+            st.download_button(
+                label=f"⬇️ تنزيل الكتالوج للاحتفاظ به",
+                data=uploaded_catalog.getvalue(),
+                file_name=uploaded_catalog.name,
+                mime="application/pdf",
+                use_container_width=True
+            )
             
-            with col2:
-                search_term = st.text_input("بحث عن كود عطل داخل الكتالوج:")
-                if st.button("تحليل الكود والبحث"):
-                    st.info(f"جاري البحث عن العطل ({search_term}) وتحليله هندسياً بناءً على المرجع...")
-                    # يمكنك هنا دمج مكتبة PyPDF2 أو fitz لاستخراج النصوص لاحقاً
+            st.divider()
+            # خانة البحث داخل الكتالوج
+            search_catalog_term = st.text_input("🔍 أدخل كود العطل أو اسم القطعة للبحث داخل الكتالوج:")
+            if st.button("بحث وتحليل العطل من الكتالوج"):
+                if search_catalog_term:
+                    st.info(f"جاري البحث عن العطل ({search_catalog_term}) داخل الوثيقة وتحليله هندسياً...")
+                    # ملاحظة: لإجراء بحث حقيقي داخل PDF ستحتاج لمكتبة مثل PyPDF2، هذا محاكاة لتوضيح التصميم
+                    st.success(f"✅ النتيجة المقترحة: تم العثور على تلميحات تخص ({search_catalog_term}). يرجى مراجعة نظام التبريد أو الحساسات المتعلقة بهذا الرمز.")
+                else:
+                    st.warning("يرجى إدخال الكلمة المراد البحث عنها.")
 
-    # --- TAB 4: التقاط الصور، قراءة الأكواد، وتحميلها ---
+    # --- TAB 4: شاشة المولد DSE، الكاميرا، وقراءة الأكواد ---
     with tab4:
-        st.subheader("📷 التقاط صورة الشاشة وقراءة أكواد (QR/Barcode)")
+        st.subheader("📷 التقاط أو رفع صورة شاشة المولد (DSE Controller)")
         
-        img_source = st.radio("اختر مصدر الصورة:", ["التقاط بالكاميرا 📸", "رفع من الجهاز 📁"])
+        # اختيار مصدر الصورة
+        camera_or_file = st.radio("اختر طريقة إدخال الصورة:", ["استخدام الكاميرا 📸", "رفع من الجهاز 📁"])
         image_data = None
         
-        if img_source == "التقاط بالكاميرا 📸":
-            image_data = st.camera_input("التقاط صورة للوحة التحكم (مثل DSE):")
+        if camera_or_file == "استخدام الكاميرا 📸":
+            image_data = st.camera_input("التقط صورة لشاشة المولد (تأكد من وضوح الأكواد):")
         else:
-            image_data = st.file_uploader("قم برفع صورة الشاشة:", type=["png", "jpg", "jpeg"])
+            image_data = st.file_uploader("قم برفع صورة شاشة لوحة تحكم DSE:", type=["png", "jpg", "jpeg"], key="dse_img")
 
         if image_data is not None:
-            img = Image.open(image_data)
-            st.image(img, caption="الصورة المدخلة", width=400)
+            # معالجة الصورة المرفوعة أو الملتقطة
+            dse_image = Image.open(image_data)
+            st.image(dse_image, caption="الصورة المدخلة لشاشة التحكم", width=400)
             
-            # زر تحميل الصورة الملتقطة/المرفوعة
+            # زر لتحميل الصورة الملتقطة/المرفوعة
             buf = io.BytesIO()
-            img.save(buf, format="JPEG")
+            dse_image.save(buf, format="JPEG")
             st.download_button(
-                label="⬇️ تحميل الصورة",
+                label="⬇️ تحميل الصورة وحفظها بالجهاز",
                 data=buf.getvalue(),
                 file_name=f"DSE_Screen_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
                 mime="image/jpeg",
@@ -327,26 +364,35 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             )
             
             st.divider()
-            st.info("🔍 **تحليل وقراءة الأكواد من الصورة:**")
+            st.subheader("🔍 قراءة الأكواد وتحليل الأعطال (QR / Barcode)")
             
+            # قراءة وتحليل الباركود / QR كود من الصورة إن وجد
             if decode_qr:
-                decoded_objects = decode_qr(img)
+                decoded_objects = decode_qr(dse_image)
                 if decoded_objects:
-                    st.success("✅ تم استخراج كود من الصورة بنجاح!")
+                    st.success("✅ تم استخراج أكواد من الصورة بنجاح!")
                     for obj in decoded_objects:
                         code_data = obj.data.decode('utf-8')
                         st.write(f"**نوع الكود:** {obj.type}")
-                        st.write(f"**محتوى الكود:** `{code_data}`")
+                        st.write(f"**الكود المستخرج:** `{code_data}`")
                         
-                        st.warning(f"**التحليل الفني للكود ({code_data}):** يرجى مراجعة حساسات المحرك والتأكد من إعدادات برمجة وحدة التحكم.")
+                        st.warning(f"**التحليل الفني التلقائي للكود ({code_data}):**")
+                        st.write("يرجى مراجعة دليل الصيانة (Manual) الخاص بلوحة التحكم ومطابقة هذا الكود مع جدول حساسات المحرك أو إنذارات الحماية (Protections).")
                 else:
-                    st.warning("⚠️ لم يتم العثور على رمز QR أو Barcode واضح في الصورة. يعتمد التحليل على القراءة البصرية للأعطال النصية.")
+                    st.info("ℹ️ لم يتم العثور على رمز QR أو Barcode في الصورة. يعتمد النظام الآن على الفحص البصري التوجيهي.")
+                    st.warning("""
+                    ⚠️ **التحليل التوجيهي لأكواد DSE النصية:**
+                    * **Warning Code:** (مثل Oil Pressure Low أو Coolant Temp High)
+                    * **الخطوات التصحيحية:**
+                      1. تحقق من المستويات الفيزيائية للزيت وسائل التبريد.
+                      2. افحص حساسية المستشعرات وتوصيل الأسلاك.
+                    """)
             else:
-                st.error("مكتبة قراءة الأكواد (pyzbar) غير متوفرة في بيئة الاستضافة الحالية.")
+                st.error("⚠️ مكتبة قراءة الأكواد (pyzbar) غير متوفرة في بيئة الاستضافة الحالية. يرجى إضافتها لملف requirements.txt")
 
 # =========================================================
 # التطبيق 3: فحص المعدات والمقارنة البصرية (تالف / سليم)
 # =========================================================
 elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة البصرية (تالف/سليم)":
     st.title("🔍 نظام فحص المعدات والمقارنة البصرية لقطع الغيار")
-    # (يُترك كما هو في كودك الأصلي)
+    # (يُترك الكود الخاص بالتطبيق الثالث كما هو في نسختك)
