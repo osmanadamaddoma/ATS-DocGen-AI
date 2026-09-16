@@ -458,11 +458,14 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         except Exception:
             pass
 
-        pdf_bytes = pdf.output(dest="S")
+        pdf_out = pdf.output(dest="S")
         for f in temp_files:
             if os.path.exists(f): os.remove(f)
-
-        return pdf_bytes.encode("latin-1", errors="replace")
+            
+        # الحل الجذري لمشكلة اختلاف إصدارات FPDF
+        if isinstance(pdf_out, str):
+            return pdf_out.encode("latin-1", errors="replace")
+        return bytes(pdf_out)
 
     st.download_button(
         label="🖨️ إصدار التقرير الفني الشامل والرسوم البيانية (PDF)",
@@ -512,36 +515,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                 st.markdown(log['result'])
                 st.divider()
 
-        # إضافة زر إصدار طباعة التقارير هنا في الاستشارات والتحليل
-        st.divider()
-        st.subheader("📄 إصدار وتنزيل تقرير الاستشارات والتحليل (PDF)")
-        def generate_consultation_pdf():
-            pdf = ComprehensivePDF("AI CONSULTATION & DIAGNOSTIC REPORT")
-            pdf.add_page()
-            pdf.set_font("Helvetica", "B", 11)
-            pdf.cell(0, 6, "Consultation & Troubleshooting Logs:", ln=True)
-            pdf.ln(3)
-            pdf.set_font("Helvetica", "", 10)
-            if "ai_logs" in st.session_state and st.session_state.ai_logs:
-                for idx, log in enumerate(st.session_state.ai_logs):
-                    pdf.set_font("Helvetica", "B", 9)
-                    pdf.cell(0, 5, f"Log #{idx+1} - Date: {log['date']}", ln=True)
-                    pdf.set_font("Helvetica", "", 9)
-                    pdf.multi_cell(0, 5, f"Query: {sanitize_latin_only(log['query'])}")
-                    pdf.multi_cell(0, 5, f"Result:\n{sanitize_latin_only(log['result'])}")
-                    pdf.ln(3)
-            else:
-                pdf.cell(0, 5, "No consultation logs recorded yet.", ln=True)
-            return pdf.output(dest="S").encode("latin-1", errors="replace")
-
-        st.download_button(
-            label="🖨️ إصدار طباعة تقارير الاستشارات والتحليل (PDF)",
-            data=generate_consultation_pdf(),
-            file_name=f"Consultation_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
-
     # --- TAB 2: البحث في Google ومواقع هندسية ---
     with tab2:
         st.subheader("🌐 محرك البحث الهندسي (Google & Engineering Sites)")
@@ -551,6 +524,7 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             if search_query:
                 st.info(f"🔍 جاري البحث عن: **{search_query}** في المصادر الهندسية ومواقع الويب...")
                 try:
+                    # محاكاة بحث عبر محرك بحث عام واستخراج النتائج الهندسية
                     encoded_q = urllib.parse.quote(search_query + " diesel generator engineering manual")
                     url = f"https://html.duckduckgo.com/html/?q={encoded_q}"
                     headers = {"User-Agent": "Mozilla/5.0"}
@@ -558,6 +532,7 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                     if resp.status_code == 200:
                         soup = BeautifulSoup(resp.text, 'html.parser')
                         results = soup.find_all('a', class_='result__snippet', limit=5)
+                        titles = soup.find_all('a', class_='result__url', limit=5)
                         
                         if results:
                             st.success("✅ تم العثور على النتائج والمراجع الهندسية التالية:")
@@ -598,6 +573,7 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             st.image(dse_image, caption="صورة شاشة وحدة التحكم DSE المرفوعة", width=350)
             
             st.info("🔍 **تحليل كود الإنذار والتحذير من شاشة DSE:**")
+            # محاكاة كشف الأكواد الشائعة في وحدات Deep Sea Electronics (مثل DSE 7320 / 8610)
             st.warning("""
             ⚠️ **التحليل التلقائي لأكواد DSE الشائعة:**
             * **Warning Code (التحذير):** `Oil Pressure Low` أو `Coolant Temperature High` أو `Charging Alternator Fail`.
@@ -606,28 +582,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
               2. افحص حساسية مستشعرات (Sensors) الضغط والحرارة وتوصيلات الأسلاك لوحدة DSE.
               3. إعادة ضبط الكود من لوحة التحكم بعد إزالة سبب العطل الفني.
             """)
-
-            # زر إصدار طباعة التقارير الخاص بتحليل شاشة DSE
-            st.divider()
-            st.subheader("📄 إصدار وتنزيل تقرير تحليل شاشة DSE (PDF)")
-            def generate_dse_pdf():
-                pdf = ComprehensivePDF("DSE CONTROLLER SCREEN DIAGNOSTIC REPORT")
-                pdf.add_page()
-                pdf.set_font("Helvetica", "B", 11)
-                pdf.cell(0, 6, "DSE Controller Screen Analysis & Alarms:", ln=True)
-                pdf.ln(3)
-                pdf.set_font("Helvetica", "", 10)
-                pdf.multi_cell(0, 5, sanitize_latin_only("Detected Warning Codes: Oil Pressure Low / Coolant Temperature High."))
-                pdf.multi_cell(0, 5, sanitize_latin_only("Recommended Actions: Check oil and coolant levels immediately. Inspect sensor wiring and connections."))
-                return pdf.output(dest="S").encode("latin-1", errors="replace")
-
-            st.download_button(
-                label="🖨️ إصدار طباعة تقرير تحليل شاشة DSE (PDF)",
-                data=generate_dse_pdf(),
-                file_name=f"DSE_Analysis_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
 
 # =========================================================
 # التطبيق 3: فحص المعدات والمقارنة البصرية (تالف / سليم)
@@ -691,10 +645,15 @@ elif selected_app == "🔍 3. نظام فحص المعدات والمقارنة 
             pdf.cell(100, 5, sanitize_latin_only(item), border=1)
             pdf.cell(50, 5, "FAIL / DEFECT" if val else "PASS / OK", border=1)
             pdf.ln()
-        return pdf.output(dest="S").encode("latin-1", errors="replace")
+            
+        # تطبيق نفس الحل الجذري هنا أيضاً
+        pdf_out = pdf.output(dest="S")
+        if isinstance(pdf_out, str):
+            return pdf_out.encode("latin-1", errors="replace")
+        return bytes(pdf_out)
 
     st.download_button(
-        label="🖨️ إصدار طباعة تقرير الفحص الميداني (PDF)",
+        label="🖨️ إصدار تقرير الفحص الميداني (PDF)",
         data=generate_chk_pdf(),
         file_name=f"Inspection_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
         mime="application/pdf",
