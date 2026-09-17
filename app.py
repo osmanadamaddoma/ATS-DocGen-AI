@@ -65,7 +65,7 @@ CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
         "name": "عثمان آدم أدومة (Addoma Trading Services)",
         "plan": "شهري (Monthly)",
-        "start_date": "2026-01-01",
+        "start_date": "2026-09-15",
         "duration_days": 30,
     },
     "CLIENT-M-881": {
