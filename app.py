@@ -3,6 +3,7 @@ import re
 import json
 import uuid
 import urllib.parse
+import base64
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -15,12 +16,6 @@ from fpdf import FPDF
 import firebase_admin
 from firebase_admin import credentials, firestore
 import streamlit as st
-
-# مكتبة Google Gemini للذكاء الاصطناعي
-try:
-    import google.generativeai as genai
-except ImportError:
-    st.error("يرجى تثبيت مكتبة Gemini: pip install google-generativeai")
 
 try:
     from pyzbar.pyzbar import decode as decode_qr
@@ -82,9 +77,6 @@ input_code = st.sidebar.text_input("أدخل كود التفعيل للوصول 
 st.sidebar.divider()
 st.sidebar.header("🧠 إعداد محرك الذكاء الاصطناعي")
 gemini_api_key = st.sidebar.text_input("أدخل مفتاح Google Gemini API:", type="password")
-
-if gemini_api_key:
-    genai.configure(api_key=gemini_api_key)
 
 is_pro = False
 client_name = "زائر (Visitor)"
@@ -266,7 +258,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     )
 
 # =========================================================
-# التطبيق 2: المساعد الذكي والكتالوجات (مدمج مع Gemini)
+# التطبيق 2: المساعد الذكي والكتالوجات (بدون مكتبات خارجية)
 # =========================================================
 elif selected_app == "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد":
     st.title("🤖 مساعد الأعطال الذكي (مدعوم بـ Google Gemini)")
@@ -292,10 +284,7 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
         else:
             with st.spinner("جارٍ معالجة البيانات عبر محرك Gemini المتقدم..."):
                 try:
-                    # اختيار الموديل القادر على تحليل الصور والنصوص
-                    model = genai.GenerativeModel("gemini-1.5-pro")
-                    
-                    prompt = f"""أنت مهندس كهروميكانيكا واستشاري صيانة محترف، متخصص في أنظمة الطاقة، المولدات (مثل Perkins، Cummins)، وأنظمة التحكم الصناعي (مثل DSE 8610 MKII).
+                    prompt_text = f"""أنت مهندس كهروميكانيكا واستشاري صيانة محترف، متخصص في أنظمة الطاقة، المولدات (مثل Perkins، Cummins)، وأنظمة التحكم الصناعي (مثل DSE 8610 MKII).
                     بناءً على المعطيات التالية:
                     وصف المشكلة: {fault_code_input}
                     يرجى تقديم:
@@ -303,19 +292,39 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                     2. خطوات الفحص والصيانة مرتبة.
                     3. احتياطات الأمان أو التوصيات التشغيلية.
                     اعتمد أسلوباً فنياً دقيقاً باللغة العربية."""
-                    
-                    contents = [prompt]
+
+                    # تجهيز أجزاء الطلب
+                    contents_parts = [{"text": prompt_text}]
+
+                    # تحويل الصورة إلى Base64 في حال وجودها
                     if target_fault_img:
-                        img_obj = Image.open(target_fault_img)
-                        st.image(img_obj, caption="الصورة المرسلة للتحليل", width=300)
-                        contents.append(img_obj)
-                        
-                    response = model.generate_content(contents)
-                    
-                    st.success("✅ اكتمل تحليل الذكاء الاصطناعي!")
-                    st.markdown("### 📋 التقرير الفني للعطل:")
-                    st.write(response.text)
-                    
+                        img_bytes = target_fault_img.getvalue()
+                        base64_image = base64.b64encode(img_bytes).decode('utf-8')
+                        mime_type = target_fault_img.type or "image/jpeg"
+                        contents_parts.append({
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": base64_image
+                            }
+                        })
+                        st.image(target_fault_img, caption="الصورة المرسلة للتحليل", width=300)
+
+                    # إرسال الطلب المباشر عبر API
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={gemini_api_key}"
+                    headers = {'Content-Type': 'application/json'}
+                    payload = {"contents": [{"parts": contents_parts}]}
+
+                    response = requests.post(url, headers=headers, json=payload)
+                    res_json = response.json()
+
+                    if response.status_code == 200 and "candidates" in res_json:
+                        ai_text = res_json["candidates"][0]["content"]["parts"][0]["text"]
+                        st.success("✅ اكتمل تحليل الذكاء الاصطناعي!")
+                        st.markdown("### 📋 التقرير الفني للعطل:")
+                        st.write(ai_text)
+                    else:
+                        st.error(f"❌ خطأ في الاستجابة: {res_json.get('error', {}).get('message', 'تعذر معالجة الطلب')}")
+
                 except Exception as e:
                     st.error(f"حدث خطأ أثناء الاتصال بمحرك الذكاء الاصطناعي: {str(e)}")
 
