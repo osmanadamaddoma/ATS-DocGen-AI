@@ -1,3 +1,34 @@
+import streamlit as st
+import pdfplumber # استدعاء المكتبة في بداية الملف
+
+st.title("🛠️ نظام استخراج وقراءة الكتالوجات")
+
+uploaded_pdf = st.file_uploader("قم برفع كتالوج المعدة أو جدول الأعطال (PDF)", type=["pdf"])
+
+if uploaded_pdf is not None:
+    with st.spinner("جاري قراءة واستخراج بيانات الكتالوج..."):
+        full_text = ""
+        # فتح ملف الـ PDF المرفوع مباشر من الذاكرة
+        with pdfplumber.open(uploaded_pdf) as pdf:
+            for i, page in enumerate(pdf.pages):
+                # 1. استخراج النص
+                page_text = page.extract_text() or ""
+                
+                # 2. استخراج الجداول (إن وجدت) والحفاظ على تنسيق الصفوف
+                tables = page.extract_tables()
+                table_text = ""
+                for table in tables:
+                    for row in table:
+                        clean_row = [str(cell) for cell in row if cell is not None]
+                        table_text += " | ".join(clean_row) + "\n"
+                
+                full_text += f"\n--- الصفحة {i+1} ---\n" + page_text + "\n" + table_text
+
+        st.success("تم استخراج البيانات بنجاح!")
+        
+        # عرض النص المستخرج أو تغذيته لنظام البحث/الذكاء الاصطناعي
+        st.text_area("محتوى الكتالوج والجداول المستخرجة:", full_text, height=300)
+
 import os
 import re
 import json
