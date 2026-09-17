@@ -1,4 +1,4 @@
-كود مهimport os
+كود مiimport os
 import re
 import json
 import uuid
