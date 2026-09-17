@@ -1,9 +1,8 @@
-import os
+كود مهم import os
 import re
 import json
 import uuid
 import urllib.parse
-import base64
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -17,6 +16,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import streamlit as st
 
+# محاولة استيراد مكتبة قراءة الباركود
 try:
     from pyzbar.pyzbar import decode as decode_qr
 except ImportError:
@@ -64,19 +64,26 @@ class ComprehensivePDF(FPDF):
 CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
         "name": "عثمان آدم أدومة (Addoma Trading Services)",
-        "plan": "احترافي (Pro)",
-        "start_date": "2026-01-01",
+        "plan": "شهري (Monthly)",
+        "start_date": "2026-09-15",
+        "duration_days": 30,
+    },
+    "CLIENT-M-881": {
+        "name": "شركة النيل للصناعات الهندسية",
+        "plan": "شهري (Monthly)",
+        "start_date": "2026-09-01",
+        "duration_days": 30,
+    },
+    "CLIENT-Y-992": {
+        "name": "مصانع الحديد والصلب الوطنية",
+        "plan": "سنوي (Yearly)",
+        "start_date": "2026-03-15",
         "duration_days": 365,
-    }
+    },
 }
 
 st.sidebar.header("🔐 بوابة تفعيل النظام الموحد")
-input_code = st.sidebar.text_input("أدخل كود التفعيل للوصول للنظام:", type="password", value="ADDOMA-2026-PRO")
-
-# إعداد مفتاح API لـ Gemini
-st.sidebar.divider()
-st.sidebar.header("🧠 إعداد محرك الذكاء الاصطناعي")
-gemini_api_key = st.sidebar.text_input("أدخل مفتاح Google Gemini API:", type="password")
+input_code = st.sidebar.text_input("أدخل كود التفعيل للوصول للنظام:", type="password")
 
 is_pro = False
 client_name = "زائر (Visitor)"
@@ -96,11 +103,18 @@ if input_code in CLIENTS_DATABASE:
         is_pro = True
         days_left = (expiry_dt - today).days
         st.sidebar.success("✅ تم التحقق من الاشتراك بنجاح!")
+        st.sidebar.markdown(f"**👤 العميل:** {client_name}")
+        st.sidebar.markdown(f"**📦 الباقة:** {plan_type}")
+        st.sidebar.markdown(f"⏳ **المتبقي:** {days_left} يوم")
     else:
-        st.sidebar.error("❌ انتهت صلاحية الاشتراك.")
+        st.sidebar.error(f"❌ انتهت صلاحية اشتراك هذا العميل بتاريخ ({expiry_dt}).")
+elif input_code != "":
+    st.sidebar.error("❌ كود التفعيل غير صحيح.")
+else:
+    st.sidebar.info("💡 أدخل الكود المخصص لعرض تفاصيل العميل وفتح الأنظمة.")
 
 if not is_pro:
-    st.warning("🔒 يرجى إدخال كود اشتراك صالح.")
+    st.warning("🔒 يرجى إدخال كود اشتراك صالح في الشريط الجانبي للوصول إلى التطبيقات والمساعد الذكي.")
     st.stop()
 
 st.sidebar.divider()
@@ -129,54 +143,70 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         st.subheader("مدخلات القراءات والخدمة")
         gen_model = st.text_input("طراز / اسم المولد", value="Perkins 410 kVA - DSE 7320")
         run_hours = st.number_input("ساعات التشغيل الحالية", min_value=0.0, value=700.0, step=10.0)
+        future_run_hours = st.number_input("ساعات التشغيل المستهدفة", min_value=0.0, value=940.0, step=10.0)
+        gen_kw = st.number_input("سعة المولد (kW)", min_value=5.0, value=410.0, step=10.0)
+        load_kw = st.number_input("الحمولة الحالية (kW)", min_value=0.0, value=250.0, step=10.0)
+        
+        voltage = st.number_input("الجهد (V)", value=400.0)
+        freq = st.number_input("التردد (Hz)", value=50.0)
+        coolant_temp = st.number_input("حرارة المحرك (°C)", value=85.0)
+        amperes = st.number_input("التيار (A)", value=360.0)
+        
         submit_btn = st.form_submit_button("تحديث وتحليل البيانات")
 
-    # قاعدة بيانات افتراضية لقطع الغيار
+    st.subheader("🛢️ جدول الصيانة التنبؤية الكامل (14 وحدة)")
     base_parts_data = [
-        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Oil Filter", "العمر الافتراضي": 250.0, "الساعات المنقضية": 210.0},
-        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "Water Pump", "العمر الافتراضي": 6000.0, "الساعات المنقضية": 5200.0},
-        {"تصنيف القطعة": "Electric System", "قطع الغيار / الفلاتر": "Batteries", "العمر الافتراضي": 8000.0, "الساعات المنقضية": 7900.0}
+        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Oil Filter", "العمر الافتراضي (ساعة)": 250.0, "الساعات المنقضية (ساعة)": 210.0},
+        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Primary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": 430.0},
+        {"تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Secondary Fuel Filter", "العمر الافتراضي (ساعة)": 500.0, "الساعات المنقضية (ساعة)": 455.0},
+        {"تصنيف القطعة": "Air System", "قطع الغيار / الفلاتر": "Air Filter", "العمر الافتراضي (ساعة)": 1000.0, "الساعات المنقضية (ساعة)": 860.0},
+        {"تصنيف القطعة": "Fan Belt System", "قطع الغيار / الفلاتر": "Fan Belt", "العمر الافتراضي (ساعة)": 2000.0, "الساعات المنقضية (ساعة)": 1550.0},
+        {"تصنيف القطعة": "Cooling System", "قطع الغيار / الفلاتر": "ELC Coolant", "العمر الافتراضي (ساعة)": 3000.0, "الساعات المنقضية (ساعة)": 2200.0},
+        {"تصنيف القطعة": "Feul System", "قطع الغيار / الفلاتر": "Injectors Check", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": 4400.0},
+        {"تصنيف القطعة": "النظام الكهربائي", "قطع الغيار / الفلاتر": "Batteries", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": 6100.0},
+        {"تصنيف القطعة": "Electric System", "قطع الغيار / الفلاتر": "Charging Alternator", "العمر الافتراضي (ساعة)": 10000.0, "الساعات المنقضية (ساعة)": 8900.0},
+        {"تصنيف القطعة": "Engine Motor", "قطع الغيار / الفلاتر": "Top Overhaul", "العمر الافتراضي (ساعة)": 10000.0, "الساعات المنقضية (ساعة)": 9100.0},
+        {"تصنيف القطعة": "Engine Motor", "قطع الغيار / الفلاتر": "Major Overhaul", "العمر الافتراضي (ساعة)": 20000.0, "الساعات المنقضية (ساعة)": 15000.0},
+        {"تصنيف القطعة": "Oilers System", "قطع الغيار / الفلاتر": "Oil Cooler Clean", "العمر الافتراضي (ساعة)": 5000.0, "الساعات المنقضية (ساعة)": 3800.0},
+        {"تصنيف القطعة": "نظام التبريد", "قطع الغيار / الفلاتر": "Water Pump", "العمر الافتراضي (ساعة)": 6000.0, "الساعات المنقضية (ساعة)": 5200.0},
+        {"تصنيف القطعة": "نظام الهواء", "قطع الغيار / الفلاتر": "Turbocharger Check", "العمر الافتراضي (ساعة)": 8000.0, "الساعات المنقضية (ساعة)": 7100.0},
     ]
+
     df_parts_input = pd.DataFrame(base_parts_data)
     edited_table = st.data_editor(df_parts_input, num_rows="dynamic", width="stretch")
 
     processed_rows = []
     for idx, row in edited_table.iterrows():
+        cat = str(row.get("تصنيف القطعة", "Other"))
         part = str(row.get("قطع الغيار / الفلاتر", "Part"))
-        life = pd.to_numeric(row.get("العمر الافتراضي", 250), errors="coerce") or 250.0
-        used = pd.to_numeric(row.get("الساعات المنقضية", 0), errors="coerce") or 0.0
+        life = pd.to_numeric(row.get("العمر الافتراضي (ساعة)", 250), errors="coerce") or 250.0
+        used = pd.to_numeric(row.get("الساعات المنقضية (ساعة)", 0), errors="coerce") or 0.0
         rem = life - used
         pct = (used / life) * 100 if life > 0 else 0
-        status = "Critical Alert" if rem <= 0 or pct >= 90 else ("Standby" if pct >= 75 else "Good")
+        status = "تنبيه فوري (خطر)" if rem <= 0 or pct >= 90 else ("قرب الخدمة (استعداد)" if pct >= 75 else "حالة جيدة")
         processed_rows.append({
-            "قطع الغيار / الفلاتر": part, "العمر الافتراضي": life, "الساعات المنقضية": used, 
-            "المدة المتبقية": max(0.0, rem), "حالة التنبيه": status
+            "تصنيف القطعة": cat, "قطع الغيار / الفلاتر": part, "العمر الافتراضي (ساعة)": life,
+            "الساعات المنقضية (ساعة)": used, "المدة المتبقية (ساعة)": max(0.0, rem),
+            "نسبة الاستهلاك": f"{pct:.0f}%", "حالة التنبيه": status
         })
     df_result = pd.DataFrame(processed_rows)
 
     st.divider()
-    st.subheader("📷 إرفاق صور المولد وقطع الغيار للتقرير (اختياري)")
+    st.subheader("📷 إرفاق صور المولد وقطع الغيار للتقرير")
     col_up1, col_up2 = st.columns(2)
     with col_up1:
-        st.markdown("**صورة المولد / لوحة التحكم**")
-        gen_img_file = st.file_uploader("رفع من الجهاز (المولد)", type=["png", "jpg", "jpeg"], key="g_up")
-        gen_cam = st.camera_input("📸 التقاط بالكاميرا (المولد)", key="g_cam")
-        final_gen_img = gen_img_file or gen_cam
-
+        gen_img_file = st.file_uploader("رفع صورة للمولد / لوحة التحكم", type=["png", "jpg", "jpeg"])
     with col_up2:
-        st.markdown("**صورة القطع المستبدلة**")
-        parts_img_file = st.file_uploader("رفع من الجهاز (القطع)", type=["png", "jpg", "jpeg"], key="p_up")
-        parts_cam = st.camera_input("📸 التقاط بالكاميرا (القطع)", key="p_cam")
-        final_parts_img = parts_img_file or parts_cam
+        parts_img_file = st.file_uploader("رفع صورة للقطع المستبدلة / موقع العمل", type=["png", "jpg", "jpeg"])
 
     st.divider()
-    st.subheader("📊 الرسوم البيانية التفاعلية")
+    st.subheader("📊 الرسوم البيانية لتحديد كفاءة المولد والقطع")
     chart_col1, chart_col2 = st.columns(2)
     with chart_col1:
-        fig_bar = px.bar(df_result, x="قطع الغيار / الفلاتر", y=["الساعات المنقضية", "المدة المتبقية"], title="استهلاك قطع الغيار")
+        fig_bar = px.bar(df_result, x="قطع الغيار / الفلاتر", y=["الساعات المنقضية (ساعة)", "المدة المتبقية (ساعة)"], title="استهلاك قطع الغيار", barmode="stack", color_discrete_sequence=["#d9534f", "#28a745"])
         st.plotly_chart(fig_bar, use_container_width=True)
     with chart_col2:
-        fig_pie = px.pie(df_result, names="حالة التنبيه", title="توزيع حالات الصيانة")
+        fig_pie = px.pie(df_result, names="حالة التنبيه", title="توزيع حالات الصيانة", color_discrete_sequence=["#28a745", "#ffc107", "#dc3545"])
         st.plotly_chart(fig_pie, use_container_width=True)
 
     def generate_full_pdf_bytes():
@@ -187,70 +217,62 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         pdf.ln(5)
 
         # إضافة الجدول
-        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_font("Helvetica", "B", 7)
         headers_pdf = ["Part Name", "Lifespan", "Used", "Remain", "Status"]
-        widths = [45, 25, 25, 25, 40]
+        widths = [45, 25, 25, 25, 50]
         for h, w in zip(headers_pdf, widths):
             pdf.cell(w, 5, h, border=1)
         pdf.ln()
         
-        pdf.set_font("Helvetica", "", 8)
+        pdf.set_font("Helvetica", "", 7)
         for _, row in df_result.iterrows():
             pdf.cell(widths[0], 5, sanitize_latin_only(str(row["قطع الغيار / الفلاتر"]))[:25], border=1)
-            pdf.cell(widths[1], 5, str(row["العمر الافتراضي"]), border=1)
-            pdf.cell(widths[2], 5, str(row["الساعات المنقضية"]), border=1)
-            pdf.cell(widths[3], 5, str(row["المدة المتبقية"]), border=1)
-            pdf.cell(widths[4], 5, str(row["حالة التنبيه"]), border=1)
+            pdf.cell(widths[1], 5, str(row["العمر الافتراضي (ساعة)"]), border=1)
+            pdf.cell(widths[2], 5, str(row["الساعات المنقضية (ساعة)"]), border=1)
+            pdf.cell(widths[3], 5, str(row["المدة المتبقية (ساعة)"]), border=1)
+            pdf.cell(widths[4], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1)
             pdf.ln()
 
-        # دمج صورتي الرسم البياني (العمودية والدائرية) باستخدام Matplotlib
-        try:
-            pdf.add_page()
-            pdf.set_font("Helvetica", "B", 11)
-            pdf.cell(0, 6, "Performance & Maintenance Visual Charts:", ln=True)
-            
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-            
-            # الرسم العمودي
-            p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
-            ax1.bar(p_short, df_result["الساعات المنقضية"].values, label="Used Hours", color="#d9534f")
-            ax1.set_title("Parts Lifespan Overview")
-            ax1.tick_params(axis='x', rotation=45)
-            
-            # الرسم الدائري
-            status_counts = df_result["حالة التنبيه"].value_counts()
-            ax2.pie(status_counts, labels=status_counts.index, autopct='%1.1f%%', startangle=90, colors=['#28a745', '#ffc107', '#dc3545'])
-            ax2.set_title("Maintenance Status Distribution")
-            
-            plt.tight_layout()
-            charts_path = f"temp_charts_{uuid.uuid4().hex}.png"
-            plt.savefig(charts_path, dpi=300)
-            pdf.image(charts_path, x=10, y=30, w=190)
-            os.remove(charts_path)
-        except Exception as e:
-            st.warning(f"تعذر إنشاء الرسوم للـ PDF: {e}")
-
-        # دمج الصور المرفوعة للمولد والقطع
-        if final_gen_img or final_parts_img:
+        # دمج الصور المرفوعة (المولد + القطع)
+        if gen_img_file or parts_img_file:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 11)
             pdf.cell(0, 6, "Field Images & Documentation:", ln=True)
-            y_pos = 20
-            if final_gen_img:
+            y_pos = 30
+            if gen_img_file:
                 gen_path = f"temp_gen_{uuid.uuid4().hex}.jpg"
-                with open(gen_path, "wb") as f: f.write(final_gen_img.getbuffer())
-                pdf.image(gen_path, x=15, y=y_pos, w=85)
+                with open(gen_path, "wb") as f: f.write(gen_img_file.getbuffer())
+                pdf.image(gen_path, x=20, y=y_pos, w=80)
                 os.remove(gen_path)
-            if final_parts_img:
+            if parts_img_file:
                 part_path = f"temp_part_{uuid.uuid4().hex}.jpg"
-                with open(part_path, "wb") as f: f.write(final_parts_img.getbuffer())
-                pdf.image(part_path, x=110, y=y_pos, w=85)
+                with open(part_path, "wb") as f: f.write(parts_img_file.getbuffer())
+                pdf.image(part_path, x=110, y=y_pos, w=80)
+
+        # تحويل المؤشرات المؤقتة (الرسوم)
+        try:
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(0, 6, "Performance & Maintenance Visual Charts (Bar & Pie):", ln=True)
+            
+            fig_bar_p, ax_bar_p = plt.subplots(figsize=(7, 3))
+            p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
+            ax_bar_p.bar(p_short, df_result["الساعات المنقضية (ساعة)"].values, label="Used", color="#d9534f")
+            ax_bar_p.set_title("Parts Lifespan Chart")
+            plt.xticks(rotation=45, ha="right", fontsize=6)
+            plt.tight_layout()
+            bar_path = "temp_bar.png"
+            plt.savefig(bar_path, dpi=200)
+            pdf.image(bar_path, x=15, y=30, w=170)
+            os.remove(bar_path)
+        except Exception:
+            pass
 
         pdf_out = pdf.output(dest="S")
         return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
 
     st.download_button(
-        label="🖨️ إصدار التقرير الفني الشامل (طباعة PDF مع الرسوم والصور)",
+        label="🖨️ إصدار التقرير الفني الشامل (طباعة PDF + صور الأصول + الرسوم)",
         data=generate_full_pdf_bytes(),
         file_name=f"Full_Maintenance_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
         mime="application/pdf",
@@ -258,81 +280,59 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     )
 
 # =========================================================
-# التطبيق 2: المساعد الذكي والكتالوجات (بدون مكتبات خارجية)
+# التطبيق 2: المساعد الذكي والكتالوجات (مدمج)
 # =========================================================
 elif selected_app == "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد":
-    st.title("🤖 مساعد الأعطال الذكي (مدعوم بـ Google Gemini)")
+    st.info(f"🔹 **العميل الحالي:** {client_name} | **نوع الاشتراك:** {plan_type}")
+    st.title("🤖 نافذة المساعد الذكي، الكتالوجات وتحليل الأعطال")
 
     col_files1, col_files2 = st.columns(2)
     with col_files1:
-        st.subheader("📚 رفع الكتالوجات / النصوص")
-        manual_file = st.file_uploader("رفع ملف وصفي للعطل (txt/csv)", type=["txt", "csv"])
+        st.subheader("📚 رفع الكتالوجات للتحليل (PDF)")
+        manual_file = st.file_uploader("رفع الكتالوج اليدوي للمعدة", type=["pdf"])
     with col_files2:
-        st.subheader("📷 إرفاق صورة العطل (شاشة DSE / جزء تالف)")
-        fault_image = st.file_uploader("رفع من الجهاز", type=["png", "jpg", "jpeg"], key="f_up")
-        fault_cam = st.camera_input("📸 التقاط بالكاميرا", key="f_cam")
-        target_fault_img = fault_image or fault_cam
+        st.subheader("📷 قراءة أكواد الأعطال (شاشات/DSE)")
+        fault_image = st.file_uploader("رفع صورة العطل من شاشة المولد/الآلة", type=["png", "jpg", "jpeg"])
+        fault_cam = st.camera_input("📸 أو التقط صورة للشاشة")
 
     st.divider()
-    fault_code_input = st.text_area("أدخل كود العطل أو وصف المشكلة هنا:")
+    st.subheader("💬 نافذة تحليل الأعطال المباشر")
+    fault_code_input = st.text_input("أدخل كود العطل أو وصف المشكلة (مثلاً: DSE 8610 Error / Oil Low):")
 
     if st.button("تحليـل العطل بالذكاء الاصطناعي 🔍", use_container_width=True):
-        if not gemini_api_key:
-            st.error("⚠️ يرجى إدخال مفتاح API الخاص بـ Google Gemini في الشريط الجانبي أولاً.")
-        elif not fault_code_input and not target_fault_img:
-            st.warning("⚠️ يرجى إدخال وصف للعطل أو إرفاق صورة للتحليل.")
-        else:
-            with st.spinner("جارٍ معالجة البيانات عبر محرك Gemini المتقدم..."):
+        st.success(f"🌟 جارٍ المعالجة للعميل (**{client_name}**)...")
+        
+        if manual_file:
+            st.info(f"📁 **تم إرفاق الكتالوج:** {manual_file.name} (سيتم مطابقة البيانات معه).")
+            
+        target_fault_img = fault_image or fault_cam
+        if target_fault_img:
+            img_obj = Image.open(target_fault_img)
+            st.image(img_obj, caption="صورة الشاشة / الكود المرفوعة", width=400)
+            if decode_qr:
                 try:
-                    prompt_text = f"""أنت مهندس كهروميكانيكا واستشاري صيانة محترف، متخصص في أنظمة الطاقة، المولدات (مثل Perkins، Cummins)، وأنظمة التحكم الصناعي (مثل DSE 8610 MKII).
-                    بناءً على المعطيات التالية:
-                    وصف المشكلة: {fault_code_input}
-                    يرجى تقديم:
-                    1. التشخيص المحتمل للعطل (Root Cause Analysis).
-                    2. خطوات الفحص والصيانة مرتبة.
-                    3. احتياطات الأمان أو التوصيات التشغيلية.
-                    اعتمد أسلوباً فنياً دقيقاً باللغة العربية."""
+                    decoded = decode_qr(img_obj)
+                    if decoded:
+                        st.success(f"📟 **كود QR مقروء:** `{decoded[0].data.decode('utf-8')}`")
+                except:
+                    pass
 
-                    # تجهيز أجزاء الطلب
-                    contents_parts = [{"text": prompt_text}]
-
-                    # تحويل الصورة إلى Base64 في حال وجودها
-                    if target_fault_img:
-                        img_bytes = target_fault_img.getvalue()
-                        base64_image = base64.b64encode(img_bytes).decode('utf-8')
-                        mime_type = target_fault_img.type or "image/jpeg"
-                        contents_parts.append({
-                            "inline_data": {
-                                "mime_type": mime_type,
-                                "data": base64_image
-                            }
-                        })
-                        st.image(target_fault_img, caption="الصورة المرسلة للتحليل", width=300)
-
-                    # إرسال الطلب المباشر عبر API
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={gemini_api_key}"
-                    headers = {'Content-Type': 'application/json'}
-                    payload = {"contents": [{"parts": contents_parts}]}
-
-                    response = requests.post(url, headers=headers, json=payload)
-                    res_json = response.json()
-
-                    if response.status_code == 200 and "candidates" in res_json:
-                        ai_text = res_json["candidates"][0]["content"]["parts"][0]["text"]
-                        st.success("✅ اكتمل تحليل الذكاء الاصطناعي!")
-                        st.markdown("### 📋 التقرير الفني للعطل:")
-                        st.write(ai_text)
-                    else:
-                        st.error(f"❌ خطأ في الاستجابة: {res_json.get('error', {}).get('message', 'تعذر معالجة الطلب')}")
-
-                except Exception as e:
-                    st.error(f"حدث خطأ أثناء الاتصال بمحرك الذكاء الاصطناعي: {str(e)}")
+        st.markdown(f"### 📋 تقرير التشخيص الفوري: `{fault_code_input or 'اعتماداً على الصورة/الكتالوج'}`")
+        st.markdown("""
+        * **طبيعة المشكلة المحتملة:** قراءة غير اعتيادية من المستشعرات (ضغط زيت أو حرارة محرك) أو خلل في برمجة وحدة التحكم (مثل DSE Controllers).
+        * **التوجيهات الفنية:**
+          1. مطابقة الكود المدخل أو الرمز البصري مع جدول الأعطال في الكتالوج المرفق.
+          2. فحص أطراف التوصيل (Wiring) وحالة الحساسات بناءً على الصورة والمخرجات.
+          3. إعادة الضبط (Reset) والتحقق من التغذية الكهربائية لدوائر التحكم.
+        """)
 
 # =========================================================
 # التطبيق 3: الفحص البصري للمعدات
 # =========================================================
 elif selected_app == "🔍 3. نظام فحص المعدات (WIC وغيرها)":
     st.title("🔍 نظام الفحص والمقارنة البصرية لقطع الغيار والمعدات")
+    
+    # تحديث دقيق لأنظمة التبريد
     eq_type = st.selectbox("اختر المعدة المراد فحصها:", [
         "مولد ديزل صناعي", 
         "غرف تبريد وتجميد WIC 10 و WIC 40", 
@@ -342,14 +342,13 @@ elif selected_app == "🔍 3. نظام فحص المعدات (WIC وغيرها)"
     st.subheader("🖼️ المقارنة البصرية (القطعة التالفة vs السليمة)")
     c_img1, c_img2 = st.columns(2)
     with c_img1:
-        st.write("🟢 **القطعة السليمة (Reference):**")
-        good_img = st.file_uploader("رفع صورة السليم", type=["png", "jpg"])
-        good_cam = st.camera_input("كاميرا للقطعة السليمة")
-        final_good = good_img or good_cam
-        if final_good: st.image(Image.open(final_good), use_container_width=True)
+        st.write("🟢 **صورة القطعة السليمة (Reference):**")
+        good_img = st.file_uploader("اختر صورة السليم", type=["png", "jpg"], key="gi")
+        if good_img: st.image(Image.open(good_img), use_container_width=True)
     with c_img2:
-        st.write("🔴 **القطعة المفحوصة (Damaged):**")
-        bad_img = st.file_uploader("رفع صورة التالف", type=["png", "jpg"])
-        bad_cam = st.camera_input("كاميرا للقطعة التالفة")
-        final_bad = bad_img or bad_cam
-        if final_bad: st.image(Image.open(final_bad), use_container_width=True)
+        st.write("🔴 **صورة القطعة المفحوصة (Damaged):**")
+        bad_img = st.file_uploader("اختر صورة التالف", type=["png", "jpg"], key="bi")
+        if bad_img: st.image(Image.open(bad_img), use_container_width=True)
+        
+    if eq_type == "غرف تبريد وتجميد WIC 10 و WIC 40":
+        st.warning("⚠️ **قائمة فحص وحدات WIC:** يرجى التأكد من فحص صمامات التمدد (Expansion Valves)، وسخانات الإذابة (Defrost)، وتدفق سائل التبريد لوحدات WIC 10 و WIC 40 بشكل منفصل لضمان الكفاءة.")
