@@ -66,7 +66,7 @@ CLIENTS_DATABASE = {
         "name": "عثمان آدم أدومة (Addoma Trading Services)",
         "plan": "احترافي سنوي (Pro - Yearly)",
         "start_date": "2026-01-01",
-        "duration_days": 365,
+        "duration_days": 30,
     },
     "CLIENT-M-881": {
         "name": "شركة النيل للصناعات الهندسية",
