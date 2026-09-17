@@ -64,7 +64,7 @@ class ComprehensivePDF(FPDF):
 CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
         "name": "عثمان آدم أدومة (Addoma Trading Services)",
-        "plan": "احترافي سنوي (Pro - Yearly)",
+        "plan": "شهري (Monthly)",
         "start_date": "2026-01-01",
         "duration_days": 30,
     },
