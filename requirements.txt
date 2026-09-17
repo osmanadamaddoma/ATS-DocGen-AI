@@ -11,3 +11,4 @@ scikit-learn
 supabase
 openpyxl
 beautifulsoup4
+pdfplumber==0.11.4
