@@ -12,4 +12,3 @@ supabase
 openpyxl
 beautifulsoup4
 pdfplumber==0.11.4
-GEMINI_API_KEY = "AIzaSy..."
