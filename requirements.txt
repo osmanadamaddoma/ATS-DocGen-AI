@@ -12,3 +12,7 @@ supabase
 openpyxl
 beautifulsoup4
 pdfplumber==0.11.4
+streamlit
+google-genai
+matplotlib
+firebase-admin
