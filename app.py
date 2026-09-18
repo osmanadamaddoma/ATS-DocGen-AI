@@ -69,7 +69,6 @@ def analyze_fault_with_gemini(fault_code, context_text=""):
     اكتب الإجابة بلغة عربية تقنية واضحة ومباشرة.
     """
 
-    # محاولة الاتصال حتى 3 مرات في حال وجود ضغط على السيرفر (503)
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -82,14 +81,14 @@ def analyze_fault_with_gemini(fault_code, context_text=""):
             err_msg = str(e)
             if "503" in err_msg or "UNAVAILABLE" in err_msg:
                 if attempt < max_retries - 1:
-                    time.sleep(2)  # الانتظار ثانيتين قبل إعادة المحاولة
+                    time.sleep(2)
                     continue
                 else:
                     return "⚠️ الخادم يمر بضغط عالٍ حالياً (503). يرجى الضغط على زر التحليل مرة أخرى بعد ثوانٍ معدودة."
             return f"❌ حدث خطأ أثناء التواصل مع الذكاء الاصطناعي: {err_msg}"
 
 # =========================================================
-# 1. دوال النظام المساعدة (تنظيف النصوص، إنشاء PDF)
+# 1. دوال النظام المساعدة وتصميم تقرير الـ PDF المطور
 # =========================================================
 def sanitize_latin_only(text):
     if not isinstance(text, str):
@@ -98,23 +97,54 @@ def sanitize_latin_only(text):
     return clean_text if clean_text else "N/A"
 
 class ComprehensivePDF(FPDF):
-    def __init__(self, title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT"):
+    def __init__(self, title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT", logo_path=None):
         super().__init__()
         self.report_title = title_text
+        self.logo_path = logo_path
 
     def header(self):
+        # شريط علوي ملون (أزرق صناعي احترافي)
+        self.set_fill_color(24, 43, 73)
+        self.rect(0, 0, 210, 8, "F")
+
+        # إضافة الشعار إن وجد
+        if self.logo_path and os.path.exists(self.logo_path):
+            self.image(self.logo_path, x=10, y=12, w=25)
+            text_x = 40
+        else:
+            text_x = 10
+
+        # عنوان التقرير وتفاصيل الشركة
+        self.set_xy(text_x, 12)
         self.set_font("Helvetica", "B", 13)
-        self.cell(0, 8, self.report_title, ln=True, align="C")
-        self.set_font("Helvetica", "I", 8)
-        self.cell(0, 4, "Addoma Trading Services - Engineering Platform", ln=True, align="C")
-        self.line(10, 20, 200, 20)
-        self.ln(5)
+        self.set_text_color(24, 43, 73)
+        self.cell(0, 5, self.report_title, ln=True)
+
+        self.set_x(text_x)
+        self.set_font("Helvetica", "B", 8)
+        self.set_text_color(100, 100, 100)
+        self.cell(0, 4, "ADDOMA TRADING SERVICES - ENGINEERING CONSULTANCY", ln=True)
+
+        self.set_x(text_x)
+        self.set_font("Helvetica", "", 8)
+        self.cell(0, 4, "Power Systems & Electro-Mechanical Maintenance Division", ln=True)
+
+        # خط فاصل أزرق خفيف
+        self.set_draw_color(24, 43, 73)
+        self.set_linewidth(0.5)
+        self.line(10, 30, 200, 30)
+        self.ln(10)
 
     def footer(self):
         self.set_y(-15)
+        self.set_draw_color(200, 200, 200)
+        self.set_linewidth(0.2)
+        self.line(10, 282, 200, 282)
+
         self.set_font("Helvetica", "I", 8)
-        self.cell(0, 5, "Prepared by: Osman Adam Addoma", ln=True, align="C")
-        self.cell(0, 5, f"Page {self.page_no()} | System Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
+        self.set_text_color(120, 120, 120)
+        self.cell(0, 4, "Prepared by: Osman Adam Addoma | Power Systems Engineer", ln=True, align="C")
+        self.cell(0, 4, f"Page {self.page_no()} | Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
 
 # =========================================================
 # 2. نظام الاشتراكات الموحد والباقات
@@ -197,6 +227,10 @@ st.sidebar.divider()
 if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)":
     st.title("⚙️ نظام الصيانة التنبؤية ومراقبة المولدات الصناعية")
 
+    # خيار رفع الشعار
+    st.sidebar.subheader("🎨 تخصيص التقرير المطبوع")
+    logo_file = st.sidebar.file_uploader("رفع شعار الشركة (Logo)", type=["png", "jpg", "jpeg"], key="logo_up")
+
     with st.sidebar.form("generator_comprehensive_form"):
         st.subheader("مدخلات القراءات والخدمة")
         gen_model = st.text_input("طراز / اسم المولد", value="Perkins 410 kVA - DSE 7320")
@@ -268,69 +302,103 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         st.plotly_chart(fig_pie, use_container_width=True)
 
     def generate_full_pdf_bytes():
-        pdf = ComprehensivePDF("GENERATOR & PREDICTIVE MAINTENANCE REPORT")
-        pdf.add_page()
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(0, 5, f"Generator Model: {sanitize_latin_only(gen_model)} | Total Hours: {run_hours}", ln=True)
-        pdf.ln(5)
+        # حفظ الشعار مؤقتاً
+        temp_logo_path = None
+        if logo_file:
+            temp_logo_path = f"temp_logo_{uuid.uuid4().hex}.png"
+            with open(temp_logo_path, "wb") as f:
+                f.write(logo_file.getbuffer())
 
-        # إضافة الجدول
-        pdf.set_font("Helvetica", "B", 7)
-        headers_pdf = ["Part Name", "Lifespan", "Used", "Remain", "Status"]
-        widths = [45, 25, 25, 25, 50]
+        pdf = ComprehensivePDF("GENERATOR PREDICTIVE MAINTENANCE REPORT", logo_path=temp_logo_path)
+        pdf.add_page()
+        
+        # ملخص المعدة والعميل
+        pdf.set_fill_color(245, 247, 250)
+        pdf.rect(10, 35, 190, 15, "F")
+        pdf.set_xy(12, 37)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(24, 43, 73)
+        pdf.cell(0, 5, f"Generator Model: {sanitize_latin_only(gen_model)} | Total Operating Hours: {run_hours} hrs", ln=True)
+        pdf.set_x(12)
+        pdf.cell(0, 5, f"Client Name: {sanitize_latin_only(client_name)} | Capacity: {gen_kw} kW", ln=True)
+        pdf.ln(8)
+
+        # رأس الجدول وتنسيقه المطور
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_fill_color(24, 43, 73)
+        pdf.set_text_color(255, 255, 255)
+        
+        headers_pdf = ["Part / Service Name", "Lifespan", "Used Hours", "Remaining", "Maintenance Status"]
+        widths = [50, 25, 25, 25, 65]
         for h, w in zip(headers_pdf, widths):
-            pdf.cell(w, 5, h, border=1)
+            pdf.cell(w, 6, h, border=1, fill=True, align="C")
         pdf.ln()
         
+        # صفوف الجدول مع التناوب الملون
         pdf.set_font("Helvetica", "", 7)
-        for _, row in df_result.iterrows():
-            pdf.cell(widths[0], 5, sanitize_latin_only(str(row["قطع الغيار / الفلاتر"]))[:25], border=1)
-            pdf.cell(widths[1], 5, str(row["العمر الافتراضي (ساعة)"]), border=1)
-            pdf.cell(widths[2], 5, str(row["الساعات المنقضية (ساعة)"]), border=1)
-            pdf.cell(widths[3], 5, str(row["المدة المتبقية (ساعة)"]), border=1)
-            pdf.cell(widths[4], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1)
+        pdf.set_text_color(0, 0, 0)
+        
+        for i, row in df_result.iterrows():
+            fill = (i % 2 == 0)
+            pdf.set_fill_color(240, 243, 246) if fill else pdf.set_fill_color(255, 255, 255)
+            
+            pdf.cell(widths[0], 5, sanitize_latin_only(str(row["قطع الغيار / الفلاتر"]))[:28], border=1, fill=fill)
+            pdf.cell(widths[1], 5, str(row["العمر الافتراضي (ساعة)"]), border=1, align="C", fill=fill)
+            pdf.cell(widths[2], 5, str(row["الساعات المنقضية (ساعة)"]), border=1, align="C", fill=fill)
+            pdf.cell(widths[3], 5, str(row["المدة المتبقية (ساعة)"]), border=1, align="C", fill=fill)
+            pdf.cell(widths[4], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1, fill=fill)
             pdf.ln()
 
         # دمج الصور المرفوعة (المولد + القطع)
         if gen_img_file or parts_img_file:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 11)
+            pdf.set_text_color(24, 43, 73)
             pdf.cell(0, 6, "Field Images & Documentation:", ln=True)
-            y_pos = 30
+            pdf.ln(4)
+            
+            y_pos = 45
             if gen_img_file:
                 gen_path = f"temp_gen_{uuid.uuid4().hex}.jpg"
                 with open(gen_path, "wb") as f: f.write(gen_img_file.getbuffer())
-                pdf.image(gen_path, x=20, y=y_pos, w=80)
+                pdf.image(gen_path, x=15, y=y_pos, w=85)
                 os.remove(gen_path)
             if parts_img_file:
                 part_path = f"temp_part_{uuid.uuid4().hex}.jpg"
                 with open(part_path, "wb") as f: f.write(parts_img_file.getbuffer())
-                pdf.image(part_path, x=110, y=y_pos, w=80)
+                pdf.image(part_path, x=110, y=y_pos, w=85)
+                os.remove(part_path)
 
-        # تحويل المؤشرات المؤقتة (الرسوم)
+        # تحويل الرسوم البيانية لصور وإدراجها في الـ PDF
         try:
             pdf.add_page()
             pdf.set_font("Helvetica", "B", 11)
-            pdf.cell(0, 6, "Performance & Maintenance Visual Charts (Bar & Pie):", ln=True)
+            pdf.set_text_color(24, 43, 73)
+            pdf.cell(0, 6, "Performance & Maintenance Visual Analytics:", ln=True)
             
-            fig_bar_p, ax_bar_p = plt.subplots(figsize=(7, 3))
+            fig_bar_p, ax_bar_p = plt.subplots(figsize=(7, 3.2))
             p_short = [sanitize_latin_only(str(x))[:12] for x in df_result["قطع الغيار / الفلاتر"]]
             ax_bar_p.bar(p_short, df_result["الساعات المنقضية (ساعة)"].values, label="Used", color="#d9534f")
-            ax_bar_p.set_title("Parts Lifespan Chart")
+            ax_bar_p.set_title("Parts Lifespan Chart", fontsize=9, fontweight='bold', color='#182B49')
             plt.xticks(rotation=45, ha="right", fontsize=6)
             plt.tight_layout()
-            bar_path = "temp_bar.png"
+            
+            bar_path = f"temp_bar_{uuid.uuid4().hex}.png"
             plt.savefig(bar_path, dpi=200)
-            pdf.image(bar_path, x=15, y=30, w=170)
+            pdf.image(bar_path, x=15, y=45, w=180)
             os.remove(bar_path)
         except Exception:
             pass
+
+        # إزالة الشعار المؤقت إن وجد
+        if temp_logo_path and os.path.exists(temp_logo_path):
+            os.remove(temp_logo_path)
 
         pdf_out = pdf.output(dest="S")
         return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
 
     st.download_button(
-        label="🖨️ إصدار التقرير الفني الشامل (طباعة PDF + صور الأصول + الرسوم)",
+        label="🖨️ إصدار التقرير الفني الشامل (طباعة PDF + الشعار + الصور والرسوم)",
         data=generate_full_pdf_bytes(),
         file_name=f"Full_Maintenance_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
         mime="application/pdf",
@@ -349,7 +417,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
         st.subheader("📚 رفع الكتالوجات للتحليل (PDF)")
         manual_file = st.file_uploader("رفع الكتالوج اليدوي للمعدة", type=["pdf"])
         if manual_file:
-            # استخراج ونقل محتوى الكتالوج لـ session_state
             if "loaded_manual_name" not in st.session_state or st.session_state.loaded_manual_name != manual_file.name:
                 with st.spinner("جاري استخراج وقراءة الكتالوج..."):
                     try:
