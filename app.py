@@ -32,9 +32,17 @@ st.set_page_config(
     layout="wide",
 )
 
+# جلب مفتاح Gemini بأمان من الإعدادات
+gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+
+if not gemini_key and "firebase" in st.secrets:
+    gemini_key = st.secrets["firebase"].get("GEMINI_API_KEY")
+
+if not gemini_key:
+    st.warning("⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY. يرجى إضافته في st.secrets.")
+
 # تهيئة عميل Gemini API
-api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-client = genai.Client(api_key=api_key) if api_key else None
+client = genai.Client(api_key=gemini_key) if gemini_key else None
 
 @st.cache_data(ttl=3600)
 def analyze_fault_with_gemini(fault_code, context_text=""):
