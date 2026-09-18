@@ -1,33 +1,100 @@
+import re
+import pdfplumber
 import streamlit as st
-import pdfplumber # استدعاء المكتبة في بداية الملف
 
-st.title("🛠️ نظام استخراج وقراءة الكتالوجات")
+st.title("🛠️ نظام استخراج وقراءة كتالوجات DSE")
 
-uploaded_pdf = st.file_uploader("قم برفع كتالوج المعدة أو جدول الأعطال (PDF)", type=["pdf"])
+uploaded_pdf = st.file_uploader(
+    "قم برفع كتالوج المعدة أو جدول الأعطال (PDF)", type=["pdf"]
+)
+fault_code_input = st.text_input(
+    "أدخل كود العطل للاستعلام (مثال: E01, 106, High Temp):"
+)
 
 if uploaded_pdf is not None:
-    with st.spinner("جاري قراءة واستخراج بيانات الكتالوج..."):
-        full_text = ""
-        # فتح ملف الـ PDF المرفوع مباشر من الذاكرة
-        with pdfplumber.open(uploaded_pdf) as pdf:
-            for i, page in enumerate(pdf.pages):
-                # 1. استخراج النص
-                page_text = page.extract_text() or ""
-                
-                # 2. استخراج الجداول (إن وجدت) والحفاظ على تنسيق الصفوف
-                tables = page.extract_tables()
-                table_text = ""
-                for table in tables:
-                    for row in table:
-                        clean_row = [str(cell) for cell in row if cell is not None]
-                        table_text += " | ".join(clean_row) + "\n"
-                
-                full_text += f"\n--- الصفحة {i+1} ---\n" + page_text + "\n" + table_text
+    # 1. استخراج وحفظ صفحات الكتالوج في الذاكرة لتجنب إعادة القراءة مع كل بحث
+    if (
+        "catalog_pages" not in st.session_state
+        or st.session_state.get("pdf_name") != uploaded_pdf.name
+    ):
+        with st.spinner("جاري قراءة واستخراج بيانات الكتالوج..."):
+            pages_data = []
+            with pdfplumber.open(uploaded_pdf) as pdf:
+                for i, page in enumerate(pdf.pages):
+                    page_text = page.extract_text() or ""
 
-        st.success("تم استخراج البيانات بنجاح!")
-        
-        # عرض النص المستخرج أو تغذيته لنظام البحث/الذكاء الاصطناعي
-        st.text_area("محتوى الكتالوج والجداول المستخرجة:", full_text, height=300)
+                    # استخراج الجداول وتحويلها إلى أسطر نصية منظمة
+                    tables = page.extract_tables()
+                    table_text = ""
+                    for table in tables:
+                        for row in table:
+                            clean_row = [
+                                str(cell).strip()
+                                for cell in row
+                                if cell is not None
+                            ]
+                            if clean_row:
+                                table_text += " | ".join(clean_row) + "\n"
+
+                    combined_page_content = page_text + "\n" + table_text
+                    pages_data.append(
+                        {"page_num": i + 1, "content": combined_page_content}
+                    )
+
+            st.session_state.catalog_pages = pages_data
+            st.session_state.pdf_name = uploaded_pdf.name
+            st.success("✅ تم تحميل ومعالجة الكتالوج بنجاح!")
+
+    # 2. منطق تحليل وفلترة النتائج بناءً على كود العطل المدخل
+    if fault_code_input.strip():
+        search_term = fault_code_input.strip()
+        matched_results = []
+
+        # تنظيف البحث لمنع مشاكل الفواصل والشرطات
+        clean_search = re.escape(search_term)
+
+        for page in st.session_state.catalog_pages:
+            content = page["content"]
+            # البحث عن الكود في أسطر الصفحة
+            lines = content.split("\n")
+            matching_lines = [
+                line
+                for line in lines
+                if re.search(clean_search, line, re.IGNORECASE)
+            ]
+
+            if matching_lines:
+                matched_results.append(
+                    {
+                        "page": page["page_num"],
+                        "matches": "\n".join(matching_lines),
+                    }
+                )
+
+        # عرض نتيجة البحث المخصصة لكود العطل
+        st.subheader(f"🔍 نتائج التحليل لكود العطل: `{search_term}`")
+
+        if matched_results:
+            for res in matched_results:
+                with st.expander(
+                    f"📄 نتائج في الصفحة {res['page']}", expanded=True
+                ):
+                    st.code(res["matches"], language="text")
+        else:
+            st.warning(
+                f"❌ لم يتم العثور على مطابقة مباشرة للكود `{search_term}` داخل هذا الكتالوج. تأكد من كتابة الرقم بشكل صحيح."
+            )
+
+    else:
+        # إذا لم يدخل المستخدم كود عطل، يتم عرض النص الكامل مجمعاً
+        st.info("💡 أدخل كود العطل في الخانة أعلاه لفلترة النتائج، أو تصفح النص الكامل أدناه:")
+        full_text = "\n".join(
+            [
+                f"--- الصفحة {p['page_num']} ---\n" + p["content"]
+                for p in st.session_state.catalog_pages
+            ]
+        )
+        st.text_area("محتوى الكتالوج الكامل:", full_text, height=300)
 
 import os
 import re
