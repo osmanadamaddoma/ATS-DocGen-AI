@@ -1,22 +1,46 @@
 import os
 import re
+import json
+import uuid
+import urllib.parse
+from datetime import datetime, timedelta
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import plotly.express as px
+from PIL import Image
+from bs4 import BeautifulSoup
+import requests
+from fpdf import FPDF
+import firebase_admin
+from firebase_admin import credentials, firestore
+import pdfplumber
 import streamlit as st
 from google import genai
 
-# ==========================================
-# 1. تهيئة عميل Gemini API
-# ==========================================
+# محاولة استيراد مكتبة قراءة الباركود
+try:
+    from pyzbar.pyzbar import decode as decode_qr
+except ImportError:
+    decode_qr = None
+
+# =========================================================
+# 0. إعدادات الصفحة الرئيسية وتهيئة الذكاء الاصطناعي
+# =========================================================
+st.set_page_config(
+    page_title="المجمع الصناعي الشامل - Addoma Trading Services",
+    layout="wide",
+)
+
+# تهيئة عميل Gemini API
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key) if api_key else None
 
-# ==========================================
-# 2. دالة التحليل عبر Gemini API (تخزين مؤقت للتوفير)
-# ==========================================
 @st.cache_data(ttl=3600)
 def analyze_fault_with_gemini(fault_code, context_text=""):
     """دالة استدعاء الذكاء الاصطناعي لتشخيص الأعطال المعقدة والغريبة"""
     if not client:
-        return "⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY. يرجى إضافته في st.secrets."
+        return "⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY. يرجى إضافته في st.secrets أو متغيّرات البيئة."
 
     prompt = f"""
     أنت خبير صيانة مهندس واستشاري صناعي متخصص في المولدات لوحات DSE (مثل DSE 7320 و DSE 8610 MKII) ومحركات Perkins و Cummins وأجهزة التبريد.
@@ -44,138 +68,6 @@ def analyze_fault_with_gemini(fault_code, context_text=""):
         return response.text
     except Exception as e:
         return f"❌ حدث خطأ أثناء التواصل مع الذكاء الاصطناعي: {str(e)}"
-
-# ==========================================
-# 3. واجهة زر التحليل الشاملة
-# ==========================================
-fault_input = st.text_input(
-    "أدخل كود العطل أو اسم الإنذار:",
-    value="Over Current",
-    key="fault_search_input",
-)
-
-if st.button("🔍 تحليل العطل بالذكاء الاصطناعي", key="btn_analyze"):
-    # 1. تنظيف النص المكتوب
-    clean_fault = fault_input.strip()
-
-    if not clean_fault:
-        st.warning("⚠️ يرجى كتابة كود العطل أولاً.")
-    else:
-        st.info("🌟 (Addoma Trading Services) جاري معالجة طلبك وفحص البيانات...")
-
-        # 2. البحث داخل صفحات الكتالوج المرفوع (إن وجد في الجلسة)
-        catalog_context = ""
-        if "catalog_pages" in st.session_state:
-            search_query = re.escape(clean_fault)
-            found_lines = []
-
-            for page in st.session_state.catalog_pages:
-                for line in page["content"].split("\n"):
-                    if re.search(search_query, line, re.IGNORECASE):
-                        found_lines.append(f"(صفحة {page['page_num']}): {line.strip()}")
-
-            if found_lines:
-                catalog_context = "\n".join(found_lines[:6])
-
-        st.markdown("---")
-        st.markdown(f"### 📋 تقرير التشخيص الفوري: `{clean_fault}`")
-
-        # عرض نصوص الكتالوج عند إيجاد مطابقة
-        if catalog_context:
-            st.success("✅ تم العثور على مقتطفات مطابقة داخل الكتالوج المرفوع:")
-            st.code(catalog_context, language="text")
-        else:
-            st.caption(f"لم يتم العثور على مطابقة لفظية مباشرة للرمز '{clean_fault}' في الكتالوج المرفوع.")
-
-        # 3. القاعدة المحلية للأعطال الشائعة
-        f = clean_fault.lower()
-        has_local_match = False
-
-        st.markdown("**التوجيهات الميدانية السريعة:**")
-
-        if any(k in f for k in ["current", "over current", "overcurrent", "oc", "over load", "overload", "kw", "kva"]):
-            st.write("• **طبيعة المشكلة:** ارتفاع التيار المسحوب أو وجود حمل زائد/شورت ماس على إحدى الفازات.")
-            st.write("• **الخطوات:** 1. إعادة توزيع الأحمال على الفازات الثلاث. 2. فحص محولات التيار (CTs) ونسب المعايرة في DSE. 3. قياس امبير الحمل بساعة خارجية (Clamp Meter).")
-            has_local_match = True
-
-        elif any(k in f for k in ["speed", "rpm", "under speed", "over speed", "low speed", "high speed", "freq", "hz"]):
-            st.write("• **طبيعة المشكلة:** خلل في سرعة دوران المحرك أو ضبط التردد.")
-            st.write("• **الخطوات:** 1. تنظيف مستشعر السرعة (MPU) وإعادة معايرة الفجوة. 2. فحص منظم السرعة (Governor) والأكتويتر. 3. فحص خطوط الوقود وفلاتر الديزل.")
-            has_local_match = True
-
-        elif any(k in f for k in ["voltage", "volt", "under volt", "over volt", "low volt", "high volt"]):
-            st.write("• **طبيعة المشكلة:** انخفاض أو ارتفاع الجهد المولد عن الحدود المسموحة.")
-            st.write("• **الخطوات:** 1. فحص كارت كبح/تنظيم الجهد (AVR). 2. ضبط المقاومة المتغيرة للجهد. 3. فحص كابلات الإحساس (Sensing) والديودات.")
-            has_local_match = True
-
-        elif any(k in f for k in ["oil", "press", "low oil", "oil pressure", "lop"]):
-            st.write("• **طبيعة المشكلة:** انخفاض ضغط زيت المحرك أو عطل مستشعر الضغط.")
-            st.write("• **الخطوات:** 1. قياس مستوى الزيت في الكارتير. 2. قياس الضغط بساعة ميكانيكية خارجية. 3. فحص استمرارية أسطوانة الحساس والتأريض.")
-            has_local_match = True
-
-        elif any(k in f for k in ["temp", "coolant", "high temp", "water", "hwt", "radiator"]):
-            st.write("• **طبيعة المشكلة:** ارتفاع حرارة سائل التبريد أو انخفاض مستواه.")
-            st.write("• **الخطوات:** 1. التأكد من مستوى السائل وسيور المروحة. 2. فحص الثيرموستات وانسداد الراديتر. 3. فحص كابلات حساس الحرارة.")
-            has_local_match = True
-
-        elif any(k in f for k in ["fail to start", "start fail", "crank", "fail to stop", "stop fail"]):
-            st.write("• **طبيعة المشكلة:** فشل المحرك في الدوران أو الاستجابة لأمر التشغيل/الإيقاف.")
-            st.write("• **الخطوات:** 1. فحص ريليه التشغيل وسولينويد الديزل. 2. فحص قوة البطاريات والمارش. 3. فحص وصول الديزل للمضخة.")
-            has_local_match = True
-
-        elif any(k in f for k in ["battery", "charge", "charge alt", "low battery", "high battery"]):
-            st.write("• **طبيعة المشكلة:** عدم شحن البطارية أو خلل في دينامو الشحن المحلي.")
-            st.write("• **الخطوات:** 1. فحص سير الدينامو وتوصيلة الطرف (WL/D+). 2. قياس الجهد على أطراف البطارية أثناء التشغيل.")
-            has_local_match = True
-
-        elif any(k in f for k in ["breaker", "contactor", "ats", "fail to close", "fail to open"]):
-            st.write("• **طبيعة المشكلة:** فشل قاطع التغذية أو الكونتاكتور في الفتح أو الإغلاق.")
-            st.write("• **الخطوات:** 1. فحص ملف المساعد (Auxiliary Switch). 2. التأكد من جهد إشارة التوصيل من DSE. 3. فحص الوقاية الميكانيكية.")
-            has_local_match = True
-
-        elif any(k in f for k in ["emergency", "e-stop", "estop", "stop button"]):
-            st.write("• **طبيعة المشكلة:** تفعيل زر الإيقاف في الطوارئ أو انقطاع دائرة التغذية عنه.")
-            st.write("• **الخطوات:** 1. إعادة إرجاع مفتاح الطوارئ الفيزيائي. 2. فحص الدخل (Input) خلف اللوحة ورقم النقطة في DSE.")
-            has_local_match = True
-
-        # 4. التوليد عبر الذكاء الاصطناعي (عند عدم وجود عطل شائعة أو للحصول على تحليل أعمق)
-        st.markdown("---")
-        st.markdown("🤖 **تحليل التقرير العميق عبر الذكاء الاصطناعي (Gemini):**")
-        with st.spinner("جاري استخلاص التوصيات من نموذج Gemini API..."):
-            ai_analysis = analyze_fault_with_gemini(clean_fault, catalog_context)
-            st.markdown(ai_analysis)
-
-import os
-import re
-import json
-import uuid
-import urllib.parse
-from datetime import datetime, timedelta
-
-import pandas as pd
-import matplotlib.pyplot as plt
-import plotly.express as px
-from PIL import Image
-from bs4 import BeautifulSoup
-import requests
-from fpdf import FPDF
-import firebase_admin
-from firebase_admin import credentials, firestore
-import streamlit as st
-
-# محاولة استيراد مكتبة قراءة الباركود
-try:
-    from pyzbar.pyzbar import decode as decode_qr
-except ImportError:
-    decode_qr = None
-
-# =========================================================
-# 0. إعدادات الصفحة الرئيسية
-# =========================================================
-st.set_page_config(
-    page_title="المجمع الصناعي الشامل - Addoma Trading Services",
-    layout="wide",
-)
 
 # =========================================================
 # 1. دوال النظام المساعدة (تنظيف النصوص، إنشاء PDF)
@@ -427,7 +319,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     )
 
 # =========================================================
-# التطبيق 2: المساعد الذكي والكتالوجات (مدمج)
+# التطبيق 2: المساعد الذكي والكتالوجات (مدمج ومتطور)
 # =========================================================
 elif selected_app == "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد":
     st.info(f"🔹 **العميل الحالي:** {client_name} | **نوع الاشتراك:** {plan_type}")
@@ -437,41 +329,129 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
     with col_files1:
         st.subheader("📚 رفع الكتالوجات للتحليل (PDF)")
         manual_file = st.file_uploader("رفع الكتالوج اليدوي للمعدة", type=["pdf"])
+        if manual_file:
+            # استخراج ونقل محتوى الكتالوج لـ session_state
+            if "loaded_manual_name" not in st.session_state or st.session_state.loaded_manual_name != manual_file.name:
+                with st.spinner("جاري استخراج وقراءة الكتالوج..."):
+                    try:
+                        catalog_pages = []
+                        with pdfplumber.open(manual_file) as pdf:
+                            for i, page in enumerate(pdf.pages):
+                                text = page.extract_text() or ""
+                                catalog_pages.append({"page_num": i + 1, "content": text})
+                        st.session_state.catalog_pages = catalog_pages
+                        st.session_state.loaded_manual_name = manual_file.name
+                        st.success(f"✅ تم حفظ وقراءة {len(catalog_pages)} صفحة من الكتالوج بنجاح!")
+                    except Exception as e:
+                        st.error(f"❌ تعذر قراءة ملف PDF: {e}")
+
     with col_files2:
         st.subheader("📷 قراءة أكواد الأعطال (شاشات/DSE)")
         fault_image = st.file_uploader("رفع صورة العطل من شاشة المولد/الآلة", type=["png", "jpg", "jpeg"])
         fault_cam = st.camera_input("📸 أو التقط صورة للشاشة")
 
     st.divider()
-    st.subheader("💬 نافذة تحليل الأعطال المباشر")
-    fault_code_input = st.text_input("أدخل كود العطل أو وصف المشكلة (مثلاً: DSE 8610 Error / Oil Low):")
 
-    if st.button("تحليـل العطل بالذكاء الاصطناعي 🔍", use_container_width=True):
-        st.success(f"🌟 جارٍ المعالجة للعميل (**{client_name}**)...")
-        
-        if manual_file:
-            st.info(f"📁 **تم إرفاق الكتالوج:** {manual_file.name} (سيتم مطابقة البيانات معه).")
-            
-        target_fault_img = fault_image or fault_cam
-        if target_fault_img:
-            img_obj = Image.open(target_fault_img)
-            st.image(img_obj, caption="صورة الشاشة / الكود المرفوعة", width=400)
-            if decode_qr:
-                try:
-                    decoded = decode_qr(img_obj)
-                    if decoded:
-                        st.success(f"📟 **كود QR مقروء:** `{decoded[0].data.decode('utf-8')}`")
-                except:
-                    pass
+    # 1. مدخل كود العطل
+    fault_input = st.text_input(
+        "أدخل كود العطل أو اسم الإنذار (مثلاً: Over Current / DSE 8610 Error / Oil Low):",
+        value="Over Current",
+        key="fault_search_input",
+    )
 
-        st.markdown(f"### 📋 تقرير التشخيص الفوري: `{fault_code_input or 'اعتماداً على الصورة/الكتالوج'}`")
-        st.markdown("""
-        * **طبيعة المشكلة المحتملة:** قراءة غير اعتيادية من المستشعرات (ضغط زيت أو حرارة محرك) أو خلل في برمجة وحدة التحكم (مثل DSE Controllers).
-        * **التوجيهات الفنية:**
-          1. مطابقة الكود المدخل أو الرمز البصري مع جدول الأعطال في الكتالوج المرفق.
-          2. فحص أطراف التوصيل (Wiring) وحالة الحساسات بناءً على الصورة والمخرجات.
-          3. إعادة الضبط (Reset) والتحقق من التغذية الكهربائية لدوائر التحكم.
-        """)
+    if st.button("🔍 تحليل العطل بالذكاء الاصطناعي", key="btn_analyze", use_container_width=True):
+        clean_fault = fault_input.strip()
+
+        if not clean_fault:
+            st.warning("⚠️ يرجى كتابة كود العطل أو الإنذار أولاً.")
+        else:
+            st.info(f"🌟 (Addoma Trading Services) جاري معالجة طلب العميل: {client_name}...")
+
+            target_fault_img = fault_image or fault_cam
+            if target_fault_img:
+                img_obj = Image.open(target_fault_img)
+                st.image(img_obj, caption="صورة العطل المرفوعة", width=350)
+                if decode_qr:
+                    try:
+                        decoded = decode_qr(img_obj)
+                        if decoded:
+                            st.success(f"📟 **كود QR/Barcode مقروء:** `{decoded[0].data.decode('utf-8')}`")
+                    except Exception:
+                        pass
+
+            # 2. البحث داخل صفحات الكتالوج المرفوع (إن وجد)
+            catalog_context = ""
+            if "catalog_pages" in st.session_state:
+                search_query = re.escape(clean_fault)
+                found_lines = []
+
+                for page in st.session_state.catalog_pages:
+                    for line in page["content"].split("\n"):
+                        if re.search(search_query, line, re.IGNORECASE):
+                            found_lines.append(f"(صفحة {page['page_num']}): {line.strip()}")
+
+                if found_lines:
+                    catalog_context = "\n".join(found_lines[:8])
+
+            st.markdown("---")
+            st.markdown(f"### 📋 تقرير التشخيص الفوري: `{clean_fault}`")
+
+            if catalog_context:
+                st.success("✅ تم العثور على المقتطفات التالية داخل الكتالوج المرفوع:")
+                st.code(catalog_context, language="text")
+            else:
+                st.caption(f"لم يتم العثور على نص مطابِق تماماً للرمز '{clean_fault}' داخل صفحات الكتالوج المرفوع.")
+
+            # 3. القاعدة السريعة للأعطال الشائعة
+            st.markdown("**التوجيهات الميدانية السريعة:**")
+            f = clean_fault.lower()
+
+            if any(k in f for k in ["current", "over current", "overcurrent", "oc", "over load", "overload", "kw", "kva"]):
+                st.write("• **طبيعة المشكلة:** ارتفاع التيار المسحوب أو وجود حمل زائد/شورت ماس على إحدى الفازات.")
+                st.write("• **الخطوات:** 1. التوزيع المتوازن للأحمال على الفازات الثلاث (R, S, T). 2. فحص محولات التيار (CTs) ومعايرة النسب في DSE. 3. قياس امبير الحمل بساعة أمبير خارجية (Clamp Meter).")
+
+            elif any(k in f for k in ["speed", "rpm", "under speed", "over speed", "low speed", "high speed", "freq", "hz", "under freq", "over freq"]):
+                st.write("• **طبيعة المشكلة:** خلل في سرعة دوران المحرك أو ضبط التردد (50Hz / 60Hz).")
+                st.write("• **الخطوات:** 1. تنظيف مستشعر السرعة (MPU) وإعادة معايرة الفجوة. 2. فحص منظم السرعة (Governor) والأكتويتر. 3. فحص فلتر الديزل ونظام الوقود.")
+
+            elif any(k in f for k in ["voltage", "volt", "under volt", "over volt", "low volt", "high volt"]):
+                st.write("• **طبيعة المشكلة:** انخفاض أو ارتفاع الجهد المولد عن الحدود التشغيلية المسموحة.")
+                st.write("• **الخطوات:** 1. فحص كارت منظم الجهد (AVR). 2. ضبط المقاومة المتغيرة للجهد. 3. فحص كابلات الإحساس (Sensing) والديودات.")
+
+            elif any(k in f for k in ["oil", "press", "low oil", "oil pressure", "lop"]):
+                st.write("• **طبيعة المشكلة:** انخفاض ضغط زيت المحرك أو عطل مستشعر الضغط.")
+                st.write("• **الخطوات:** 1. قياس مستوى الزيت الفيزيائي. 2. قياس الضغط بساعة خارجية. 3. فحص أسلاك وتأريض الحساس.")
+
+            elif any(k in f for k in ["temp", "coolant", "high temp", "water", "hwt", "radiator"]):
+                st.write("• **طبيعة المشكلة:** ارتفاع حرارة سائل التبريد أو انخفاض مستواه.")
+                st.write("• **الخطوات:** 1. التأكد من مستوى السائل وسيور المروحة. 2. فحص الثيرموستات وانسداد الراديتر. 3. فحص حساس الحرارة.")
+
+            elif any(k in f for k in ["fail to start", "start fail", "crank", "fail to stop", "stop fail"]):
+                st.write("• **طبيعة المشكلة:** فشل المحرك في الدوران أو الاستجابة لأمر التشغيل/الإيقاف.")
+                st.write("• **الخطوات:** 1. فحص ريليه التشغيل وسولينويد الديزل. 2. فحص قوة البطاريات والمارش. 3. فحص خطوط الوقود.")
+
+            elif any(k in f for k in ["battery", "charge", "charge alt", "low battery", "high battery"]):
+                st.write("• **طبيعة المشكلة:** عدم شحن البطارية أو خلل في دينامو الشحن.")
+                st.write("• **الخطوات:** 1. فحص سير الدينامو وتوصيلة الطرف (WL/D+). 2. قياس الجهد على أطراف البطارية أثناء التشغيل.")
+
+            elif any(k in f for k in ["breaker", "contactor", "ats", "fail to close", "fail to open"]):
+                st.write("• **طبيعة المشكلة:** فشل قاطع التغذية أو الكونتاكتور في الفتح أو الإغلاق.")
+                st.write("• **الخطوات:** 1. فحص ملف المساعد (Auxiliary Switch). 2. التأكد من جهد إشارة التوصيل من DSE. 3. فحص الوقاية الميكانيكية للقاطع.")
+
+            elif any(k in f for k in ["emergency", "e-stop", "estop", "stop button"]):
+                st.write("• **طبيعة المشكلة:** تفعيل زر الإيقاف في الطوارئ أو انقطاع دائرة التغذية عنه.")
+                st.write("• **الخطوات:** 1. إعادة إرجاع مفتاح الطوارئ الفيزيائي. 2. فحص الدخل (Input) خلف اللوحة ورقم النقطة في DSE.")
+
+            else:
+                st.write(f"• **طبيعة المشكلة:** إنذار تشغيلي/تحذيري برمز `{clean_fault}`.")
+                st.write("• **الخطوات:** 1. مراجعة القائمة التشخيصية للكتالوج. 2. إعادة ضبط الإنذار (Reset). 3. فحص أسلاك الدخل والخرج المبرمجة.")
+
+            # 4. التوليد والتحليل العميق عبر الذكاء الاصطناعي (Gemini)
+            st.markdown("---")
+            st.markdown("🤖 **تحليل التقرير العميق عبر الذكاء الاصطناعي (Gemini):**")
+            with st.spinner("جاري استخلاص التوصيات الهندسية من نموذج Gemini API..."):
+                ai_analysis = analyze_fault_with_gemini(clean_fault, catalog_context)
+                st.markdown(ai_analysis)
 
 # =========================================================
 # التطبيق 3: الفحص البصري للمعدات
@@ -479,7 +459,6 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
 elif selected_app == "🔍 3. نظام فحص المعدات (WIC وغيرها)":
     st.title("🔍 نظام الفحص والمقارنة البصرية لقطع الغيار والمعدات")
     
-    # تحديث دقيق لأنظمة التبريد
     eq_type = st.selectbox("اختر المعدة المراد فحصها:", [
         "مولد ديزل صناعي", 
         "غرف تبريد وتجميد WIC 10 و WIC 40", 
