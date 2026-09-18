@@ -2,11 +2,14 @@ import re
 import pdfplumber
 import streamlit as st
 
-# 1. إدخال كود العطل
-fault_input = st.text_input("أدخل كود العطل أو اسم الإنذار:", value="Low Voltage")
+# 1. مدخل كود العطل
+fault_input = st.text_input(
+    "أدخل كود العطل أو اسم الإنذار:",
+    value="Low Speed",
+    key="fault_search_input",
+)
 
-# 2. زر التحليل الديناميكي
-if st.button("🔍 تحليل العطل بالذكاء الاصطناعي"):
+if st.button("🔍 تحليل العطل بالذكاء الاصطناعي", key="btn_analyze"):
     if not fault_input.strip():
         st.warning("⚠️ يرجى كتابة كود العطل أولاً.")
     else:
@@ -16,7 +19,7 @@ if st.button("🔍 تحليل العطل بالذكاء الاصطناعي"):
 
         matched_info = ""
 
-        # البحث داخل الكتالوج المرفوع والمحفوظ في session_state
+        # البحث داخل صفحات الكتالوج المرفوع
         if "catalog_pages" in st.session_state:
             search_query = re.escape(fault_input.strip())
             found_lines = []
@@ -29,51 +32,144 @@ if st.button("🔍 تحليل العطل بالذكاء الاصطناعي"):
                         )
 
             if found_lines:
-                matched_info = "\n".join(found_lines[:5])  # أخذ أول 5 نتائج
+                matched_info = "\n".join(found_lines[:8])
 
-        # عرض التقرير الديناميكي بناءً على المدخلات والكتالوج
         st.markdown("---")
         st.markdown(f"### 📋 تقرير التشخيص الفوري: `{fault_input}`")
 
         if matched_info:
-            st.success("✅ تم العثور على التفاصيل التالية داخل الكتالوج:")
+            st.success("✅ تم العثور على النصوص التالية داخل الكتالوج المرفوع:")
             st.code(matched_info, language="text")
         else:
             st.warning(
-                f"لم يتم العثور على مطابقة رقمية مباشرة للكود '{fault_input}' في صفحات الكتالوج."
+                f"لم يتم العثور على نص مطابِق تماماً للرمز '{fault_input}' داخل صفحات الكتالوج المرفوع."
             )
 
-        # التوجيهات التشغيلية المخصصة حسب نوع العطل
+        # 2. القاعدة المحدثة الشاملة لتغطية كافة أعطال DSE والمولدات
         st.markdown("**طبيعة المشكلة والتوجيهات الفنية:**")
+        f = fault_input.lower().strip()
 
-        fault_lower = fault_input.lower()
-        if "voltage" in fault_lower or "volt" in fault_lower:
+        # أ. أعطال السرعة والتردد (Speed & Frequency)
+        if any(
+            k in f
+            for k in [
+                "speed",
+                "rpm",
+                "under speed",
+                "over speed",
+                "low speed",
+                "high speed",
+            ]
+        ):
             st.write(
-                "• **طبيعة المشكلة:** انخفاض أو ارتفاع الجهد الكهربائي عن الحدود المسموحة (AVR/Alternator)."
+                "• **طبيعة المشكلة:** خلل في قراءة السرعة أو منظم السرعة الإلكتروني (Magnetic Pick-Up / Governor)."
             )
             st.write(
-                "• **الخطوات:** 1. فحص منظم الجهد التلقائي (AVR). 2. التأكد من سرعة المحرك (RPM/Hz). 3. فحص أسلاك الحساسات."
+                "• **الخطوات:** 1. تنظيف مستشعر السرعة (MPU) من الرايش المغناطيسي ومعايرة الفجوة. 2. فحص إشارة التردد من الدينامو. 3. فحص أسلاك وأوامر الأكتويتر (Actuator)."
             )
-        elif "oil" in fault_lower or "press" in fault_lower:
+
+        # ب. أعطال الجهد والكهرباء (Voltage & AVR)
+        elif any(
+            k in f
+            for k in [
+                "voltage",
+                "volt",
+                "under volt",
+                "over volt",
+                "low volt",
+                "high volt",
+            ]
+        ):
             st.write(
-                "• **طبيعة المشكلة:** خلل في منظومة ضغط الزيت (Oil Pressure Sensor/Pump)."
+                "• **طبيعة المشكلة:** انخفاض أو ارتفاع جهد المولد عن الحدود التشغيلية المسموحة."
             )
             st.write(
-                "• **الخطوات:** 1. التحقق من مستوى الزيت الفيزيائي. 2. فحص حساس ضغط الزيت والأسلاك. 3. استبدال فلتر الزيت."
+                "• **الخطوات:** 1. فحص كارت كبح الجهد (AVR). 2. ضبط أواني معايرة الجهد (VOLT Trimmer). 3. فحص كابلات الإحساس (Sensing) وديودات التوحيد (Diodes)."
             )
-        elif "temp" in fault_lower or "coolant" in fault_lower:
+
+        # ج. أعطال الزيت والضغط (Oil Pressure)
+        elif any(
+            k in f
+            for k in ["oil", "press", "low oil", "oil pressure", "lop"]
+        ):
             st.write(
-                "• **طبيعة المشكلة:** ارتفاع حرارة سائل التبريد (Coolant Temperature)."
+                "• **طبيعة المشكلة:** انخفاض ضغط زيت المحرك أو عطل مستشعر الضغط (Pressure Switch/Sender)."
             )
             st.write(
-                "• **الخطوات:** 1. فحص مستوى ماء الراديتر وسيور المروحة. 2. فحص حساس الحرارة الثيرموستات."
+                "• **الخطوات:** 1. قياس مستوى الزيت في الكارتير. 2. قياس الضغط بساعة ميكانيكية خارجية. 3. فحص استمرارية أسطوانة الحساس وتأريض المحرك."
             )
+
+        # د. أعطال الحرارة وسوائل التبريد (Temperature & Coolant)
+        elif any(
+            k in f
+            for k in [
+                "temp",
+                "coolant",
+                "high temp",
+                "water",
+                "hwt",
+                "radiator",
+            ]
+        ):
+            st.write(
+                "• **طبيعة المشكلة:** ارتفاع حرارة سائل التبريد أو انخفاض مستواه في الراديتر."
+            )
+            st.write(
+                "• **الخطوات:** 1. التأكد من مستوى السائل وسيور المروحة. 2. فحص الثيرموستات وانسداد خطوط الراديتر. 3. فحص كابلات حساس الحرارة."
+            )
+
+        # هـ. أعطال التبديل والتشغيل (Start / Crank / Stop)
+        elif any(
+            k in f
+            for k in [
+                "fail to start",
+                "start fail",
+                "crank",
+                "fail to stop",
+                "stop fail",
+            ]
+        ):
+            st.write(
+                "• **طبيعة المشكلة:** فشل المحرك في الدوران أو الاستجابة لأمر التشغيل/الإيقاف."
+            )
+            st.write(
+                "• **الخطوات:** 1. فحص ريليه التشغيل (Crank Relay) وسولينويد الديزل (Fuel Solenoid). 2. التأكد من قوة البطاريات والمارش (Starter Motor). 3. فحص وصول الديزل للمضخة."
+            )
+
+        # و. أعطال البطارية ودينامو الشحن (Battery & Charge Alt)
+        elif any(
+            k in f
+            for k in [
+                "battery",
+                "charge",
+                "charge alt",
+                "low battery",
+                "high battery",
+            ]
+        ):
+            st.write(
+                "• **طبيعة المشكلة:** عدم شحن البطارية أو خلل في دينامو الشحن المحلي (Charge Alternator)."
+            )
+            st.write(
+                "• **الخطوات:** 1. فحص سير الدينامو وتوصيلة الطرف (WL/D+). 2. قياس الجهد على أطراف البطارية أثناء التشغيل (يجب أن يكون 26V-28V لنظام 24V)."
+            )
+
+        # ز. أعطال الطوارئ والتوقف الفوري (Emergency Stop)
+        elif any(k in f for k in ["emergency", "e-stop", "estop", "stop button"]):
+            st.write(
+                "• **طبيعة المشكلة:** تفعيل زر الإيقاف في الطوارئ أو انقطاع دائرة التغذية الموجبة عنه."
+            )
+            st.write(
+                "• **الخطوات:** 1. التأكد من إرجاع مفتاح الطوارئ الفيزيائي لخطيته. 2. فحص الدخل (Input) لزر الطوارئ خلف اللوحة ورقم النقطة في DSE."
+            )
+
+        # ح. الأعطال غير المسجلة بالقاعدة
         else:
             st.write(
-                f"• **طبيعة المشكلة:** إنذار تشغيلي خاص بالرمز `{fault_input}`."
+                f"• **طبيعة المشكلة:** إنذار تشغيلي/تحذيري برمز `{fault_input}`."
             )
             st.write(
-                "• **الخطوات:** مطابقة الرمز مع جداول الأعطال المرفقة واختبار دوائر الدخل/الخرج لوحدة التحكم DSE."
+                "• **الخطوات:** 1. مراجعة القائمة التشخيصية للكتالوج. 2. إعادة ضبط الإنذار (Reset). 3. فحص أسلاك الدخل والخرج المبرمجة (Auxiliary Inputs/Outputs)."
             )
 
 import os
