@@ -2,99 +2,79 @@ import re
 import pdfplumber
 import streamlit as st
 
-st.title("🛠️ نظام استخراج وقراءة كتالوجات DSE")
+# 1. إدخال كود العطل
+fault_input = st.text_input("أدخل كود العطل أو اسم الإنذار:", value="Low Voltage")
 
-uploaded_pdf = st.file_uploader(
-    "قم برفع كتالوج المعدة أو جدول الأعطال (PDF)", type=["pdf"]
-)
-fault_code_input = st.text_input(
-    "أدخل كود العطل للاستعلام (مثال: E01, 106, High Temp):"
-)
+# 2. زر التحليل الديناميكي
+if st.button("🔍 تحليل العطل بالذكاء الاصطناعي"):
+    if not fault_input.strip():
+        st.warning("⚠️ يرجى كتابة كود العطل أولاً.")
+    else:
+        st.info(
+            "🌟 (Addoma Trading Services) جاري المعالجة للعميل عثمان آدم أدومة..."
+        )
 
-if uploaded_pdf is not None:
-    # 1. استخراج وحفظ صفحات الكتالوج في الذاكرة لتجنب إعادة القراءة مع كل بحث
-    if (
-        "catalog_pages" not in st.session_state
-        or st.session_state.get("pdf_name") != uploaded_pdf.name
-    ):
-        with st.spinner("جاري قراءة واستخراج بيانات الكتالوج..."):
-            pages_data = []
-            with pdfplumber.open(uploaded_pdf) as pdf:
-                for i, page in enumerate(pdf.pages):
-                    page_text = page.extract_text() or ""
+        matched_info = ""
 
-                    # استخراج الجداول وتحويلها إلى أسطر نصية منظمة
-                    tables = page.extract_tables()
-                    table_text = ""
-                    for table in tables:
-                        for row in table:
-                            clean_row = [
-                                str(cell).strip()
-                                for cell in row
-                                if cell is not None
-                            ]
-                            if clean_row:
-                                table_text += " | ".join(clean_row) + "\n"
+        # البحث داخل الكتالوج المرفوع والمحفوظ في session_state
+        if "catalog_pages" in st.session_state:
+            search_query = re.escape(fault_input.strip())
+            found_lines = []
 
-                    combined_page_content = page_text + "\n" + table_text
-                    pages_data.append(
-                        {"page_num": i + 1, "content": combined_page_content}
-                    )
+            for page in st.session_state.catalog_pages:
+                for line in page["content"].split("\n"):
+                    if re.search(search_query, line, re.IGNORECASE):
+                        found_lines.append(
+                            f"(صفحة {page['page_num']}): {line.strip()}"
+                        )
 
-            st.session_state.catalog_pages = pages_data
-            st.session_state.pdf_name = uploaded_pdf.name
-            st.success("✅ تم تحميل ومعالجة الكتالوج بنجاح!")
+            if found_lines:
+                matched_info = "\n".join(found_lines[:5])  # أخذ أول 5 نتائج
 
-    # 2. منطق تحليل وفلترة النتائج بناءً على كود العطل المدخل
-    if fault_code_input.strip():
-        search_term = fault_code_input.strip()
-        matched_results = []
+        # عرض التقرير الديناميكي بناءً على المدخلات والكتالوج
+        st.markdown("---")
+        st.markdown(f"### 📋 تقرير التشخيص الفوري: `{fault_input}`")
 
-        # تنظيف البحث لمنع مشاكل الفواصل والشرطات
-        clean_search = re.escape(search_term)
-
-        for page in st.session_state.catalog_pages:
-            content = page["content"]
-            # البحث عن الكود في أسطر الصفحة
-            lines = content.split("\n")
-            matching_lines = [
-                line
-                for line in lines
-                if re.search(clean_search, line, re.IGNORECASE)
-            ]
-
-            if matching_lines:
-                matched_results.append(
-                    {
-                        "page": page["page_num"],
-                        "matches": "\n".join(matching_lines),
-                    }
-                )
-
-        # عرض نتيجة البحث المخصصة لكود العطل
-        st.subheader(f"🔍 نتائج التحليل لكود العطل: `{search_term}`")
-
-        if matched_results:
-            for res in matched_results:
-                with st.expander(
-                    f"📄 نتائج في الصفحة {res['page']}", expanded=True
-                ):
-                    st.code(res["matches"], language="text")
+        if matched_info:
+            st.success("✅ تم العثور على التفاصيل التالية داخل الكتالوج:")
+            st.code(matched_info, language="text")
         else:
             st.warning(
-                f"❌ لم يتم العثور على مطابقة مباشرة للكود `{search_term}` داخل هذا الكتالوج. تأكد من كتابة الرقم بشكل صحيح."
+                f"لم يتم العثور على مطابقة رقمية مباشرة للكود '{fault_input}' في صفحات الكتالوج."
             )
 
-    else:
-        # إذا لم يدخل المستخدم كود عطل، يتم عرض النص الكامل مجمعاً
-        st.info("💡 أدخل كود العطل في الخانة أعلاه لفلترة النتائج، أو تصفح النص الكامل أدناه:")
-        full_text = "\n".join(
-            [
-                f"--- الصفحة {p['page_num']} ---\n" + p["content"]
-                for p in st.session_state.catalog_pages
-            ]
-        )
-        st.text_area("محتوى الكتالوج الكامل:", full_text, height=300)
+        # التوجيهات التشغيلية المخصصة حسب نوع العطل
+        st.markdown("**طبيعة المشكلة والتوجيهات الفنية:**")
+
+        fault_lower = fault_input.lower()
+        if "voltage" in fault_lower or "volt" in fault_lower:
+            st.write(
+                "• **طبيعة المشكلة:** انخفاض أو ارتفاع الجهد الكهربائي عن الحدود المسموحة (AVR/Alternator)."
+            )
+            st.write(
+                "• **الخطوات:** 1. فحص منظم الجهد التلقائي (AVR). 2. التأكد من سرعة المحرك (RPM/Hz). 3. فحص أسلاك الحساسات."
+            )
+        elif "oil" in fault_lower or "press" in fault_lower:
+            st.write(
+                "• **طبيعة المشكلة:** خلل في منظومة ضغط الزيت (Oil Pressure Sensor/Pump)."
+            )
+            st.write(
+                "• **الخطوات:** 1. التحقق من مستوى الزيت الفيزيائي. 2. فحص حساس ضغط الزيت والأسلاك. 3. استبدال فلتر الزيت."
+            )
+        elif "temp" in fault_lower or "coolant" in fault_lower:
+            st.write(
+                "• **طبيعة المشكلة:** ارتفاع حرارة سائل التبريد (Coolant Temperature)."
+            )
+            st.write(
+                "• **الخطوات:** 1. فحص مستوى ماء الراديتر وسيور المروحة. 2. فحص حساس الحرارة الثيرموستات."
+            )
+        else:
+            st.write(
+                f"• **طبيعة المشكلة:** إنذار تشغيلي خاص بالرمز `{fault_input}`."
+            )
+            st.write(
+                "• **الخطوات:** مطابقة الرمز مع جداول الأعطال المرفقة واختبار دوائر الدخل/الخرج لوحدة التحكم DSE."
+            )
 
 import os
 import re
