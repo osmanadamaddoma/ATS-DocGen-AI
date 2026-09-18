@@ -2,6 +2,7 @@ import os
 import re
 import json
 import uuid
+import time
 import urllib.parse
 from datetime import datetime, timedelta
 
@@ -46,7 +47,7 @@ client = genai.Client(api_key=gemini_key) if gemini_key else None
 
 @st.cache_data(ttl=3600)
 def analyze_fault_with_gemini(fault_code, context_text=""):
-    """دالة استدعاء الذكاء الاصطناعي لتشخيص الأعطال المعقدة والغريبة"""
+    """دالة استدعاء الذكاء الاصطناعي مع معالجة حزمة الضغط العالي (503) وإعادة المحاولة"""
     if not client:
         return "⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY. يرجى إضافته في st.secrets أو متغيّرات البيئة."
 
@@ -68,15 +69,24 @@ def analyze_fault_with_gemini(fault_code, context_text=""):
     اكتب الإجابة بلغة عربية تقنية واضحة ومباشرة.
     """
 
-    try:
-        # التحديث النهائي المعتمد بناءً على طلب خوادم Google
-        response = client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=prompt,
-        )
-        return response.text
-    except Exception as e:
-        return f"❌ حدث خطأ أثناء التواصل مع الذكاء الاصطناعي: {str(e)}"
+    # محاولة الاتصال حتى 3 مرات في حال وجود ضغط على السيرفر (503)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt,
+            )
+            return response.text
+        except Exception as e:
+            err_msg = str(e)
+            if "503" in err_msg or "UNAVAILABLE" in err_msg:
+                if attempt < max_retries - 1:
+                    time.sleep(2)  # الانتظار ثانيتين قبل إعادة المحاولة
+                    continue
+                else:
+                    return "⚠️ الخادم يمر بضغط عالٍ حالياً (503). يرجى الضغط على زر التحليل مرة أخرى بعد ثوانٍ معدودة."
+            return f"❌ حدث خطأ أثناء التواصل مع الذكاء الاصطناعي: {err_msg}"
 
 # =========================================================
 # 1. دوال النظام المساعدة (تنظيف النصوص، إنشاء PDF)
