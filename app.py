@@ -97,7 +97,12 @@ def sanitize_latin_only(text):
     return clean_text if clean_text else "N/A"
 
 class ComprehensivePDF(FPDF):
-    def __init__(self, title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT", logo_path=None):
+
+    def __init__(
+        self,
+        title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT",
+        logo_path=None,
+    ):
         super().__init__()
         self.report_title = title_text
         self.logo_path = logo_path
@@ -123,28 +128,49 @@ class ComprehensivePDF(FPDF):
         self.set_x(text_x)
         self.set_font("Helvetica", "B", 8)
         self.set_text_color(100, 100, 100)
-        self.cell(0, 4, "ADDOMA TRADING SERVICES - ENGINEERING CONSULTANCY", ln=True)
+        self.cell(
+            0,
+            4,
+            "ADDOMA TRADING SERVICES - ENGINEERING CONSULTANCY",
+            ln=True,
+        )
 
         self.set_x(text_x)
         self.set_font("Helvetica", "", 8)
-        self.cell(0, 4, "Power Systems & Electro-Mechanical Maintenance Division", ln=True)
+        self.cell(
+            0,
+            4,
+            "Power Systems & Electro-Mechanical Maintenance Division",
+            ln=True,
+        )
 
-        # خط فاصل أزرق خفيف
+        # خط فاصل أزرق خفيف (تم تصحيح اسم الدالة إلى set_line_width)
         self.set_draw_color(24, 43, 73)
-        self.set_linewidth(0.5)
+        self.set_line_width(0.5)
         self.line(10, 30, 200, 30)
         self.ln(10)
 
     def footer(self):
         self.set_y(-15)
         self.set_draw_color(200, 200, 200)
-        self.set_linewidth(0.2)
+        self.set_line_width(0.2)
         self.line(10, 282, 200, 282)
 
         self.set_font("Helvetica", "I", 8)
         self.set_text_color(120, 120, 120)
-        self.cell(0, 4, "Prepared by: Osman Adam Addoma | Power Systems Engineer", ln=True, align="C")
-        self.cell(0, 4, f"Page {self.page_no()} | Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
+        self.cell(
+            0,
+            4,
+            "Prepared by: Osman Adam Addoma | Power Systems Engineer",
+            ln=True,
+            align="C",
+        )
+        self.cell(
+            0,
+            4,
+            f"Page {self.page_no()} | Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            align="C",
+        )
 
 # =========================================================
 # 2. نظام الاشتراكات الموحد والباقات
