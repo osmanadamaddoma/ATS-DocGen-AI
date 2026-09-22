@@ -6,6 +6,7 @@ import time
 import urllib.parse
 from datetime import datetime, timedelta
 import threading
+import io
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -19,7 +20,7 @@ from firebase_admin import credentials, firestore
 import pdfplumber
 import streamlit as st
 from google import genai
-import pyttsx3 # استيراد مكتبة تحويل النص إلى كلام
+from gtts import gTTS # استيراد مكتبة gTTS بدلاً من pyttsx3
 
 # محاولة استيراد مكتبة قراءة الباركود
 try:
@@ -47,29 +48,22 @@ if not gemini_key:
 # تهيئة عميل Gemini API
 client = genai.Client(api_key=gemini_key) if gemini_key else None
 
-# تهيئة محرك تحويل النص إلى كلام
-engine = pyttsx3.init()
-voices = engine.getProperty('voices')
-# محاولة ضبط صوت عربي إن وجد (يعتمد على نظام التشغيل)
-for voice in voices:
-    if 'arabic' in voice.name.lower():
-        engine.setProperty('voice', voice.id)
-        break
-
-def speak_text(text):
-    """دالة لنطق النص باستخدام مسار منفصل لتجنب تجميد الواجهة"""
-    def run_speech():
-        try:
-            # محرك pyttsx3 قد يحتاج إلى إعادة تهيئة داخل الـ thread في بعض الأنظمة
-            local_engine = pyttsx3.init()
-            local_engine.say(text)
-            local_engine.runAndWait()
-        except RuntimeError:
-            pass # تجاهل خطأ التشغيل المتكرر
-    
-    t = threading.Thread(target=run_speech)
-    t.start()
-
+# 1. تعريف دالة الصوت الجديدة
+def play_audio(text):
+    """تحويل النص إلى صوت باستخدام gTTS وتشغيله مباشرة عبر st.audio"""
+    try:
+        # تحويل النص إلى صوت باللغة العربية
+        tts = gTTS(text=text, lang='ar')
+        
+        # حفظ الصوت في الذاكرة المؤقتة 
+        audio_data = io.BytesIO()
+        tts.write_to_fp(audio_data)
+        audio_data.seek(0) # العودة لبداية الملف الصوتي
+        
+        # عرض مشغل الصوت في واجهة التطبيق مع التشغيل التلقائي
+        st.audio(audio_data, format='audio/mp3', autoplay=True)
+    except Exception as e:
+        st.error(f"حدث خطأ في تشغيل الصوت: {e}")
 
 @st.cache_data(ttl=3600)
 def analyze_fault_with_gemini(fault_code, context_text=""):
@@ -367,11 +361,11 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         if remaining_target <= 50 and remaining_target > 0:
             msg = f"تنبيه! المولد {selected_gen} في موقع {selected_site} يقترب من موعد الصيانة. متبقي {remaining_target} ساعة."
             st.warning(f"🔊 {msg}")
-            speak_text(msg)
+            play_audio(msg)
         elif remaining_target <= 0:
              msg = f"إنذار! المولد {selected_gen} في موقع {selected_site} تجاوز موعد الصيانة المجدول!"
              st.error(f"🚨🔊 {msg}")
-             speak_text(msg)
+             play_audio(msg)
         
         # ---------------------------------------------------------
         # جدول قطع الغيار والصيانة (منفصل لكل مولد)
@@ -441,7 +435,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             if rem <= 0 or pct >= 90:
                 part_msg = f"تنبيه! القطعة {part} في المولد {selected_gen} تحتاج لاستبدال فوري."
                 st.error(f"🚨 {part_msg}")
-                # speak_text(part_msg) # يمكنك تفعيله، قد يكون مزعجاً إذا كثرت القطع
+                # play_audio(part_msg) # يمكنك تفعيله، قد يكون مزعجاً إذا كثرت القطع
 
             processed_rows.append({
                 "تصنيف القطعة": cat, "قطع الغيار / الفلاتر": part, "العمر الافتراضي (ساعة)": life,
@@ -701,6 +695,10 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
             with st.spinner("جاري استخلاص التوصيات الهندسية من نموذج Gemini API..."):
                 ai_analysis = analyze_fault_with_gemini(clean_fault, catalog_context)
                 st.markdown(ai_analysis)
+                
+                # إضافة زر الاستماع لنتيجة التشخيص هنا
+                if st.button("🔊 استمع لنتيجة التشخيص", key="audio_btn"):
+                    play_audio(ai_analysis)
 
 # =========================================================
 # التطبيق 3: الفحص البصري للمعدات
