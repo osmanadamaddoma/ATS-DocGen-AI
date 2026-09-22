@@ -96,17 +96,30 @@ if not gemini_key:
 # تهيئة عميل Gemini API
 client = genai.Client(api_key=gemini_key) if gemini_key else None
 
-# دالة تشغيل الصوت المحدثة مع دعم خيار الكتم
-def play_audio(text):
-    """تحويل النص إلى صوت باستخدام gTTS وتشغيله إن لم يتم تفعيل Mute"""
+# دالة تشغيل الصوت المحدثة مع دعم خيار الكتم والتكرار المستمر للانذارات
+def play_audio(text, loop=False):
+    """تحويل النص إلى صوت باستخدام gTTS وتشغيله إن لم يتم تفعيل Mute مع دعم التكرار"""
     if st.session_state.get("audio_muted", False):
         return
     try:
         tts = gTTS(text=text, lang='ar')
         audio_data = io.BytesIO()
         tts.write_to_fp(audio_data)
-        audio_data.seek(0)
-        st.audio(audio_data, format='audio/mp3', autoplay=True)
+        audio_bytes = audio_data.getvalue()
+        
+        if loop:
+            import base64
+            b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+            audio_html = f"""
+                <audio autoplay loop controls style="width: 100%;">
+                    <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
+                    متصفحك لا يدعم تشغيل الصوت تلقائياً.
+                </audio>
+            """
+            st.components.v1.html(audio_html, height=60)
+        else:
+            audio_data.seek(0)
+            st.audio(audio_data, format='audio/mp3', autoplay=True)
     except Exception as e:
         st.error(f"حدث خطأ في تشغيل الصوت: {e}")
 
@@ -319,7 +332,7 @@ def edit_generator_modal(site_key, gen_key):
 
     st.markdown(f"### ⚙️ بيانات المولد: **{gen_key}** - موقع: **{site_key}**")
     
-    # تفكيك القائمة المرجعة إلى 3 متغيرات
+    # تفكيك القائمة المرجعة إلى 3 متغيرات مستقلة
     tab1, tab2, tab3 = st.tabs(["🏷️ البيانات الأساسية", "⚡ معايرة الكهرباء", "🔧 معايرة المحرك"])
 
     with tab1:
@@ -345,7 +358,7 @@ def edit_generator_modal(site_key, gen_key):
         r_rpm = st.number_input("سرعة المحرك Engine Speed (RPM)", value=float(eng.get("rpm", 1500.0)))
         b_volt = st.number_input("جهد بطارية التشغيل Battery (V)", value=float(eng.get("battery_v", 26.0)))
 
-    if st.button("💾 حفظ البيانات والتغييرات", use_container_width=True, type="primary"):
+    if st.button("💾 حفظ البيانات وتكرار صوت المنبه والإنذار حتى يتم توقيفه بزر Mute والتغييرات", use_container_width=True, type="primary"):
         st.session_state.sites_data[site_key]["generators"][gen_key] = {
             "model": new_model,
             "run_hours": new_run_hours,
@@ -462,7 +475,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         m_c4.metric("معايرة حرارة المحرك", f"{calib_m.get('coolant_temp_c', 0)} °C", f"الضغط: {calib_m.get('oil_press_bar', 0)} Bar")
 
         # ---------------------------------------------------------
-        # فحص قيم المعايرة وإطلاق التنبيهات الصوتية المستمرة
+        # فحص قيم المعايرة وإطلاق التنبيهات الصوتية المستمرة (Looping Alarms)
         # ---------------------------------------------------------
         alarm_messages = []
 
@@ -487,12 +500,12 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         elif remaining_target <= 0:
             alarm_messages.append(f"إنذار! تجاوز المولد {selected_gen} الساعات الافتراضية المجدولة للصيانة!")
 
-        # إطلاق التنبيهات مع Mute Option
+        # إطلاق التنبيهات مع خيار التكرار المستمر للصوت حتى Mute
         if alarm_messages:
             for msg in alarm_messages:
                 st.error(f"🚨 {msg}")
             combined_alert_text = " . ".join(alarm_messages)
-            play_audio(combined_alert_text)
+            play_audio(combined_alert_text, loop=True)
 
         # ---------------------------------------------------------
         # جدول الصيانة التنبؤية لـ 14 قطعة غيار
