@@ -16,4 +16,3 @@ streamlit
 google-genai
 matplotlib
 firebase-admin
-pyttsx3
