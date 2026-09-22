@@ -1,4 +1,4 @@
-import os
+مشكل import os
 import re
 import json
 import uuid
@@ -319,64 +319,46 @@ def edit_generator_modal(site_key, gen_key):
 
     st.markdown(f"### ⚙️ بيانات المولد: **{gen_key}** - موقع: **{site_key}**")
     
-    # بديل يعمل دائماً بصفة مستقرة داخل النوافذ المنبثقة والنماذج بدلاً من st.tabs
-    selected_tab = st.radio(
-        "اختر القسم:",
-        ["🏷️ البيانات الأساسية", "⚡ معايرة الكهرباء", "🔧 معايرة المحرك"],
-        horizontal=True
-    )
+    with st.tabs(["🏷️ البيانات الأساسية", "⚡ معايرة الكهرباء", "🔧 معايرة المحرك"]):
+        with st.tab("🏷️ البيانات الأساسية"):
+            new_model = st.text_input("طراز / اسم المولد", value=gen_data.get("model", ""))
+            new_run_hours = st.number_input("ساعات التشغيل الحالية", min_value=0.0, value=float(gen_data.get("run_hours", 0.0)))
+            new_target = st.number_input("الساعات المستهدفة الافتراضية للصيانة", min_value=0.0, value=float(gen_data.get("target", 250.0)))
+            new_kw = st.number_input("سعة المولد (kW)", min_value=0.0, value=float(gen_data.get("kw", 0.0)))
+            new_load = st.number_input("الحمولة الحالية (kW)", min_value=0.0, value=float(gen_data.get("load", 0.0)))
 
-    if selected_tab == "🏷️ البيانات الأساسية":
-        st.write("### 🏷️ البيانات الأساسية")
-        st.text_input("طراز / اسم المولد", value=gen_data.get("model", ""), key="new_model")
-        st.number_input("ساعات التشغيل الحالية", min_value=0.0, value=float(gen_data.get("run_hours", 0.0)), key="new_run_hours")
-        st.number_input("الساعات المستهدفة الافتراضية للصيانة", min_value=0.0, value=float(gen_data.get("target", 250.0)), key="new_target")
-        st.number_input("سعة المولد (kW)", min_value=0.0, value=float(gen_data.get("kw", 0.0)), key="new_kw")
-        st.number_input("الحمولة الحالية (kW)", min_value=0.0, value=float(gen_data.get("load", 0.0)), key="new_load")
+        with st.tab("⚡ معايرة الكهرباء"):
+            v_nom = st.number_input("الجهد الاسمي Nominal (V)", value=float(elec.get("v_nominal", 400.0)))
+            v_meas = st.number_input("الجهد المقاس Measured (V)", value=float(elec.get("v_measured", 398.0)))
+            f_nom = st.number_input("التردد الاسمي Nominal (Hz)", value=float(elec.get("freq_nominal", 50.0)))
+            f_meas = st.number_input("التردد المقاس Measured (Hz)", value=float(elec.get("freq_measured", 50.0)))
+            c_max = st.number_input("أقصى تيار مسموح Max Current (A)", value=float(elec.get("current_max", 600.0)))
+            c_meas = st.number_input("التيار المقاس Measured Current (A)", value=float(elec.get("current_measured", 360.0)))
+            pf_val = st.number_input("معامل القدرة Power Factor (PF)", value=float(elec.get("pf", 0.85)))
+            ct_rat = st.text_input("نسبة محولات التيار CT Ratio", value=str(elec.get("ct_ratio", "600/5")))
 
-    elif selected_tab == "⚡ معايرة الكهرباء":
-        st.write("### ⚡ معايرة الكهرباء")
-        st.number_input("الجهد الاسمي Nominal (V)", value=float(elec.get("v_nominal", 400.0)), key="v_nom")
-        st.number_input("الجهد المقاس Measured (V)", value=float(elec.get("v_measured", 398.0)), key="v_meas")
-        st.number_input("التردد الاسمي Nominal (Hz)", value=float(elec.get("freq_nominal", 50.0)), key="f_nom")
-        st.number_input("التردد المقاس Measured (Hz)", value=float(elec.get("freq_measured", 50.0)), key="f_meas")
-        st.number_input("أقصى تيار مسموح Max Current (A)", value=float(elec.get("current_max", 600.0)), key="c_max")
-        st.number_input("التيار المقاس Measured Current (A)", value=float(elec.get("current_measured", 360.0)), key="c_meas")
-        st.number_input("معامل القدرة Power Factor (PF)", value=float(elec.get("pf", 0.85)), key="pf_val")
-        st.text_input("نسبة محولات التيار CT Ratio", value=str(elec.get("ct_ratio", "600/5")), key="ct_rat")
+        with st.tab("🔧 معايرة المحرك"):
+            o_press = st.number_input("ضغط الزيت Oil Pressure (Bar)", value=float(eng.get("oil_press_bar", 4.5)))
+            c_temp = st.number_input("حرارة سائل التبريد Coolant Temp (°C)", value=float(eng.get("coolant_temp_c", 85.0)))
+            r_rpm = st.number_input("سرعة المحرك Engine Speed (RPM)", value=float(eng.get("rpm", 1500.0)))
+            b_volt = st.number_input("جهد بطارية التشغيل Battery (V)", value=float(eng.get("battery_v", 26.0)))
 
-    elif selected_tab == "🔧 معايرة المحرك":
-        st.write("### 🔧 معايرة المحرك")
-        st.number_input("ضغط الزيت Oil Pressure (Bar)", value=float(eng.get("oil_press_bar", 4.5)), key="o_press")
-        st.number_input("حرارة سائل التبريد Coolant Temp (°C)", value=float(eng.get("coolant_temp_c", 85.0)), key="c_temp")
-        st.number_input("سرعة المحرك Engine Speed (RPM)", value=float(eng.get("rpm", 1500.0)), key="r_rpm")
-        st.number_input("جهد بطارية التشغيل Battery (V)", value=float(eng.get("battery_v", 26.0)), key="b_volt")
-
-    st.write("---")
-    
     if st.button("💾 حفظ البيانات والتغييرات", use_container_width=True, type="primary"):
-        # استدعاء القيم من الجلسة لتفادي فقدان البيانات في الأقسام غير المحددة
         st.session_state.sites_data[site_key]["generators"][gen_key] = {
-            "model": st.session_state.get("new_model", gen_data.get("model", "")),
-            "run_hours": st.session_state.get("new_run_hours", gen_data.get("run_hours", 0.0)),
-            "target": st.session_state.get("new_target", gen_data.get("target", 250.0)),
-            "kw": st.session_state.get("new_kw", gen_data.get("kw", 0.0)),
-            "load": st.session_state.get("new_load", gen_data.get("load", 0.0)),
+            "model": new_model,
+            "run_hours": new_run_hours,
+            "target": new_target,
+            "kw": new_kw,
+            "load": new_load,
             "calib_elec": {
-                "v_nominal": st.session_state.get("v_nom", elec.get("v_nominal", 400.0)),
-                "v_measured": st.session_state.get("v_meas", elec.get("v_measured", 398.0)),
-                "freq_nominal": st.session_state.get("f_nom", elec.get("freq_nominal", 50.0)),
-                "freq_measured": st.session_state.get("f_meas", elec.get("freq_measured", 50.0)),
-                "current_max": st.session_state.get("c_max", elec.get("current_max", 600.0)),
-                "current_measured": st.session_state.get("c_meas", elec.get("current_measured", 360.0)),
-                "pf": st.session_state.get("pf_val", elec.get("pf", 0.85)),
-                "ct_ratio": st.session_state.get("ct_rat", elec.get("ct_ratio", "600/5"))
+                "v_nominal": v_nom, "v_measured": v_meas,
+                "freq_nominal": f_nom, "freq_measured": f_meas,
+                "current_max": c_max, "current_measured": c_meas,
+                "pf": pf_val, "ct_ratio": ct_rat
             },
             "calib_engine": {
-                "oil_press_bar": st.session_state.get("o_press", eng.get("oil_press_bar", 4.5)),
-                "coolant_temp_c": st.session_state.get("c_temp", eng.get("coolant_temp_c", 85.0)),
-                "rpm": st.session_state.get("r_rpm", eng.get("rpm", 1500.0)),
-                "battery_v": st.session_state.get("b_volt", eng.get("battery_v", 26.0))
+                "oil_press_bar": o_press, "coolant_temp_c": c_temp,
+                "rpm": r_rpm, "battery_v": b_volt
             }
         }
         st.success("✅ تم تحديث بيانات المولد والمعايرة بنجاح!")
@@ -580,40 +562,327 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
                 color_code = "#ffc107" # أصفر (70% - 90%)
                 status_str = "تحذير - قرب الصيانة (70%-90%)"
             else:
-                color_code = "#dc3545" # أحمر (تجاوز 90% أو خطر)
-                status_str = "إنذار - صيانة فورية!"
+                color_code = "#dc3545" # أحمر (تجاوز 90% - 100%)
+                status_str = "إنذار - استبدال فوري (90%-100%)"
 
-            processed_rows.append({
-                "Part": part,
-                "Category": cat,
-                "Life": life,
-                "Used": used,
-                "Remaining": rem,
-                "Percent": pct,
-                "Status": status_str,
-                "Color": color_code
-            })
             bar_colors.append(color_code)
 
-        df_viz = pd.DataFrame(processed_rows)
+            processed_rows.append({
+                "الوحدة": row.get("الوحدة", idx + 1),
+                "تصنيف القطعة": cat,
+                "قطع الغيار / الفلاتر": part,
+                "العمر الافتراضي (ساعة)": life,
+                "الساعات المنقضية (ساعة)": used,
+                "المدة المتبقية (ساعة)": max(0.0, rem),
+                "نسبة الاستهلاك (%)": round(pct, 1),
+                "حالة التنبيه": status_str,
+                "الكود الملون": color_code
+            })
 
-        # الرسم البياني
-        if not df_viz.empty:
-            st.subheader("📈 رسم بياني: نسبة استهلاك قطع الغيار والمكونات")
-            fig = px.bar(
-                df_viz,
-                x='Percent',
-                y='Part',
-                orientation='h',
-                title="مؤشر الصيانة التنبؤية (النسبة المئوية للاستهلاك)",
-                labels={'Percent': 'نسبة الاستهلاك (%)', 'Part': 'القطعة'},
-                color='Status',
-                color_discrete_map={
-                    "حالة جيدة (أقل من 70%)": "#28a745",
-                    "تحذير - قرب الصيانة (70%-90%)": "#ffc107",
-                    "إنذار - صيانة فورية!": "#dc3545"
-                },
-                text=df_viz['Percent'].apply(lambda x: f"{x:.1f}%")
+        df_result = pd.DataFrame(processed_rows)
+
+        st.divider()
+
+        # ---------------------------------------------------------
+        # الرسومات البيانية (البار الملون والدائري)
+        # ---------------------------------------------------------
+        st.subheader("📊 الرسومات البيانية ومؤشرات الأداء")
+        chart_col1, chart_col2 = st.columns(2)
+
+        with chart_col1:
+            st.markdown("##### 🟢🟡🔴 رسم استهلاك الساعات (🟢 ≤70% | 🟡 70-90% | 🔴 ≥90%)")
+            fig_bar = go.Figure()
+            fig_bar.add_trace(go.Bar(
+                x=df_result["قطع الغيار / الفلاتر"],
+                y=df_result["نسبة الاستهلاك (%)"],
+                marker_color=bar_colors,
+                text=df_result["نسبة الاستهلاك (%)"].astype(str) + "%",
+                textposition='auto'
+            ))
+            fig_bar.update_layout(
+                title="نسبة استهلاك الساعات المجدولة للـ 14 قطعة",
+                xaxis_title="القطعة",
+                yaxis_title="النسبة المئوية %",
+                yaxis=dict(range=[0, 110])
             )
-            fig.update_layout(yaxis={'categoryorder': 'total ascending'})
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        with chart_col2:
+            st.markdown("##### 🍩 الرسم البياني الدائري لأداء ومدة المولد")
+            total_target_h = max(1.0, float(gen_info["target"]))
+            current_h = float(gen_info["run_hours"])
+            rem_h = max(0.0, total_target_h - current_h)
+
+            labels_pie = ['الساعات المنقضية', 'الساعات المتبقية الافتراضية']
+            values_pie = [current_h, rem_h]
+
+            fig_pie = px.pie(
+                names=labels_pie,
+                values=values_pie,
+                hole=0.5,
+                title=f"نسب أداء ساعات التشغيل للمولد {selected_gen}",
+                color_discrete_sequence=["#182b49", "#28a745"]
+            )
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+        st.divider()
+        st.subheader("📷 إرفاق صور المولد وقطع الغيار للتقرير")
+        col_up1, col_up2 = st.columns(2)
+        with col_up1:
+            gen_img_file = st.file_uploader("رفع صورة للمولد / لوحة التحكم", type=["png", "jpg", "jpeg"])
+        with col_up2:
+            parts_img_file = st.file_uploader("رفع صورة للقطع المستبدلة / موقع العمل", type=["png", "jpg", "jpeg"])
+
+        # ---------------------------------------------------------
+        # دالة توليد تقرير PDF المطور
+        # ---------------------------------------------------------
+        def generate_full_pdf_bytes():
+            temp_logo_path = None
+            if logo_file:
+                temp_logo_path = f"temp_logo_{uuid.uuid4().hex}.png"
+                with open(temp_logo_path, "wb") as f:
+                    f.write(logo_file.getbuffer())
+
+            pdf = ComprehensivePDF("GENERATOR PREDICTIVE MAINTENANCE REPORT", logo_path=temp_logo_path)
+            pdf.add_page()
+
+            # قسم الموقع والبيانات
+            pdf.set_fill_color(245, 247, 250)
+            pdf.rect(10, 35, 190, 25, "F")
+            pdf.set_xy(12, 37)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(24, 43, 73)
+            
+            pdf.cell(0, 5, f"Site Name: {sanitize_latin_only(selected_site)} | Address: {sanitize_latin_only(current_site_address)}", ln=True)
+            pdf.set_x(12)
+            pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | Capacity: {gen_info['kw']} kW", ln=True)
+            pdf.set_x(12)
+            pdf.cell(0, 5, f"Current Run Hours: {gen_info['run_hours']} hrs | Target Hours: {gen_info['target']} hrs", ln=True)
+            pdf.set_x(12)
+            pdf.cell(0, 5, f"Electrical Calib: {calib_e.get('v_measured',0)}V / {calib_e.get('freq_measured',0)}Hz | Engine: {calib_m.get('coolant_temp_c',0)} C / {calib_m.get('oil_press_bar',0)} Bar", ln=True)
+            pdf.ln(8)
+
+            # جدول الـ 14 قطعة
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_fill_color(24, 43, 73)
+            pdf.set_text_color(255, 255, 255)
+
+            headers_pdf = ["#", "Part / Service Name", "Lifespan", "Used", "Remain", "Status"]
+            widths = [10, 60, 25, 25, 25, 45]
+            for h, w in zip(headers_pdf, widths):
+                pdf.cell(w, 6, h, border=1, fill=True, align="C")
+            pdf.ln()
+
+            pdf.set_font("Helvetica", "", 7)
+            pdf.set_text_color(0, 0, 0)
+
+            for i, row in df_result.iterrows():
+                fill = (i % 2 == 0)
+                pdf.set_fill_color(240, 243, 246) if fill else pdf.set_fill_color(255, 255, 255)
+
+                pdf.cell(widths[0], 5, str(row["الوحدة"]), border=1, align="C", fill=fill)
+                pdf.cell(widths[1], 5, sanitize_latin_only(str(row["قطع الغيار / الفلاتر"]))[:32], border=1, fill=fill)
+                pdf.cell(widths[2], 5, str(row["العمر الافتراضي (ساعة)"]), border=1, align="C", fill=fill)
+                pdf.cell(widths[3], 5, str(row["الساعات المنقضية (ساعة)"]), border=1, align="C", fill=fill)
+                pdf.cell(widths[4], 5, str(row["المدة المتبقية (ساعة)"]), border=1, align="C", fill=fill)
+                pdf.cell(widths[5], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1, fill=fill)
+                pdf.ln()
+
+            # إدراج الصور
+            if gen_img_file or parts_img_file:
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 11)
+                pdf.set_text_color(24, 43, 73)
+                pdf.cell(0, 6, "Field Attachment Images:", ln=True)
+                pdf.ln(4)
+
+                y_pos = 45
+                if gen_img_file:
+                    gen_path = f"temp_gen_{uuid.uuid4().hex}.jpg"
+                    with open(gen_path, "wb") as f: f.write(gen_img_file.getbuffer())
+                    pdf.image(gen_path, x=15, y=y_pos, w=85)
+                    os.remove(gen_path)
+                if parts_img_file:
+                    part_path = f"temp_part_{uuid.uuid4().hex}.jpg"
+                    with open(part_path, "wb") as f: f.write(parts_img_file.getbuffer())
+                    pdf.image(part_path, x=110, y=y_pos, w=85)
+                    os.remove(part_path)
+
+            # إدراج الرسم البياني في الـ PDF
+            try:
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 11)
+                pdf.set_text_color(24, 43, 73)
+                pdf.cell(0, 6, "Visual Analytics & Maintenance Color Codes:", ln=True)
+
+                fig_bar_p, ax_bar_p = plt.subplots(figsize=(7, 3.5))
+                p_short = [sanitize_latin_only(str(x))[:10] for x in df_result["قطع الغيار / الفلاتر"]]
+                colors_p = [x for x in df_result["الكود الملون"]]
+                ax_bar_p.bar(p_short, df_result["نسبة الاستهلاك (%)"].values, color=colors_p)
+                ax_bar_p.set_title("14 Parts Usage Status (Green <=70%, Yellow 70-90%, Red >=90%)", fontsize=8, fontweight='bold')
+                plt.xticks(rotation=45, ha="right", fontsize=6)
+                plt.tight_layout()
+
+                bar_path = f"temp_bar_{uuid.uuid4().hex}.png"
+                plt.savefig(bar_path, dpi=200)
+                pdf.image(bar_path, x=15, y=45, w=180)
+                os.remove(bar_path)
+            except Exception:
+                pass
+
+            if temp_logo_path and os.path.exists(temp_logo_path):
+                os.remove(temp_logo_path)
+
+            pdf_out = pdf.output(dest="S")
+            return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
+
+        st.download_button(
+            label=f"🖨️ إصدار التقرير الشامل للمولد ({selected_gen}) في ({selected_site})",
+            data=generate_full_pdf_bytes(),
+            file_name=f"Report_{selected_site}_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+
+# =========================================================
+# التطبيق 2: المساعد الذكي والكتالوجات (مدمج ومتطور)
+# =========================================================
+elif selected_app == "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد":
+    st.info(f"🔹 **العميل الحالي:** {client_name} | **نوع الاشتراك:** {plan_type}")
+    st.title("🤖 نافذة المساعد الذكي، الكتالوجات وتحليل الأعطال")
+
+    col_files1, col_files2 = st.columns(2)
+    with col_files1:
+        st.subheader("📚 رفع الكتالوجات للتحليل (PDF)")
+        manual_file = st.file_uploader("رفع الكتالوج اليدوي للمعدة", type=["pdf"])
+        if manual_file:
+            if "loaded_manual_name" not in st.session_state or st.session_state.loaded_manual_name != manual_file.name:
+                with st.spinner("جاري استخراج وقراءة الكتالوج..."):
+                    try:
+                        catalog_pages = []
+                        with pdfplumber.open(manual_file) as pdf:
+                            for i, page in enumerate(pdf.pages):
+                                text = page.extract_text() or ""
+                                catalog_pages.append({"page_num": i + 1, "content": text})
+                        st.session_state.catalog_pages = catalog_pages
+                        st.session_state.loaded_manual_name = manual_file.name
+                        st.success(f"✅ تم حفظ وقراءة {len(catalog_pages)} صفحة من الكتالوج بنجاح!")
+                    except Exception as e:
+                        st.error(f"❌ تعذر قراءة ملف PDF: {e}")
+
+    with col_files2:
+        st.subheader("📷 قراءة أكواد الأعطال (شاشات/DSE)")
+        fault_image = st.file_uploader("رفع صورة العطل من شاشة المولد/الآلة", type=["png", "jpg", "jpeg"])
+        fault_cam = st.camera_input("📸 أو التقط صورة للشاشة")
+
+    st.divider()
+
+    fault_input = st.text_input(
+        "أدخل كود العطل أو اسم الإنذار (مثلاً: Over Current / DSE 8610 Error / Oil Low):",
+        value="Over Current",
+        key="fault_search_input",
+    )
+
+    if st.button("🔍 تحليل العطل بالذكاء الاصطناعي", key="btn_analyze", use_container_width=True):
+        clean_fault = fault_input.strip()
+
+        if not clean_fault:
+            st.warning("⚠️ يرجى كتابة كود العطل أو الإنذار أولاً.")
+        else:
+            st.info(f"🌟 (Addoma Trading Services) جاري معالجة طلب العميل: {client_name}...")
+
+            target_fault_img = fault_image or fault_cam
+            if target_fault_img:
+                img_obj = Image.open(target_fault_img)
+                st.image(img_obj, caption="صورة العطل المرفوعة", width=350)
+                if decode_qr:
+                    try:
+                        decoded = decode_qr(img_obj)
+                        if decoded:
+                            st.success(f"📟 **كود QR/Barcode مقروء:** `{decoded[0].data.decode('utf-8')}`")
+                    except Exception:
+                        pass
+
+            catalog_context = ""
+            if "catalog_pages" in st.session_state:
+                search_query = re.escape(clean_fault)
+                found_lines = []
+
+                for page in st.session_state.catalog_pages:
+                    for line in page["content"].split("\n"):
+                        if re.search(search_query, line, re.IGNORECASE):
+                            found_lines.append(f"(صفحة {page['page_num']}): {line.strip()}")
+
+                if found_lines:
+                    catalog_context = "\n".join(found_lines[:8])
+
+            st.markdown("---")
+            st.markdown(f"### 📋 تقرير التشخيص الفوري: `{clean_fault}`")
+
+            if catalog_context:
+                st.success("✅ تم العثور على المقتطفات التالية داخل الكتالوج المرفوع:")
+                st.code(catalog_context, language="text")
+            else:
+                st.caption(f"لم يتم العثور على نص مطابِق تماماً للرمز '{clean_fault}' داخل صفحات الكتالوج المرفوع.")
+
+            st.markdown("**التوجيهات الميدانية السريعة:**")
+            f = clean_fault.lower()
+
+            if any(k in f for k in ["current", "over current", "overcurrent", "oc", "over load", "overload", "kw", "kva"]):
+                st.write("• **طبيعة المشكلة:** ارتفاع التيار المسحوب أو وجود حمل زائد/شورت ماس على إحدى الفازات.")
+                st.write("• **الخطوات:** 1. التوزيع المتوازن للأحمال على الفازات الثلاث (R, S, T). 2. فحص محولات التيار (CTs) ومعايرة النسب في DSE. 3. قياس امبير الحمل بساعة أمبير خارجية (Clamp Meter).")
+
+            elif any(k in f for k in ["speed", "rpm", "under speed", "over speed", "low speed", "high speed", "freq", "hz", "under freq", "over freq"]):
+                st.write("• **طبيعة المشكلة:** خلل في سرعة دوران المحرك أو ضبط التردد (50Hz / 60Hz).")
+                st.write("• **الخطوات:** 1. تنظيف مستشعر السرعة (MPU) وإعادة معايرة الفجوة. 2. فحص منظم السرعة (Governor) والأكتويتر. 3. فحص فلتر الديزل ونظام الوقود.")
+
+            elif any(k in f for k in ["voltage", "volt", "under volt", "over volt", "low volt", "high volt"]):
+                st.write("• **طبيعة المشكلة:** انخفاض أو ارتفاع الجهد المولد عن الحدود التشغيلية المسموحة.")
+                st.write("• **الخطوات:** 1. فحص كارت منظم الجهد (AVR). 2. ضبط المقاومة المتغيرة للجهد. 3. فحص كابلات الإحساس (Sensing) والديودات.")
+
+            elif any(k in f for k in ["oil", "press", "low oil", "oil pressure", "lop"]):
+                st.write("• **طبيعة المشكلة:** انخفاض ضغط زيت المحرك أو عطل مستشعر الضغط.")
+                st.write("• **الخطوات:** 1. قياس مستوى الزيت الفيزيائي. 2. قياس الضغط بساعة خارجية. 3. فحص أسلاك وتأريض الحساس.")
+
+            elif any(k in f for k in ["temp", "coolant", "high temp", "water", "hwt", "radiator"]):
+                st.write("• **طبيعة المشكلة:** ارتفاع حرارة سائل التبريد أو انخفاض مستواه.")
+                st.write("• **الخطوات:** 1. التأكد من مستوى السائل وسيور المروحة. 2. فحص الثيرموستات وانسداد الراديتر. 3. فحص حساس الحرارة.")
+
+            else:
+                st.write(f"• **طبيعة المشكلة:** إنذار تشغيلي/تحذيري برمز `{clean_fault}`.")
+                st.write("• **الخطوات:** 1. مراجعة القائمة التشخيصية للكتالوج. 2. إعادة ضبط الإنذار (Reset). 3. فحص أسلاك الدخل والخرج المبرمجة.")
+
+            st.markdown("---")
+            st.markdown("🤖 **تحليل التقرير العميق عبر الذكاء الاصطناعي (Gemini):**")
+            with st.spinner("جاري استخلاص التوصيات الهندسية من نموذج Gemini API..."):
+                ai_analysis = analyze_fault_with_gemini(clean_fault, catalog_context)
+                st.markdown(ai_analysis)
+
+                if st.button("🔊 استمع لنتيجة التشخيص", key="audio_btn"):
+                    play_audio(ai_analysis)
+
+# =========================================================
+# التطبيق 3: الفحص البصري للمعدات
+# =========================================================
+elif selected_app == "🔍 3. نظام فحص المعدات (WIC وغيرها)":
+    st.title("🔍 نظام الفحص والمقارنة البصرية لقطع الغيار والمعدات")
+
+    eq_type = st.selectbox("اختر المعدة المراد فحصها:", [
+        "مولد ديزل صناعي",
+        "غرف تبريد وتجميد WIC 10 و WIC 40",
+        "محرك كهربائي 3-Phase"
+    ])
+
+    st.subheader("🖼️ المقارنة البصرية (القطعة التالفة vs السليمة)")
+    c_img1, c_img2 = st.columns(2)
+    with c_img1:
+        st.write("🟢 **صورة القطعة السليمة (Reference):**")
+        good_img = st.file_uploader("اختر صورة السليم", type=["png", "jpg"], key="gi")
+        if good_img: st.image(Image.open(good_img), use_container_width=True)
+    with c_img2:
+        st.write("🔴 **صورة القطعة المفحوصة (Damaged):**")
+        bad_img = st.file_uploader("اختر صورة التالف", type=["png", "jpg"], key="bi")
+        if bad_img: st.image(Image.open(bad_img), use_container_width=True)
+
+    if eq_type == "غرف تبريد وتجميد WIC 10 و WIC 40":
+        st.warning("⚠️ **قائمة فحص وحدات WIC:** يرجى التأكد من فحص صمامات التمدد (Expansion Valves)، وسخانات الإذابة (Defrost)، وتدفق سائل التبريد لوحدات WIC 10 و WIC 40 بشكل منفصل لضمان الكفاءة.")
