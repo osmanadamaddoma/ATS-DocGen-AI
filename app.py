@@ -173,6 +173,12 @@ class ComprehensivePDF(FPDF):
         )
 
 # =========================================================
+# تهيئة قاعدة البيانات المحلية المؤقتة (Session State) للمواقع
+# =========================================================
+if "sites_database" not in st.session_state:
+    st.session_state.sites_database = {} # شكل البيانات: {"اسم الموقع": [قائمة المولدات]}
+
+# =========================================================
 # 2. نظام الاشتراكات الموحد والباقات
 # =========================================================
 CLIENTS_DATABASE = {
@@ -234,7 +240,7 @@ if not is_pro:
 st.sidebar.divider()
 
 # =========================================================
-# 3. قائمة اختيار التطبيق المركزي
+# 3. قائمة اختيار التطبيق المركزي (تمت إضافة التطبيق الرابع)
 # =========================================================
 st.sidebar.markdown("🛠️ التطبيقات المتاحة (نسخة احترافية)")
 selected_app = st.sidebar.radio(
@@ -242,7 +248,8 @@ selected_app = st.sidebar.radio(
     [
         "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
         "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد",
-        "🔍 3. نظام فحص المعدات (WIC وغيرها)"
+        "🔍 3. نظام فحص المعدات (WIC وغيرها)",
+        "🏢 4. إدارة المواقع والمولدات (مواقع متعددة)" # الخيار الجديد
     ]
 )
 st.sidebar.divider()
@@ -621,3 +628,113 @@ elif selected_app == "🔍 3. نظام فحص المعدات (WIC وغيرها)"
         
     if eq_type == "غرف تبريد وتجميد WIC 10 و WIC 40":
         st.warning("⚠️ **قائمة فحص وحدات WIC:** يرجى التأكد من فحص صمامات التمدد (Expansion Valves)، وسخانات الإذابة (Defrost)، وتدفق سائل التبريد لوحدات WIC 10 و WIC 40 بشكل منفصل لضمان الكفاءة.")
+
+# =========================================================
+# التطبيق 4: إدارة المواقع والمولدات (النظام الجديد)
+# =========================================================
+elif selected_app == "🏢 4. إدارة المواقع والمولدات (مواقع متعددة)":
+    st.title("🏢 نظام الإدارة الشاملة للمواقع والمولدات")
+    st.markdown("إدارة عدد غير محدود من المواقع الجغرافية، وإدخال بيانات لعدد يصل إلى **300 مولد** لكل موقع على حدة.")
+
+    # تقسيم الشاشة لقسمين: إدارة المواقع (يمين) وإضافة المولدات (يسار)
+    col_site, col_gen = st.columns([1, 1.5])
+    
+    with col_site:
+        st.subheader("📍 إدارة المواقع والفروع")
+        with st.form("add_site_form"):
+            new_site_name = st.text_input("إضافة موقع جديد (مثال: مصنع الحديد - فرع الخرطوم):")
+            submit_site = st.form_submit_button("➕ إنشاء الموقع")
+            
+            if submit_site:
+                if new_site_name.strip() == "":
+                    st.warning("يرجى كتابة اسم الموقع أولاً.")
+                elif new_site_name in st.session_state.sites_database:
+                    st.error("⚠️ هذا الموقع مسجل مسبقاً!")
+                else:
+                    st.session_state.sites_database[new_site_name] = []
+                    st.success(f"✅ تم إضافة الموقع '{new_site_name}' بنجاح.")
+                    st.rerun()
+
+        # اختيار الموقع للعمل عليه
+        st.divider()
+        sites_list = list(st.session_state.sites_database.keys())
+        if not sites_list:
+            st.info("لم يتم إضافة أي مواقع حتى الآن. قم بإضافة موقع للبدء.")
+            selected_site = None
+        else:
+            selected_site = st.selectbox("📌 اختر الموقع لإدارة مولداته:", sites_list)
+
+    with col_gen:
+        if selected_site:
+            st.subheader(f"⚡ إدخال مولد جديد في: {selected_site}")
+            with st.form("add_gen_to_site_form"):
+                gen_code = st.text_input("رقم / كود المولد (مثال: GEN-001)")
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    gen_brand_input = st.selectbox("نوع المحرك", ["Perkins", "Cummins", "Caterpillar", "Volvo", "Scania", "أخرى"])
+                    gen_size_input = st.number_input("حجم المولد (kVA)", min_value=5.0, value=150.0, step=10.0)
+                with c2:
+                    gen_panel = st.selectbox("لوحة التحكم", ["DSE 7320", "DSE 8610 MKII", "ComAp", "Woodward", "Deep Sea (Other)"])
+                    gen_status = st.selectbox("الحالة التشغيلية", ["نشط (يعمل)", "احتياطي (Standby)", "تحت الصيانة", "متوقف (عطل)"])
+                
+                gen_notes = st.text_input("ملاحظات إضافية (اختياري)")
+                
+                submit_gen = st.form_submit_button("💾 حفظ بيانات المولد في الموقع")
+                
+                if submit_gen:
+                    if gen_code.strip() == "":
+                        st.warning("يرجى إدخال رقم/كود المولد كحد أدنى.")
+                    else:
+                        # التحقق من الحد الأقصى للمولدات (300)
+                        if len(st.session_state.sites_database[selected_site]) >= 300:
+                            st.error("❌ تم الوصول للحد الأقصى (300 مولد) في هذا الموقع.")
+                        else:
+                            # إضافة البيانات للقائمة
+                            new_generator_data = {
+                                "رقم المولد": gen_code,
+                                "النوع": gen_brand_input,
+                                "الحجم (kVA)": gen_size_input,
+                                "لوحة التحكم": gen_panel,
+                                "الحالة": gen_status,
+                                "تاريخ الإضافة": datetime.now().strftime("%Y-%m-%d"),
+                                "ملاحظات": gen_notes
+                            }
+                            st.session_state.sites_database[selected_site].append(new_generator_data)
+                            st.success(f"✅ تمت إضافة المولد {gen_code} بنجاح إلى {selected_site}!")
+                            st.rerun()
+
+    # عرض جدول المولدات للموقع المحدد (مع إمكانية التعديل والحذف)
+    st.divider()
+    if selected_site and st.session_state.sites_database[selected_site]:
+        gen_count = len(st.session_state.sites_database[selected_site])
+        st.subheader(f"📋 قاعدة بيانات المولدات - {selected_site} (العدد: {gen_count}/300)")
+        st.caption("💡 يمكنك تعديل البيانات مباشرة من الجدول أدناه أو تحديد صف للأسفل وحذفه، ثم الضغط على 'حفظ التعديلات'.")
+        
+        # تحويل البيانات إلى DataFrame لتسهيل العرض والتعديل
+        df_site_gens = pd.DataFrame(st.session_state.sites_database[selected_site])
+        
+        edited_site_df = st.data_editor(
+            df_site_gens, 
+            num_rows="dynamic", # يتيح للمستخدم إضافة أو حذف صفوف من الجدول مباشرة
+            use_container_width=True,
+            key=f"editor_{selected_site}"
+        )
+        
+        col_btn1, col_btn2 = st.columns([1, 4])
+        with col_btn1:
+            if st.button("🔄 حفظ التعديلات على الجدول", type="primary"):
+                # تحويل الجدول المعدل إلى قاموس وحفظه مرة أخرى
+                st.session_state.sites_database[selected_site] = edited_site_df.to_dict('records')
+                st.success("✅ تم حفظ التعديلات على قاعدة بيانات الموقع بنجاح!")
+        with col_btn2:
+            # تصدير البيانات كنسخة احتياطية JSON
+            json_data = json.dumps(st.session_state.sites_database, ensure_ascii=False, indent=4)
+            st.download_button(
+                label="📥 تحميل نسخة احتياطية من كل المواقع (JSON Backup)",
+                data=json_data,
+                file_name=f"Addoma_Sites_Backup_{datetime.now().strftime('%Y%m%d')}.json",
+                mime="application/json"
+            )
+    elif selected_site:
+        st.info("لا توجد مولدات مسجلة في هذا الموقع حتى الآن.")
