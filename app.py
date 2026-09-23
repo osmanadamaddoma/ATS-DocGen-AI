@@ -86,6 +86,24 @@ if "sites_data" not in st.session_state:
         }
     }
 
+# سجل الإدخالات اليومية وتتبع القراءات
+if "daily_logs" not in st.session_state:
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    st.session_state.daily_logs = [
+        {
+            "timestamp": f"{today_str} 08:30:00",
+            "date": today_str,
+            "site": "الموقع الرئيسي - الخرطوم",
+            "generator": "G1",
+            "technician": "أحمد فني الصيانة",
+            "run_hours": 700.0,
+            "v_measured": 398.0,
+            "oil_press": 4.5,
+            "coolant_temp": 85.0,
+            "status": "طبيعي"
+        }
+    ]
+
 # جلب مفتاح Gemini بأمان من الإعدادات
 gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
@@ -317,14 +335,15 @@ selected_app = st.sidebar.radio(
     "اختر النظام المطلوب:",
     [
         "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
-        "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد",
-        "🔍 3. نظام فحص المعدات (WIC وغيرها)"
+        "📊 2. المتابعة اليومية وتقارير الإدارة والتذكيرات",
+        "🤖 3. المساعد الذكي والكتالوجات وقراءة الأكواد",
+        "🔍 4. نظام فحص المعدات (WIC وغيرها)"
     ]
 )
 st.sidebar.divider()
 
 # =========================================================
-# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد ومعايرته
+# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد مع التحقق الفوري (Data Validation)
 # =========================================================
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة")
 def edit_generator_modal(site_key, gen_key):
@@ -334,7 +353,7 @@ def edit_generator_modal(site_key, gen_key):
 
     st.markdown(f"### ⚙️ بيانات المولد: **{gen_key}** - موقع: **{site_key}**")
     
-    # تفكيك القائمة المرجعة إلى 3 متغيرات مستقلة
+    tech_name = st.text_input("اسم الفني المسؤول عن الإدخال:", value="فني الصيانة المناوب")
     tab1, tab2, tab3 = st.tabs(["🏷️ البيانات الأساسية", "⚡ معايرة الكهرباء", "🔧 معايرة المحرك"])
 
     with tab1:
@@ -361,27 +380,68 @@ def edit_generator_modal(site_key, gen_key):
         b_volt = st.number_input("جهد بطارية التشغيل Battery (V)", value=float(eng.get("battery_v", 26.0)))
         ambient_t = st.number_input("درجة الحرارة المحيطة Ambient Temp (°C)", value=float(eng.get("ambient_temp", 43.0)))
 
-    if st.button("💾 حفظ البيانات وتكرار صوت المنبه والإنذار حتى يتم توقيفه بزر Mute والتغييرات", use_container_width=True, type="primary"):
-        st.session_state.sites_data[site_key]["generators"][gen_key] = {
-            "model": new_model,
-            "run_hours": new_run_hours,
-            "target": new_target,
-            "kw": new_kw,
-            "load": new_load,
-            "calib_elec": {
-                "v_nominal": v_nom, "v_measured": v_meas,
-                "freq_nominal": f_nom, "freq_measured": f_meas,
-                "current_max": c_max, "current_measured": c_meas,
-                "pf": pf_val, "ct_ratio": ct_rat
-            },
-            "calib_engine": {
-                "oil_press_bar": o_press, "coolant_temp_c": c_temp,
-                "rpm": r_rpm, "battery_v": b_volt,
-                "ambient_temp": ambient_t
+    if st.button("💾 حفظ البيانات والتأكد من الصحة", use_container_width=True, type="primary"):
+        # =========================================================
+        # الميزة 1: التحقق الفوري من صحة البيانات (Data Validation)
+        # =========================================================
+        validation_errors = []
+        
+        if c_temp < 0 or c_temp > 125.0:
+            validation_errors.append(f"❌ درجة حرارة المحرك غير منطقية ({c_temp}°C)! النطاق الطبيعي بين 0 و 120 درجة.")
+        
+        if o_press < 0.0 or o_press > 12.0:
+            validation_errors.append(f"❌ ضغط الزيت المدخل مستحيل أو غير منطقي ({o_press} Bar)! النطاق التشغيلي بين 0 و 10 Bar.")
+            
+        if v_meas < 100.0 or v_meas > 600.0:
+            validation_errors.append(f"❌ قيمة الجهد الكهربائي المقاس ({v_meas} V) خارج حدود النطاق الطبيعي المسموح.")
+            
+        if b_volt < 8.0 or b_volt > 35.0:
+            validation_errors.append(f"❌ جهد البطارية غير منطقي ({b_volt} V).")
+
+        if validation_errors:
+            for err in validation_errors:
+                st.error(err)
+            st.warning("⚠️ تم رفض حفظ البيانات لحماية جودة النظام وقاعدة البيانات. يرجى تصحيح الأرقام أعلاه.")
+        else:
+            st.session_state.sites_data[site_key]["generators"][gen_key] = {
+                "model": new_model,
+                "run_hours": new_run_hours,
+                "target": new_target,
+                "kw": new_kw,
+                "load": new_load,
+                "calib_elec": {
+                    "v_nominal": v_nom, "v_measured": v_meas,
+                    "freq_nominal": f_nom, "freq_measured": f_meas,
+                    "current_max": c_max, "current_measured": c_meas,
+                    "pf": pf_val, "ct_ratio": ct_rat
+                },
+                "calib_engine": {
+                    "oil_press_bar": o_press, "coolant_temp_c": c_temp,
+                    "rpm": r_rpm, "battery_v": b_volt,
+                    "ambient_temp": ambient_t
+                }
             }
-        }
-        st.success("✅ تم تحديث بيانات المولد والمعايرة بنجاح!")
-        st.rerun()
+
+            # إضافة السجل اليومي للإدارة
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            today_date = datetime.now().strftime("%Y-%m-%d")
+            
+            # تحديث أو إضافة السجل
+            st.session_state.daily_logs.append({
+                "timestamp": now_str,
+                "date": today_date,
+                "site": site_key,
+                "generator": gen_key,
+                "technician": tech_name,
+                "run_hours": new_run_hours,
+                "v_measured": v_meas,
+                "oil_press": o_press,
+                "coolant_temp": c_temp,
+                "status": "محدث وصحيح"
+            })
+
+            st.success("✅ تم التحقق من صحة البيانات وحفظها بنجاح وتسجيل السجل اليومي!")
+            st.rerun()
 
 # =========================================================
 # التطبيق 1: نظام الصيانة التنبؤية والتقارير الشاملة
@@ -787,9 +847,131 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         )
 
 # =========================================================
-# التطبيق 2: المساعد الذكي والكتالوجات (مدمج ومتطور)
+# التطبيق 2: المتابعة اليومية وتقارير الإدارة والتذكيرات الآلية (جديد)
 # =========================================================
-elif selected_app == "🤖 2. المساعد الذكي والكتالوجات وقراءة الأكواد":
+elif selected_app == "📊 2. المتابعة اليومية وتقارير الإدارة والتذكيرات":
+    st.title("📊 نظام المتابعة اليومية والتذكيرات وتقارير الصيانة")
+    
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    st.info(f"📅 **تاريخ اليوم:** {today_str} | **إشراف:** Addoma Trading Services")
+
+    tab_mgr1, tab_mgr2 = st.tabs(["📋 التقرير الملخص اليومي لمدير الموقع", "⏰ التذكيرات والتنبيهات الآلية للفنيين"])
+
+    # =========================================================
+    # الميزة 3: تقرير ملخص يومي لإدارة الصيانة
+    # =========================================================
+    with tab_mgr1:
+        st.subheader("📝 تقرير ملخص قراءات اليوم لإدارة الموقع")
+        
+        # استخراج القراءات المسجلة لهذا اليوم
+        today_logs = [log for log in st.session_state.daily_logs if log.get("date") == today_str]
+        
+        # حصر المولدات المفروض تسجيلها
+        all_gens = []
+        for s_name, s_info in st.session_state.sites_data.items():
+            for g_name in s_info.get("generators", {}):
+                all_gens.append({"site": s_name, "generator": g_name})
+        
+        logged_gen_keys = [f"{log['site']} - {log['generator']}" for log in today_logs]
+        total_gens_count = len(all_gens)
+        logged_count = len(set(logged_gen_keys))
+        
+        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1.metric("إجمالي المولدات المستهدفة", total_gens_count)
+        col_m2.metric("المولدات المسجلة اليوم", logged_count)
+        col_m3.metric("نسبة الإنجاز اليومي", f"{int((logged_count/total_gens_count)*100) if total_gens_count>0 else 0}%")
+
+        st.divider()
+        if today_logs:
+            df_daily = pd.DataFrame(today_logs)
+            st.markdown("##### 🟢 القراءات التي تم تسجيلها اليوم:")
+            st.dataframe(df_daily[["timestamp", "site", "generator", "technician", "run_hours", "v_measured", "oil_press", "coolant_temp", "status"]], use_container_width=True)
+        else:
+            st.warning("⚠️ لم يتم تسجيل أي قراءات يومية حتى الآن لهذا اليوم!")
+
+        st.divider()
+        
+        # تصدير التقرير اليومي الإداري
+        def generate_daily_summary_pdf():
+            pdf = ComprehensivePDF("DAILY MAINTENANCE MANAGEMENT SUMMARY")
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(0, 6, f"Daily Site Summary Report - Date: {today_str}", ln=True)
+            pdf.ln(4)
+            
+            pdf.set_fill_color(24, 43, 73)
+            pdf.set_text_color(255, 255, 255)
+            headers = ["Site", "Gen ID", "Tech", "Hours", "Volt", "Oil(Bar)", "Temp(C)"]
+            widths = [45, 20, 35, 25, 20, 25, 20]
+            for h, w in zip(headers, widths):
+                pdf.cell(w, 6, h, border=1, fill=True, align="C")
+            pdf.ln()
+
+            pdf.set_font("Helvetica", "", 7)
+            pdf.set_text_color(0, 0, 0)
+            for log in today_logs:
+                pdf.cell(widths[0], 5, sanitize_latin_only(log['site'])[:20], border=1)
+                pdf.cell(widths[1], 5, sanitize_latin_only(log['generator']), border=1, align="C")
+                pdf.cell(widths[2], 5, sanitize_latin_only(log['technician'])[:15], border=1)
+                pdf.cell(widths[3], 5, str(log['run_hours']), border=1, align="C")
+                pdf.cell(widths[4], 5, str(log['v_measured']), border=1, align="C")
+                pdf.cell(widths[5], 5, str(log['oil_press']), border=1, align="C")
+                pdf.cell(widths[6], 5, str(log['coolant_temp']), border=1, align="C")
+                pdf.ln()
+                
+            pdf_out = pdf.output(dest="S")
+            return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
+
+        st.download_button(
+            label="📄 تحميل التقرير اليومي المدمج لمدير الموقع (PDF)",
+            data=generate_daily_summary_pdf(),
+            file_name=f"Daily_Summary_{today_str}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+
+    # =========================================================
+    # الميزة 2: التنبيهات والتذكيرات الآلية للفنيين
+    # =========================================================
+    with tab_mgr2:
+        st.subheader("🔔 نظام التذكير السريع للفنيين بمواعيد التسجيل")
+        
+        unlogged_gens = []
+        for item in all_gens:
+            gen_key_id = f"{item['site']} - {item['generator']}"
+            if gen_key_id not in logged_gen_keys:
+                unlogged_gens.append(item)
+
+        if unlogged_gens:
+            st.warning(f"⚠️ يوجد عدد ({len(unlogged_gens)}) مولد لم يتم تسجيل قراءاتها اليوم حتى الآن!")
+            
+            st.markdown("##### 📋 المولدات التي تطلب إرسال تذكير سريع للفنيين:")
+            for un_gen in unlogged_gens:
+                st.write(f"• **الموقع:** {un_gen['site']} | **المولد:** {un_gen['generator']}")
+                
+            st.divider()
+            st.markdown("##### 📲 إرسال تنبيه / تذكير سريع للفنيين عبر WhatsApp أو SMS:")
+            tech_phone = st.text_input("رقم هاتف الفني المناوب (مثال: 249912345678):", value="249912345678")
+            
+            reminder_msg = f"تذكير صيانة آلي من Addoma Trading: يرجى تسجيل قراءات المولدات المتبقية اليوم ({today_str}) فوراً لضمان عدم تفويت الإدخال اليومي."
+            
+            encoded_msg = urllib.parse.quote(reminder_msg)
+            whatsapp_url = f"https://wa.me/{tech_phone}?text={encoded_msg}"
+            
+            st.markdown(f'''
+                <a href="{whatsapp_url}" target="_blank">
+                    <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-size:16px;">
+                        💬 إرسال تذكير عاجل عبر واتساب للفني
+                    </button>
+                </a>
+            ''', unsafe_allow_html=True)
+        else:
+            st.success("🎉 ممتااااز! تم تسجيل جميع قراءات المولدات اليومية بنجاح ولم يتم تفويت أي مولد اليوم.")
+
+# =========================================================
+# التطبيق 3: المساعد الذكي والكتالوجات (مدمج ومتطور)
+# =========================================================
+elif selected_app == "🤖 3. المساعد الذكي والكتالوجات وقراءة الأكواد":
     st.info(f"🔹 **العميل الحالي:** {client_name} | **نوع الاشتراك:** {plan_type}")
     st.title("🤖 نافذة المساعد الذكي، الكتالوجات وتحليل الأعطال")
 
@@ -904,9 +1086,9 @@ elif selected_app == "🤖 2. المساعد الذكي والكتالوجات �
                     play_audio(ai_analysis)
 
 # =========================================================
-# التطبيق 3: الفحص البصري للمعدات
+# التطبيق 4: الفحص البصري للمعدات
 # =========================================================
-elif selected_app == "🔍 3. نظام فحص المعدات (WIC وغيرها)":
+elif selected_app == "🔍 4. نظام فحص المعدات (WIC وغيرها)":
     st.title("🔍 نظام الفحص والمقارنة البصرية لقطع الغيار والمعدات")
 
     eq_type = st.selectbox("اختر المعدة المراد فحصها:", [
@@ -928,4 +1110,3 @@ elif selected_app == "🔍 3. نظام فحص المعدات (WIC وغيرها)"
 
     if eq_type == "غرف تبريد وتجميد WIC 10 و WIC 40":
         st.warning("⚠️ **قائمة فحص وحدات WIC:** يرجى التأكد من فحص صمامات التمدد (Expansion Valves)، وسخانات الإذابة (Defrost)، وتدفق سائل التبريد لوحدات WIC 10 و WIC 40 بشكل منفصل لضمان الكفاءة.")
-
