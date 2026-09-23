@@ -19,3 +19,4 @@ firebase-admin
 gTTS
 streamlit
 SQLAlchemy
+psycopg2-binary
