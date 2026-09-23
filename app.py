@@ -42,30 +42,13 @@ st.set_page_config(
 # =========================================================
 # 0. تهيئة قاعدة البيانات باستخدام SQLAlchemy و Supabase
 # =========================================================
-# 1. استدعاء رابط الاتصال من الأسرار
-DATABASE_URL = st.secrets["postgres"]["url"]
+db_connected = False
+DATABASE_URL = st.secrets.get("postgres", {}).get("url") if "postgres" in st.secrets else None
 
-# 2. إنشاء محرك الاتصال وتخزينه في الكاش لسرعة الأداء
-@st.cache_resource
-def init_connection():
-    return create_engine(DATABASE_URL)
-
-engine = init_connection()
-
-# 3. اختبار الاتصال واسترجاع البيانات
-try:
-    with engine.connect() as conn:
-        st.success("تم الاتصال بقاعدة بيانات Supabase بنجاح! ⚡")
-        
-        # مثال: قراءة البيانات من جدول (استبدل my_table باسم جدولك في Supabase)
-        # df = pd.read_sql("SELECT * FROM my_table;", conn)
-        # st.dataframe(df)
-        
-except Exception as e:
-    st.error(f"فشل الاتصال: {e}")
+if not DATABASE_URL:
+    st.error("⚠️ لم يتم العثور على رابط قاعدة البيانات في st.secrets['postgres']['url']. يرجى إضافته أولاً.")
 
 Base = declarative_base()
-SessionLocal = sessionmaker(bind=engine)
 
 class Company(Base):
     __tablename__ = "companies"
@@ -146,17 +129,36 @@ class MaintenancePart(Base):
     
     generator = relationship("Generator", back_populates="parts")
 
-# إنشاء الجداول في قاعدة البيانات
-Base.metadata.create_all(bind=engine)
+@st.cache_resource
+def init_connection(url):
+    return create_engine(url)
+
+if DATABASE_URL:
+    try:
+        engine = init_connection(DATABASE_URL)
+        with engine.connect() as conn:
+            st.success("تم الاتصال بقاعدة بيانات Supabase بنجاح! ⚡")
+        
+        Base.metadata.create_all(bind=engine)
+        SessionLocal = sessionmaker(bind=engine)
+        db_connected = True
+    except Exception as e:
+        st.error(f"❌ فشل الاتصال بقاعدة البيانات (يرجى مراجعة اسم المستخدم وكلمة المرور في Secrets): {e}")
 
 def get_db_session():
-    return SessionLocal()
+    if db_connected:
+        return SessionLocal()
+    return None
 
 # =========================================================
 # البذر المبدئي للبيانات (Seed Initial Data)
 # =========================================================
 def init_db_data():
+    if not db_connected:
+        return
     db = get_db_session()
+    if not db:
+        return
     try:
         # 1. إدخال الشركات والاشتراكات المبدئية
         companies_seed = [
@@ -227,7 +229,8 @@ def init_db_data():
     finally:
         db.close()
 
-init_db_data()
+if db_connected:
+    init_db_data()
 
 # =========================================================
 # تهيئة الذكاء الاصطناعي والصوت
@@ -373,10 +376,11 @@ client_name = "زائر (Visitor)"
 plan_type = "غير مفعل"
 company_obj = None
 
-if input_code != "":
+if input_code != "" and db_connected:
     db = get_db_session()
-    comp = db.query(Company).filter(Company.id == input_code).first()
-    db.close()
+    comp = db.query(Company).filter(Company.id == input_code).first() if db else None
+    if db:
+        db.close()
     
     if comp:
         client_name = comp.name
@@ -402,7 +406,7 @@ else:
     st.sidebar.info("💡 أدخل الكود المخصص لعرض تفاصيل العميل وفتح الأنظمة.")
 
 if not is_pro:
-    st.warning("🔒 يرجى إدخال كود اشتراك صالح في الشريط الجانبي للوصول إلى التطبيقات والمساعد الذكي.")
+    st.warning("🔒 يرجى إدخال كود اشتراك صالح في الشريط الجانبي والتأكد من الاتصال بقاعدة البيانات للوصول إلى التطبيقات والمساعد الذكي.")
     st.stop()
 
 st.sidebar.divider()
@@ -427,6 +431,9 @@ st.sidebar.divider()
 # =========================================================
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة")
 def edit_generator_modal(generator_id):
+    if not db_connected:
+        st.error("❌ لا يوجد اتصال بمركزي قاعدة البيانات.")
+        return
     db = get_db_session()
     gen = db.query(Generator).options(joinedload(Generator.site)).filter(Generator.id == generator_id).first()
     
@@ -545,13 +552,13 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     col_site1, col_site2 = st.columns(2)
     
     db = get_db_session()
-    user_company = db.query(Company).filter(Company.id == input_code).first()
+    user_company = db.query(Company).filter(Company.id == input_code).first() if db else None
 
     with col_site1:
         new_site_name = st.text_input("اسم الموقع الجديد:")
         new_site_address = st.text_input("عنوان الموقع بالتفصيل (كتابة نصية):")
         if st.button("➕ أضف الموقع والعنوان"):
-            if new_site_name and user_company:
+            if new_site_name and user_company and db:
                 existing_site = db.query(Site).filter(Site.company_id == user_company.id, Site.name == new_site_name).first()
                 if not existing_site:
                     db.add(Site(company_id=user_company.id, name=new_site_name, address=new_site_address or "غير محدد"))
@@ -562,11 +569,12 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
                 else:
                     st.warning("الموقع موجود بالفعل!")
 
-    company_sites = db.query(Site).filter(Site.company_id == user_company.id).all() if user_company else []
+    company_sites = db.query(Site).filter(Site.company_id == user_company.id).all() if (user_company and db) else []
     
     if not company_sites:
         st.warning("الرجاء إضافة موقع للبدء.")
-        db.close()
+        if db:
+            db.close()
         st.stop()
 
     site_dict = {s.name: s for s in company_sites}
@@ -577,9 +585,10 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         
         current_site_address = st.text_input("تعديل عنوان الموقع المختار:", value=current_site_obj.address or "")
         if st.button("✏️ تحديث عنوان الموقع"):
-            current_site_obj.address = current_site_address
-            db.commit()
-            st.success("تم تحديث العنوان!")
+            if db:
+                current_site_obj.address = current_site_address
+                db.commit()
+                st.success("تم تحديث العنوان!")
 
     st.divider()
 
@@ -591,7 +600,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         st.write("")
         st.write("")
         if st.button("➕ إنشاء المولد"):
-            if new_gen_code:
+            if new_gen_code and db:
                 existing_gen = db.query(Generator).filter(Generator.site_id == current_site_obj.id, Generator.gen_code == new_gen_code).first()
                 if not existing_gen:
                     new_g = Generator(
@@ -629,12 +638,13 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
                 else:
                     st.warning("المولد موجود بالفعل بنفس الكود!")
 
-    site_generators = db.query(Generator).filter(Generator.site_id == current_site_obj.id).all()
+    site_generators = db.query(Generator).filter(Generator.site_id == current_site_obj.id).all() if db else []
     gen_dict = {g.gen_code: g for g in site_generators}
 
     if not gen_dict:
         st.info("لا توجد مولدات في هذا الموقع. قم بإضافة مولد للبدء.")
-        db.close()
+        if db:
+            db.close()
     else:
         col_select_g, col_modal_btn = st.columns([2, 1])
         with col_select_g:
@@ -680,7 +690,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         # ---------------------------------------------------------
         # جدول الصيانة التنبؤية لـ 14 قطعة غيار عبر SQLAlchemy
         # ---------------------------------------------------------
-        gen_parts = db.query(MaintenancePart).filter(MaintenancePart.generator_id == selected_gen_obj.id).order_by(MaintenancePart.unit_num).all()
+        gen_parts = db.query(MaintenancePart).filter(MaintenancePart.generator_id == selected_gen_obj.id).order_by(MaintenancePart.unit_num).all() if db else []
         
         parts_list_data = []
         for p in gen_parts:
@@ -712,23 +722,24 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         )
 
         if st.button("🔄 تأكيد تحديث وتصفير القطع المحددة", type="primary"):
-            for idx, row in edited_df.iterrows():
-                p_id = row.get("id")
-                is_reset = row.get("تجديد (تصفير)")
-                life = float(row.get("العمر الافتراضي (ساعة)", 250))
-                used = float(row.get("الساعات المنقضية (ساعة)", 0))
-                
-                if p_id:
-                    part_db = db.query(MaintenancePart).filter(MaintenancePart.id == p_id).first()
-                    if part_db:
-                        part_db.category = row.get("تصنيف القطعة")
-                        part_db.part_name = row.get("قطع الغيار / الفلاتر")
-                        part_db.lifespan_hours = life
-                        part_db.used_hours = 0.0 if is_reset else used
-            db.commit()
-            st.success("✅ تم تحديث قاعدة البيانات وتصفير القطع المحددة بنجاح!")
-            db.close()
-            st.rerun()
+            if db:
+                for idx, row in edited_df.iterrows():
+                    p_id = row.get("id")
+                    is_reset = row.get("تجديد (تصفير)")
+                    life = float(row.get("العمر الافتراضي (ساعة)", 250))
+                    used = float(row.get("الساعات المنقضية (ساعة)", 0))
+                    
+                    if p_id:
+                        part_db = db.query(MaintenancePart).filter(MaintenancePart.id == p_id).first()
+                        if part_db:
+                            part_db.category = row.get("تصنيف القطعة")
+                            part_db.part_name = row.get("قطع الغيار / الفلاتر")
+                            part_db.lifespan_hours = life
+                            part_db.used_hours = 0.0 if is_reset else used
+                db.commit()
+                st.success("✅ تم تحديث قاعدة البيانات وتصفير القطع المحددة بنجاح!")
+                db.close()
+                st.rerun()
 
         # حساب النسب والألوان
         processed_rows = []
@@ -938,7 +949,8 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             mime="application/pdf",
             use_container_width=True
         )
-        db.close()
+        if db:
+            db.close()
 
 # =========================================================
 # التطبيق 2: المتابعة اليومية وتقارير الإدارة والتذكيرات الآلية عبر SQLAlchemy
@@ -952,16 +964,16 @@ elif selected_app == "📊 2. المتابعة اليومية وتقارير ا�
     tab_mgr1, tab_mgr2 = st.tabs(["📋 التقرير الملخص اليومي لمدير الموقع", "⏰ التذكيرات والتنبيهات الآلية للفنيين"])
 
     db = get_db_session()
-    user_company = db.query(Company).filter(Company.id == input_code).first()
+    user_company = db.query(Company).filter(Company.id == input_code).first() if db else None
 
     # الاستعلام عن القراءات اليومية للشركة الحالية
     today_readings = db.query(DailyReading).join(Generator).join(Site).filter(
         Site.company_id == user_company.id,
         DailyReading.log_date == date.today()
-    ).all() if user_company else []
+    ).all() if (user_company and db) else []
 
     # استعلام جميع المولدات التابعة للشركة
-    all_company_generators = db.query(Generator).join(Site).filter(Site.company_id == user_company.id).all() if user_company else []
+    all_company_generators = db.query(Generator).join(Site).filter(Site.company_id == user_company.id).all() if (user_company and db) else []
 
     logged_gen_ids = [r.generator_id for r in today_readings]
     total_gens_count = len(all_company_generators)
@@ -1067,7 +1079,8 @@ elif selected_app == "📊 2. المتابعة اليومية وتقارير ا�
         else:
             st.success("🎉 ممتااااز! تم تسجيل جميع قراءات المولدات اليومية بنجاح ولم يتم تفويت أي مولد اليوم.")
             
-    db.close()
+    if db:
+        db.close()
 
 # =========================================================
 # التطبيق 3: المساعد الذكي والكتالوجات (مدمج ومتطور)
