@@ -32,10 +32,38 @@ except ImportError:
     decode_qr = None
 
 # =========================================================
-# 0. تهيئة قاعدة البيانات باستخدام SQLAlchemy
+# 1. إعدادات الصفحة الرئيسية (يجب أن تكون أول أمر Streamlit)
 # =========================================================
-DATABASE_URL = "sqlite:///addoma_maintenance.db"
-engine = create_engine(DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
+st.set_page_config(
+    page_title="المجمع الصناعي الشامل - Addoma Trading Services",
+    layout="wide",
+)
+
+# =========================================================
+# 0. تهيئة قاعدة البيانات باستخدام SQLAlchemy و Supabase
+# =========================================================
+# 1. استدعاء رابط الاتصال من الأسرار
+DATABASE_URL = st.secrets["postgres"]["url"]
+
+# 2. إنشاء محرك الاتصال وتخزينه في الكاش لسرعة الأداء
+@st.cache_resource
+def init_connection():
+    return create_engine(DATABASE_URL)
+
+engine = init_connection()
+
+# 3. اختبار الاتصال واسترجاع البيانات
+try:
+    with engine.connect() as conn:
+        st.success("تم الاتصال بقاعدة بيانات Supabase بنجاح! ⚡")
+        
+        # مثال: قراءة البيانات من جدول (استبدل my_table باسم جدولك في Supabase)
+        # df = pd.read_sql("SELECT * FROM my_table;", conn)
+        # st.dataframe(df)
+        
+except Exception as e:
+    st.error(f"فشل الاتصال: {e}")
+
 Base = declarative_base()
 SessionLocal = sessionmaker(bind=engine)
 
@@ -202,13 +230,8 @@ def init_db_data():
 init_db_data()
 
 # =========================================================
-# 1. إعدادات الصفحة الرئيسية وتهيئة الذكاء الاصطناعي والصوت
+# تهيئة الذكاء الاصطناعي والصوت
 # =========================================================
-st.set_page_config(
-    page_title="المجمع الصناعي الشامل - Addoma Trading Services",
-    layout="wide",
-)
-
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
 
