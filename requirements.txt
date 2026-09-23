@@ -18,3 +18,4 @@ matplotlib
 firebase-admin
 gTTS
 streamlit
+SQLAlchemy
