@@ -60,7 +60,8 @@ if "sites_data" not in st.session_state:
                     },
                     "calib_engine": {
                         "oil_press_bar": 4.5, "coolant_temp_c": 85.0,
-                        "rpm": 1500.0, "battery_v": 26.5
+                        "rpm": 1500.0, "battery_v": 26.5,
+                        "ambient_temp": 43.0
                     }
                 },
                 "G2": {
@@ -77,7 +78,8 @@ if "sites_data" not in st.session_state:
                     },
                     "calib_engine": {
                         "oil_press_bar": 4.2, "coolant_temp_c": 88.0,
-                        "rpm": 1500.0, "battery_v": 25.8
+                        "rpm": 1500.0, "battery_v": 25.8,
+                        "ambient_temp": 45.0
                     }
                 }
             }
@@ -357,6 +359,7 @@ def edit_generator_modal(site_key, gen_key):
         c_temp = st.number_input("حرارة سائل التبريد Coolant Temp (°C)", value=float(eng.get("coolant_temp_c", 85.0)))
         r_rpm = st.number_input("سرعة المحرك Engine Speed (RPM)", value=float(eng.get("rpm", 1500.0)))
         b_volt = st.number_input("جهد بطارية التشغيل Battery (V)", value=float(eng.get("battery_v", 26.0)))
+        ambient_t = st.number_input("درجة الحرارة المحيطة Ambient Temp (°C)", value=float(eng.get("ambient_temp", 43.0)))
 
     if st.button("💾 حفظ البيانات وتكرار صوت المنبه والإنذار حتى يتم توقيفه بزر Mute والتغييرات", use_container_width=True, type="primary"):
         st.session_state.sites_data[site_key]["generators"][gen_key] = {
@@ -373,7 +376,8 @@ def edit_generator_modal(site_key, gen_key):
             },
             "calib_engine": {
                 "oil_press_bar": o_press, "coolant_temp_c": c_temp,
-                "rpm": r_rpm, "battery_v": b_volt
+                "rpm": r_rpm, "battery_v": b_volt,
+                "ambient_temp": ambient_t
             }
         }
         st.success("✅ تم تحديث بيانات المولد والمعايرة بنجاح!")
@@ -442,7 +446,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
                     "kw": 100.0,
                     "load": 50.0,
                     "calib_elec": {"v_nominal": 400.0, "v_measured": 400.0, "freq_nominal": 50.0, "freq_measured": 50.0, "current_max": 200.0, "current_measured": 100.0, "pf": 0.8, "ct_ratio": "200/5"},
-                    "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0}
+                    "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0, "ambient_temp": 43.0}
                 }
                 st.success(f"تم إنشاء المولد {new_gen_id}")
                 st.rerun()
@@ -472,7 +476,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
         m_c1.metric("الطراز والسعة", f"{gen_info['model']}", f"{gen_info['kw']} kW")
         m_c2.metric("ساعات التشغيل / الهدف", f"{gen_info['run_hours']} hrs", f"المستهدف: {gen_info['target']} hrs")
         m_c3.metric("معايرة الجهد المقاس", f"{calib_e.get('v_measured', 0)} V", f"الاسمي: {calib_e.get('v_nominal', 0)} V")
-        m_c4.metric("معايرة حرارة المحرك", f"{calib_m.get('coolant_temp_c', 0)} °C", f"الضغط: {calib_m.get('oil_press_bar', 0)} Bar")
+        m_c4.metric("حرارة المحرك / المحيطة", f"{calib_m.get('coolant_temp_c', 0)} °C", f"المحيطة: {calib_m.get('ambient_temp', 0)} °C")
 
         # ---------------------------------------------------------
         # فحص قيم المعايرة وإطلاق التنبيهات الصوتية المستمرة (Looping Alarms)
@@ -663,11 +667,12 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
 
             # قسم الموقع والبيانات
             pdf.set_fill_color(245, 247, 250)
-            pdf.rect(10, 35, 190, 25, "F")
+            pdf.rect(10, 35, 190, 40, "F") # تم زيادة ارتفاع المربع لاستيعاب التوصيات
             pdf.set_xy(12, 37)
             pdf.set_font("Helvetica", "B", 9)
             pdf.set_text_color(24, 43, 73)
             
+            # إضافة اسم الموقع والعنوان بوضوح
             pdf.cell(0, 5, f"Site Name: {sanitize_latin_only(selected_site)} | Address: {sanitize_latin_only(current_site_address)}", ln=True)
             pdf.set_x(12)
             pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | Capacity: {gen_info['kw']} kW", ln=True)
@@ -675,6 +680,28 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.cell(0, 5, f"Current Run Hours: {gen_info['run_hours']} hrs | Target Hours: {gen_info['target']} hrs", ln=True)
             pdf.set_x(12)
             pdf.cell(0, 5, f"Electrical Calib: {calib_e.get('v_measured',0)}V / {calib_e.get('freq_measured',0)}Hz | Engine: {calib_m.get('coolant_temp_c',0)} C / {calib_m.get('oil_press_bar',0)} Bar", ln=True)
+            
+            # ---------------------------------------------------------
+            # إضافة التوصيات الخاصة بنوع الزيت بناءً على درجة الحرارة المحيطة
+            # ---------------------------------------------------------
+            amb_temp_val = calib_m.get('ambient_temp', 43.0)
+            
+            pdf.ln(2)
+            pdf.set_x(12)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(200, 30, 30) # لون أحمر للتوصيات
+            pdf.cell(0, 5, "Engine Oil Recommendation based on Ambient Temperature:", ln=True)
+            
+            pdf.set_x(12)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(24, 43, 73)
+            if amb_temp_val >= 45:
+                pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 2W50", ln=True)
+            elif amb_temp_val >= 43:
+                pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 15W40", ln=True)
+            else:
+                pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: USE STANDARD OIL SIZE 15W40", ln=True)
+            
             pdf.ln(8)
 
             # جدول الـ 14 قطعة
@@ -901,3 +928,4 @@ elif selected_app == "🔍 3. نظام فحص المعدات (WIC وغيرها)"
 
     if eq_type == "غرف تبريد وتجميد WIC 10 و WIC 40":
         st.warning("⚠️ **قائمة فحص وحدات WIC:** يرجى التأكد من فحص صمامات التمدد (Expansion Valves)، وسخانات الإذابة (Defrost)، وتدفق سائل التبريد لوحدات WIC 10 و WIC 40 بشكل منفصل لضمان الكفاءة.")
+
