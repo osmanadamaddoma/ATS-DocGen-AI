@@ -41,52 +41,47 @@ st.set_page_config(
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
 
+# تحديث هيكل قاعدة البيانات المصغرة ليدعم القوائم الرئيسية والفرعية
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
-        "الموقع الرئيسي - الخرطوم": {
-            "address": "الخرطوم - المنطقة الصناعية - كافوري",
-            "sub_sites": {
-                "المحطة المركزية (أ)": {
-                    "generators": {
-                        "G1": {
-                            "model": "Perkins 410 kVA",
-                            "run_hours": 700.0,
-                            "target": 940.0,
-                            "kw": 410.0,
-                            "load": 250.0,
-                            "calib_elec": {
-                                "v_nominal": 400.0, "v_measured": 398.0,
-                                "freq_nominal": 50.0, "freq_measured": 50.1,
-                                "current_max": 600.0, "current_measured": 360.0,
-                                "pf": 0.85, "ct_ratio": "600/5"
-                            },
-                            "calib_engine": {
-                                "oil_press_bar": 4.5, "coolant_temp_c": 85.0,
-                                "rpm": 1500.0, "battery_v": 26.5,
-                                "ambient_temp": 43.0
-                            }
+        "الخرطوم (القائمة الرئيسية)": {
+            "الموقع الرئيسي - كافوري (موقع فرعي)": {
+                "address": "الخرطوم - المنطقة الصناعية - كافوري",
+                "generators": {
+                    "G1": {
+                        "model": "Perkins 410 kVA",
+                        "run_hours": 700.0,
+                        "target": 940.0,
+                        "kw": 410.0,
+                        "load": 250.0,
+                        "calib_elec": {
+                            "v_nominal": 400.0, "v_measured": 398.0,
+                            "freq_nominal": 50.0, "freq_measured": 50.1,
+                            "current_max": 600.0, "current_measured": 360.0,
+                            "pf": 0.85, "ct_ratio": "600/5"
+                        },
+                        "calib_engine": {
+                            "oil_press_bar": 4.5, "coolant_temp_c": 85.0,
+                            "rpm": 1500.0, "battery_v": 26.5,
+                            "ambient_temp": 43.0
                         }
-                    }
-                },
-                "المحطة الفرعية (ب)": {
-                    "generators": {
-                        "G2": {
-                            "model": "Cummins 250 kVA",
-                            "run_hours": 1200.0,
-                            "target": 1500.0,
-                            "kw": 250.0,
-                            "load": 180.0,
-                            "calib_elec": {
-                                "v_nominal": 400.0, "v_measured": 402.0,
-                                "freq_nominal": 50.0, "freq_measured": 49.9,
-                                "current_max": 360.0, "current_measured": 260.0,
-                                "pf": 0.82, "ct_ratio": "400/5"
-                            },
-                            "calib_engine": {
-                                "oil_press_bar": 4.2, "coolant_temp_c": 88.0,
-                                "rpm": 1500.0, "battery_v": 25.8,
-                                "ambient_temp": 45.0
-                            }
+                    },
+                    "G2": {
+                        "model": "Cummins 250 kVA",
+                        "run_hours": 1200.0,
+                        "target": 1500.0,
+                        "kw": 250.0,
+                        "load": 180.0,
+                        "calib_elec": {
+                            "v_nominal": 400.0, "v_measured": 402.0,
+                            "freq_nominal": 50.0, "freq_measured": 49.9,
+                            "current_max": 360.0, "current_measured": 260.0,
+                            "pf": 0.82, "ct_ratio": "400/5"
+                        },
+                        "calib_engine": {
+                            "oil_press_bar": 4.2, "coolant_temp_c": 88.0,
+                            "rpm": 1500.0, "battery_v": 25.8,
+                            "ambient_temp": 45.0
                         }
                     }
                 }
@@ -101,7 +96,7 @@ if "daily_logs" not in st.session_state:
         {
             "timestamp": f"{today_str} 08:30:00",
             "date": today_str,
-            "site": "الموقع الرئيسي - الخرطوم | المحطة المركزية (أ)",
+            "site": "الخرطوم (القائمة الرئيسية) - الموقع الرئيسي - كافوري (موقع فرعي)",
             "generator": "G1",
             "technician": "أحمد فني الصيانة",
             "run_hours": 700.0,
@@ -354,12 +349,12 @@ st.sidebar.divider()
 # النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد مع التحقق الفوري
 # =========================================================
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة")
-def edit_generator_modal(site_key, sub_site_key, gen_key):
-    gen_data = st.session_state.sites_data[site_key]["sub_sites"][sub_site_key]["generators"][gen_key]
+def edit_generator_modal(main_site, sub_site, gen_key):
+    gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
     elec = gen_data.get("calib_elec", {})
     eng = gen_data.get("calib_engine", {})
 
-    st.markdown(f"### ⚙️ بيانات المولد: **{gen_key}** - الموقع: **{site_key} | {sub_site_key}**")
+    st.markdown(f"### ⚙️ بيانات المولد: **{gen_key}** - موقع: **{sub_site}**")
     
     tech_name = st.text_input("اسم الفني المسؤول عن الإدخال:", value="فني الصيانة المناوب")
     tab1, tab2, tab3 = st.tabs(["🏷️ البيانات الأساسية", "⚡ معايرة الكهرباء", "🔧 معايرة المحرك"])
@@ -408,7 +403,7 @@ def edit_generator_modal(site_key, sub_site_key, gen_key):
                 st.error(err)
             st.warning("⚠️ تم رفض حفظ البيانات لحماية جودة النظام وقاعدة البيانات. يرجى تصحيح الأرقام أعلاه.")
         else:
-            st.session_state.sites_data[site_key]["sub_sites"][sub_site_key]["generators"][gen_key] = {
+            st.session_state.sites_data[main_site][sub_site]["generators"][gen_key] = {
                 "model": new_model,
                 "run_hours": new_run_hours,
                 "target": new_target,
@@ -439,7 +434,7 @@ def edit_generator_modal(site_key, sub_site_key, gen_key):
             st.session_state.daily_logs.append({
                 "timestamp": now_str,
                 "date": today_date,
-                "site": f"{site_key} | {sub_site_key}",
+                "site": f"{main_site} - {sub_site}",
                 "generator": gen_key,
                 "technician": tech_name,
                 "run_hours": new_run_hours,
@@ -468,73 +463,66 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
     st.sidebar.subheader("🎨 تخصيص التقرير المطبوع")
     logo_file = st.sidebar.file_uploader("رفع شعار الشركة (Logo)", type=["png", "jpg", "jpeg"], key="logo_up")
 
-    st.subheader("📍 إدارة المواقع الرئيسية والفرعية (نظام هرمي)")
-    
+    st.subheader("📍 إدارة المواقع والعناوين (قائمة رئيسية وقوائم فرعية تشعبية)")
     col_site1, col_site2 = st.columns(2)
+    
+    main_sites = list(st.session_state.sites_data.keys())
+    
     with col_site1:
-        with st.expander("🏢 القائمة الرئيسية: إدارة المواقع (الشركة / المجمع)", expanded=True):
-            new_site_name = st.text_input("إدخال اسم الموقع الرئيسي الجديد:")
-            new_site_address = st.text_input("عنوان الموقع الرئيسي بالتفصيل:")
-            if st.button("➕ أضف الموقع الرئيسي"):
-                if new_site_name and new_site_name not in st.session_state.sites_data:
-                    st.session_state.sites_data[new_site_name] = {
-                        "address": new_site_address if new_site_address else "غير محدد",
-                        "sub_sites": {}
-                    }
-                    st.success(f"تم إضافة الموقع: {new_site_name}")
-                    st.rerun()
-
-    site_list = list(st.session_state.sites_data.keys())
-    if not site_list:
-        st.warning("الرجاء إضافة موقع رئيسي للبدء.")
-        st.stop()
+        st.markdown("### 🏢 القائمة الرئيسية للمواقع")
+        new_main_site = st.text_input("اسم الموقع الرئيسي الجديد (مثال: الإدارة العامة):")
+        if st.button("➕ أضف الموقع الرئيسي"):
+            if new_main_site and new_main_site not in st.session_state.sites_data:
+                st.session_state.sites_data[new_main_site] = {}
+                st.success(f"تم إضافة الموقع الرئيسي: {new_main_site}")
+                st.rerun()
+                
+        selected_main_site = st.selectbox("📌 اختر الموقع الرئيسي (لتنبثق منه الارتباطات الفرعية):", main_sites) if main_sites else None
 
     with col_site2:
-        with st.expander("📌 تحديد الموقع الرئيسي النشط", expanded=True):
-            selected_site = st.selectbox("اختر الموقع الرئيسي الحالي للعمل عليه:", site_list)
-            current_site_address = st.text_input("تعديل عنوان الموقع المختار:", value=st.session_state.sites_data[selected_site].get("address", ""))
-            if st.button("✏️ تحديث عنوان الموقع الرئيسي"):
-                st.session_state.sites_data[selected_site]["address"] = current_site_address
-                st.success("تم تحديث العنوان!")
-
-    st.divider()
-
-    # === القوائم الفرعية (Sub-Sites) ===
-    st.markdown(f"### 🔗 القوائم الفرعية لموقع: **{selected_site}**")
-    
-    col_sub1, col_sub2 = st.columns(2)
-    with col_sub1:
-        with st.expander(f"➕ إضافة موقع/قسم فرعي داخل ({selected_site})", expanded=True):
-            new_sub_site = st.text_input("اسم الموقع الفرعي (مثال: الورشة أ، المحطة ب):")
-            if st.button("➕ أضف الموقع الفرعي"):
-                if new_sub_site and new_sub_site not in st.session_state.sites_data[selected_site]["sub_sites"]:
-                    st.session_state.sites_data[selected_site]["sub_sites"][new_sub_site] = {"generators": {}}
+        st.markdown("### 🏗️ القوائم الفرعية (مواقع بيانات المولدات)")
+        if selected_main_site:
+            sub_sites = list(st.session_state.sites_data[selected_main_site].keys())
+            
+            new_sub_site = st.text_input(f"اسم الموقع الفرعي التابع لـ ({selected_main_site}):")
+            new_sub_address = st.text_input("عنوان موقع بيانات المولد الفرعي (إدخال يدوي):")
+            
+            if st.button("➕ أضف الموقع الفرعي والعنوان اليدوي"):
+                if new_sub_site and new_sub_site not in st.session_state.sites_data[selected_main_site]:
+                    st.session_state.sites_data[selected_main_site][new_sub_site] = {
+                        "address": new_sub_address if new_sub_address else "غير محدد",
+                        "generators": {}
+                    }
                     st.success(f"تم إضافة الموقع الفرعي: {new_sub_site}")
                     st.rerun()
                     
-    sub_site_list = list(st.session_state.sites_data[selected_site].get("sub_sites", {}).keys())
-    if not sub_site_list:
-        st.warning("الرجاء إضافة موقع فرعي لاستعراض وإضافة المولدات.")
-        st.stop()
-        
-    with col_sub2:
-        with st.expander("📂 تحديد الموقع الفرعي النشط", expanded=True):
-            selected_sub_site = st.selectbox("اختر الموقع الفرعي للعمل عليه:", sub_site_list)
+            selected_sub_site = st.selectbox("📍 اختر الموقع الفرعي (ارتباط تشعبي للوصول للمولدات):", sub_sites) if sub_sites else None
             
-    st.divider()
+            if selected_sub_site:
+                current_site_address = st.text_input("تعديل عنوان موقع بيانات المولد (إدخال يدوي):", value=st.session_state.sites_data[selected_main_site][selected_sub_site].get("address", ""))
+                if st.button("✏️ تحديث عنوان موقع بيانات المولد"):
+                    st.session_state.sites_data[selected_main_site][selected_sub_site]["address"] = current_site_address
+                    st.success("تم تحديث العنوان للموقع الفرعي بنجاح!")
+        else:
+            selected_sub_site = None
 
-    # === المولدات (Generators) ===
-    st.markdown(f"#### ⚡ المولدات والآليات داخل: **{selected_sub_site}**")
+    if not main_sites or not selected_main_site or not selected_sub_site:
+        st.warning("الرجاء إضافة وتحديد موقع رئيسي وموقع فرعي للبدء في إدارة المولدات.")
+        st.stop()
+
+    st.divider()
 
     col_gen_m1, col_gen_m2 = st.columns([2, 1])
     with col_gen_m1:
-        new_gen_id = st.text_input(f"إضافة مولد جديد في ({selected_sub_site}):", placeholder="مثال: G3")
+        st.markdown(f"### ⚙️ بيانات عدد المولدات المحلية في [ {selected_main_site} 🔗 {selected_sub_site} ]")
+        new_gen_id = st.text_input(f"إضافة مولد محلي جديد في الموقع الفرعي:", placeholder="مثال: G3")
     with col_gen_m2:
         st.write("")
         st.write("")
+        st.write("")
         if st.button("➕ إنشاء المولد"):
-            if new_gen_id and new_gen_id not in st.session_state.sites_data[selected_site]["sub_sites"][selected_sub_site]["generators"]:
-                st.session_state.sites_data[selected_site]["sub_sites"][selected_sub_site]["generators"][new_gen_id] = {
+            if new_gen_id and new_gen_id not in st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"]:
+                st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][new_gen_id] = {
                     "model": "Perkins Standard",
                     "run_hours": 0.0,
                     "target": 250.0,
@@ -546,7 +534,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
                 st.success(f"تم إنشاء المولد {new_gen_id}")
                 st.rerun()
 
-    gen_list = list(st.session_state.sites_data[selected_site]["sub_sites"][selected_sub_site]["generators"].keys())
+    gen_list = list(st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"].keys())
 
     if not gen_list:
         st.info("لا توجد مولدات في هذا الموقع الفرعي. قم بإضافة مولد للبدء.")
@@ -558,9 +546,9 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             st.write("")
             st.write("")
             if st.button("📝 فتح نافذة إدخال وتعديل البيانات المعايرة"):
-                edit_generator_modal(selected_site, selected_sub_site, selected_gen)
+                edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
 
-        gen_info = st.session_state.sites_data[selected_site]["sub_sites"][selected_sub_site]["generators"][selected_gen]
+        gen_info = st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
         calib_e = gen_info.get("calib_elec", {})
         calib_m = gen_info.get("calib_engine", {})
 
@@ -596,7 +584,7 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             combined_alert_text = " . ".join(alarm_messages)
             play_audio(combined_alert_text, loop=True)
 
-        parts_key = f"parts_{selected_site}_{selected_sub_site}_{selected_gen}"
+        parts_key = f"parts_{selected_main_site}_{selected_sub_site}_{selected_gen}"
         if parts_key not in st.session_state:
             st.session_state[parts_key] = [
                 {"الوحدة": 1, "تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Oil Filter", "العمر الافتراضي (ساعة)": 250.0, "الساعات المنقضية (ساعة)": 180.0, "تجديد (تصفير)": False},
@@ -740,14 +728,15 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             pdf.add_page()
 
             pdf.set_fill_color(245, 247, 250)
-            pdf.rect(10, 35, 190, 40, "F")
+            pdf.rect(10, 35, 190, 45, "F")
             pdf.set_xy(12, 37)
             pdf.set_font("Helvetica", "B", 9)
             pdf.set_text_color(24, 43, 73)
             
-            pdf.cell(0, 5, f"Main Site: {sanitize_latin_only(selected_site)} | Sub-Site: {sanitize_latin_only(selected_sub_site)}", ln=True)
+            # إدراج عنوان موقع بيانات المولد كما هو مطلوب بشكل صريح
+            pdf.cell(0, 5, f"Generator Data Site Address: {sanitize_latin_only(current_site_address)}", ln=True)
             pdf.set_x(12)
-            pdf.cell(0, 5, f"Address: {sanitize_latin_only(current_site_address)}", ln=True)
+            pdf.cell(0, 5, f"Main Site: {sanitize_latin_only(selected_main_site)} | Sub Site: {sanitize_latin_only(selected_sub_site)}", ln=True)
             pdf.set_x(12)
             pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | Capacity: {gen_info['kw']} kW", ln=True)
             pdf.set_x(12)
@@ -847,9 +836,9 @@ if selected_app == "⚙️ 1. الصيانة التنبؤية والمولدات
             return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
 
         st.download_button(
-            label=f"🖨️ إصدار التقرير الشامل للمولد ({selected_gen})",
+            label=f"🖨️ إصدار التقرير الشامل للمولد ({selected_gen}) في موقع ({selected_sub_site})",
             data=generate_full_pdf_bytes(),
-            file_name=f"Report_{selected_site}_{selected_sub_site}_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
+            file_name=f"Report_{selected_main_site}_{selected_sub_site}_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
             mime="application/pdf",
             use_container_width=True
         )
@@ -871,10 +860,10 @@ elif selected_app == "📊 2. المتابعة اليومية وتقارير ا�
         today_logs = [log for log in st.session_state.daily_logs if log.get("date") == today_str]
         
         all_gens = []
-        for s_name, s_info in st.session_state.sites_data.items():
-            for sub_name, sub_info in s_info.get("sub_sites", {}).items():
-                for g_name in sub_info.get("generators", {}):
-                    all_gens.append({"site": f"{s_name} | {sub_name}", "generator": g_name})
+        for m_site, m_info in st.session_state.sites_data.items():
+            for s_name, s_info in m_info.items():
+                for g_name in s_info.get("generators", {}):
+                    all_gens.append({"site": f"{m_site} - {s_name}", "generator": g_name})
         
         logged_gen_keys = [f"{log['site']} - {log['generator']}" for log in today_logs]
         total_gens_count = len(all_gens)
@@ -904,7 +893,7 @@ elif selected_app == "📊 2. المتابعة اليومية وتقارير ا�
             
             pdf.set_fill_color(24, 43, 73)
             pdf.set_text_color(255, 255, 255)
-            headers = ["Site(Sub)", "Gen ID", "Tech", "Hours", "Volt", "Oil(Bar)", "Temp(C)"]
+            headers = ["Site", "Gen ID", "Tech", "Hours", "Volt", "Oil(Bar)", "Temp(C)"]
             widths = [45, 20, 35, 25, 20, 25, 20]
             for h, w in zip(headers, widths):
                 pdf.cell(w, 6, h, border=1, fill=True, align="C")
@@ -947,7 +936,7 @@ elif selected_app == "📊 2. المتابعة اليومية وتقارير ا�
             
             st.markdown("##### 📋 المولدات التي تطلب إرسال تذكير سريع للفنيين:")
             for un_gen in unlogged_gens:
-                st.write(f"• **الموقع (رئيسي/فرعي):** {un_gen['site']} | **المولد:** {un_gen['generator']}")
+                st.write(f"• **الموقع:** {un_gen['site']} | **المولد:** {un_gen['generator']}")
                 
             st.divider()
             st.markdown("##### 📲 إرسال تنبيه / تذكير سريع للفنيين عبر WhatsApp أو SMS:")
