@@ -17,9 +17,14 @@ google-genai
 matplotlib
 firebase-admin
 gTTS
-streamlit
 SQLAlchemy
 psycopg2-binary
 influxdb-client
-pandas
 joblib
+pillow
+beautifulsoup4
+requests
+fpdf2
+google-genai
+gtts
+influxdb-client
