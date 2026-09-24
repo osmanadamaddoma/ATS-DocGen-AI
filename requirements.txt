@@ -20,3 +20,6 @@ gTTS
 streamlit
 SQLAlchemy
 psycopg2-binary
+influxdb-client
+pandas
+joblib
