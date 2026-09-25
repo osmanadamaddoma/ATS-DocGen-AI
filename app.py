@@ -1218,15 +1218,23 @@ elif selected_app == "🔍 5. نظام فحص المعدات (WIC وغيرها)"
 # =========================================================
 st.divider()
 
-from firebase_admin import initialize_app, get_app
+import streamlit as st
+import firebase_admin
+from firebase_admin import credentials
 
-# تهيئة الاتصال بقاعدة البيانات
-try:
-    app = get_app()
-except ValueError:
-    # يجب وضع مسار ملف مفاتيح Firebase الصحيح هنا
-    cred = credentials.Certificate("firebase_credentials.json") 
-    app = initialize_app(cred)
+# منع خطأ التهيئة المتكررة (ValueError)
+if not firebase_admin._apps:
+    try:
+        # قراءة الاعتمادات من Streamlit Secrets عند التشغيل على السحابة
+        firebase_secrets = dict(st.secrets["firebase"])
+        cred = credentials.Certificate(firebase_secrets)
+        firebase_admin.initialize_app(cred)
+    except (KeyError, FileNotFoundError):
+        # خط رجعة (Fallback) عند التشغيل والبرمجة محلياً (Localhost)
+        cred = credentials.Certificate("firebase_credentials.json")
+        firebase_admin.initialize_app(cred)
+else:
+    app = firebase_admin.get_app()
 
 db = firestore.client()
 
@@ -1245,4 +1253,3 @@ if st.button("اختبار الاتصال بـ Firebase"):
             st.warning("⚠️ تمت العملية البرمجية لكن لم يتم العثور على المستند في القاعدة.")
     except Exception as e:
         st.error(f"❌ فشل الاتصال أو الحفظ. الخطأ البرمجي: {e}")
-
