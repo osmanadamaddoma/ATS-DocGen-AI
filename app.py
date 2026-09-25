@@ -141,10 +141,18 @@ if create_client:
         supabase_key = st.secrets["supabase"].get("SUPABASE_KEY")
 
     if supabase_url and supabase_key:
+        # تهيئة الاتصال
         try:
-            supabase: Client = create_client(supabase_url, supabase_key)
+            supabase = create_client(supabase_url, supabase_key)
+            
+            # محاولة استعلام تجريبي
+            response = supabase.table("subscriptions").select("*").limit(1).execute()
+            
+            # في حال نجاح الاستعلام
+            st.success("✅ التطبيق متصل ومُفعل بنجاح مع قاعدة بيانات Supabase!")
+            
         except Exception as e:
-            st.warning(f"⚠️ حدث خطأ أثناء الاتصال بقاعدة بيانات Supabase: {e}")
+            st.error(f"❌ فشل الاتصال بقاعدة البيانات: {e}")
     else:
         st.info("💡 لم يتم العثور على مفاتيح Supabase. يرجى إضافتها (SUPABASE_URL و SUPABASE_KEY) في ملف st.secrets للاتصال بقاعدة بيانات تطبيقاتك.")
 else:
