@@ -393,11 +393,16 @@ CLIENTS_DATABASE = {
     },
 }
 
-@st.cache_resource
+import extra_streamlit_components as stx
+import streamlit as st
+
 def get_cookie_manager():
-    return stx.CookieManager()
+    if "cookie_manager" not in st.session_state:
+        st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager")
+    return st.session_state["cookie_manager"]
 
 cookie_manager = get_cookie_manager()
+
 saved_code = cookie_manager.get(cookie="activation_code")
 
 if "authenticated" not in st.session_state:
@@ -659,7 +664,7 @@ def edit_generator_modal(main_site, sub_site, gen_key):
 
 # --- 2. واجهة المساعد الذكي (Chat UI) ---
 if st.session_state.current_page == "chat":
-    st.title("🤖 " + ("المساعد الذكي الهندي" if L == "ar" else "Smart AI Assistant"))
+    st.title("🤖 " + ("المساعد الذكي الهندسي" if L == "ar" else "Smart AI Assistant"))
     st.caption("Addoma Trading Services - Industrial AI Engine")
 
     if "messages" not in st.session_state:
