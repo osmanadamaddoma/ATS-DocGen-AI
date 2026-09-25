@@ -1212,3 +1212,37 @@ elif selected_app == "🔍 5. نظام فحص المعدات (WIC وغيرها)"
 
     if eq_type == "غرف تبريد وتجميد WIC 10 و WIC 40":
         st.warning("⚠️ **قائمة فحص وحدات WIC:** يرجى التأكد من فحص صمامات التمدد (Expansion Valves)، وسخانات الإذابة (Defrost)، وتدفق سائل التبريد لوحدات WIC 10 و WIC 40 بشكل منفصل لضمان الكفاءة.")
+
+# =========================================================
+# 6. اختبار اتصال مباشر (Ping Test) بقاعدة البيانات Firebase
+# =========================================================
+st.divider()
+
+from firebase_admin import initialize_app, get_app
+
+# تهيئة الاتصال بقاعدة البيانات
+try:
+    app = get_app()
+except ValueError:
+    # يجب وضع مسار ملف مفاتيح Firebase الصحيح هنا
+    cred = credentials.Certificate("firebase_credentials.json") 
+    app = initialize_app(cred)
+
+db = firestore.client()
+
+st.subheader("🛠️ فحص حالة اتصال قاعدة البيانات")
+if st.button("اختبار الاتصال بـ Firebase"):
+    try:
+        # محاولة كتابة بيانات تجريبية
+        test_ref = db.collection("System_Tests").document("test_connection")
+        test_ref.set({"status": "Active", "module": "Generator_Diagnostics"})
+        
+        # محاولة قراءة نفس البيانات للتأكد من حفظها
+        result = test_ref.get()
+        if result.exists:
+            st.success(f"✅ تم الاتصال وحفظ البيانات بنجاح! {result.to_dict()}")
+        else:
+            st.warning("⚠️ تمت العملية البرمجية لكن لم يتم العثور على المستند في القاعدة.")
+    except Exception as e:
+        st.error(f"❌ فشل الاتصال أو الحفظ. الخطأ البرمجي: {e}")
+
