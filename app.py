@@ -17,12 +17,16 @@ from PIL import Image
 from bs4 import BeautifulSoup
 import requests
 from fpdf import FPDF
-import firebase_admin
-from firebase_admin import credentials, firestore
 import pdfplumber
 import streamlit as st
 from google import genai
 from gtts import gTTS
+
+# محاولة استيراد مكتبة Supabase
+try:
+    from supabase import create_client, Client
+except ImportError:
+    create_client = None
 
 # استيراد مكتبة قاعدة بيانات إنترنت الأشياء الحية (IoT Database)
 try:
@@ -117,14 +121,34 @@ if "daily_logs" not in st.session_state:
 # جلب مفتاح Gemini بأمان من الإعدادات
 gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
-if not gemini_key and "firebase" in st.secrets:
-    gemini_key = st.secrets["firebase"].get("GEMINI_API_KEY")
+if not gemini_key and "supabase" in st.secrets:
+    gemini_key = st.secrets["supabase"].get("GEMINI_API_KEY")
 
 if not gemini_key:
     st.warning("⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY. يرجى إضافته في st.secrets.")
 
 # تهيئة عميل Gemini API
 client = genai.Client(api_key=gemini_key) if gemini_key else None
+
+# إعدادات قاعدة بيانات Supabase للاتصال بتطبيقاتي
+supabase = None
+if create_client:
+    supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+    supabase_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
+    
+    if not supabase_url and "supabase" in st.secrets:
+        supabase_url = st.secrets["supabase"].get("SUPABASE_URL")
+        supabase_key = st.secrets["supabase"].get("SUPABASE_KEY")
+
+    if supabase_url and supabase_key:
+        try:
+            supabase: Client = create_client(supabase_url, supabase_key)
+        except Exception as e:
+            st.warning(f"⚠️ حدث خطأ أثناء الاتصال بقاعدة بيانات Supabase: {e}")
+    else:
+        st.info("💡 لم يتم العثور على مفاتيح Supabase. يرجى إضافتها (SUPABASE_URL و SUPABASE_KEY) في ملف st.secrets للاتصال بقاعدة بيانات تطبيقاتك.")
+else:
+    st.warning("⚠️ مكتبة supabase غير مثبتة. يرجى تثبيتها باستخدام pip install supabase")
 
 # دالة تشغيل الصوت المحدثة مع دعم خيار الكتم والتكرار المستمر للانذارات
 def play_audio(text, loop=False):
