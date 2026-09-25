@@ -1068,6 +1068,33 @@ elif selected_app == "🤖 4. المساعد الذكي والكتالوجات �
                         st.success(f"✅ تم حفظ وقراءة {len(catalog_pages)} صفحة من الكتالوج بنجاح!")
                     except Exception as e:
                         st.error(f"❌ تعذر قراءة ملف PDF: {e}")
+            else:
+                st.success(f"✅ الكتالوج ({st.session_state.loaded_manual_name}) محمل ومقروء مسبقاً في الجلسة الحالية.")
+
+            # الإضافة الجديدة: ميزة استخراج وتحليل الأعطال مباشرة من الكتالوج المرفوع
+            if st.button("📑 استخراج وتحليل أكواد الأعطال من الكتالوج المرفوع", use_container_width=True):
+                with st.spinner("جاري تحليل محتوى الكتالوج واستخراج الأكواد بواسطة الذكاء الاصطناعي..."):
+                    if client and "catalog_pages" in st.session_state:
+                        # أخذ عينة من الكتالوج (مثلا أول 15 صفحة) لتجنب تجاوز حد استيعاب المحتوى للنموذج
+                        sample_text = "\n".join([p["content"] for p in st.session_state.catalog_pages[:15]])
+                        extract_prompt = f"""
+                        أنت مهندس استشاري متخصص في لوحات التحكم DSE (مثل DSE 8610 MKII و DSE 7320 MKII) ومحركات Perkins و Cummins، بالإضافة إلى غرف التبريد WIC 10 و WIC 40.
+                        قم بتحليل النص التالي المستخرج من الكتالوج، واستخرج قائمة بأهم أكواد الأعطال (Fault Codes) المذكورة، مع تقديم شرح موجز وعملي لكل عطل بناءً على السياق المستخرج.
+                        
+                        النص المستخرج:
+                        {sample_text}
+                        """
+                        try:
+                            extract_response = client.models.generate_content(
+                                model="gemini-3.6-flash",
+                                contents=extract_prompt,
+                            )
+                            st.markdown("### 📊 نتيجة تحليل قراءة أكواد الكتالوج:")
+                            st.info(extract_response.text)
+                        except Exception as e:
+                            st.error(f"❌ حدث خطأ أثناء التحليل الآلي للكتالوج: {e}")
+                    else:
+                        st.warning("⚠️ لا يمكن إتمام عملية التحليل لعدم توفر مفتاح Gemini أو لعدم نجاح قراءة الكتالوج.")
 
     with col_files2:
         st.subheader("📷 قراءة أكواد الأعطال (شاشات/DSE)")
