@@ -396,26 +396,62 @@ def check_code_validity(user_code):
         return False, f"خطأ في قاعدة البيانات أو لم يتم إنشاؤها بعد: {e}"
 
 # ==========================================
-# 1. دالة النافذة المنبثقة لإدارة/تفعيل المشتركين
+# دالة مساعدة لإنشاء جدول المشتركين إذا لم يكن موجوداً
+# ==========================================
+def init_subscribers_db():
+    conn = sqlite3.connect('subscribers.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS codes
+                 (client_name TEXT, code TEXT PRIMARY KEY, expiry_date TEXT, plan TEXT)''')
+    conn.commit()
+    conn.close()
+
+# ==========================================
+# 1. دالة النافذة المنبثقة لإدارة/تفعيل المشتركين (المحدثة)
 # ==========================================
 @st.dialog("🔑 إدارة وتفعيل كود المشتركين")
 def subscriber_management_modal():
-    st.write("أدخل بيانات المشترك أو كود التفعيل للتحقق والتحرير:")
+    init_subscribers_db() # التأكد من جاهزية قاعدة البيانات
+    st.write("أدخل بيانات المشترك والمدة لإصدار كود تفعيل جديد:")
     
     # نموذج إدخال البيانات
     with st.form("subscriber_form"):
         subscriber_name = st.text_input("اسم المشترك / الشركة:")
-        subscription_code = st.text_input("كود التفعيل / الاشتراك:", type="password")
-        action_type = st.selectbox("نوع الإجراء:", ["تفعيل اشتراك جديد", "استخراج كود", "تحرير بيانات"])
+        subscription_code = st.text_input("كود التفعيل (مثال: CLIENT-2026):")
+        duration_days = st.number_input("مدة الاشتراك (بالأيام):", min_value=1, value=30, step=1)
         
-        submit_btn = st.form_submit_button("إرسال / تطبيق الإجراء")
+        submit_btn = st.form_submit_button("إصدار وحفظ الاشتراك")
         
         if submit_btn:
             if subscription_code and subscriber_name:
-                # يمكنك هنا إضافة منطق التحقق الخاص بك أو الحفظ في قاعدة البيانات/الملف
-                st.success(f"تم تنفيذ الإجراء ({action_type}) بنجاح للمشترك: {subscriber_name}")
+                # حساب تاريخ الانتهاء بناءً على عدد الأيام وتنسيقه ليتطابق مع دالة التحقق
+                expiry_date = datetime.now() + timedelta(days=duration_days)
+                expiry_date_str = expiry_date.strftime('%Y-%m-%d %H:%M:%S.%f')
+                
+                try:
+                    conn = sqlite3.connect('subscribers.db')
+                    c = conn.cursor()
+                    # إدخال المشترك الجديد، أو تحديث بياناته إذا كان الكود موجوداً مسبقاً
+                    c.execute('''INSERT INTO codes (client_name, code, expiry_date, plan) 
+                                 VALUES (?, ?, ?, ?)
+                                 ON CONFLICT(code) DO UPDATE SET 
+                                 client_name=excluded.client_name, 
+                                 expiry_date=excluded.expiry_date''', 
+                              (subscriber_name, subscription_code, expiry_date_str, "PRO-SQLITE"))
+                    conn.commit()
+                    conn.close()
+                    
+                    st.success(f"✅ تم تفعيل الكود ({subscription_code}) بنجاح للمشترك: {subscriber_name}")
+                    st.info(f"⏳ صالح حتى تاريخ: {expiry_date.strftime('%Y-%m-%d')}")
+                    
+                    # زر لإغلاق النافذة وتحديث الصفحة
+                    if st.form_submit_button("إغلاق وتحديث"):
+                        st.rerun()
+                        
+                except Exception as e:
+                    st.error(f"حدث خطأ أثناء الحفظ في قاعدة البيانات: {e}")
             else:
-                st.error("يرجى ملء جميع الحقول المطلوبة.")
+                st.error("⚠️ يرجى ملء حقل اسم المشترك وكود التفعيل.")
 
 # =========================================================
 # النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد
