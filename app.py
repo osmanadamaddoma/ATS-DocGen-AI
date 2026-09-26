@@ -395,6 +395,117 @@ def check_code_validity(user_code):
     except Exception as e:
         return False, f"خطأ في قاعدة البيانات أو لم يتم إنشاؤها بعد: {e}"
 
+# ==========================================
+# 1. دالة النافذة المنبثقة لإدارة/تفعيل المشتركين
+# ==========================================
+@st.dialog("🔑 إدارة وتفعيل كود المشتركين")
+def subscriber_management_modal():
+    st.write("أدخل بيانات المشترك أو كود التفعيل للتحقق والتحرير:")
+    
+    # نموذج إدخال البيانات
+    with st.form("subscriber_form"):
+        subscriber_name = st.text_input("اسم المشترك / الشركة:")
+        subscription_code = st.text_input("كود التفعيل / الاشتراك:", type="password")
+        action_type = st.selectbox("نوع الإجراء:", ["تفعيل اشتراك جديد", "استخراج كود", "تحرير بيانات"])
+        
+        submit_btn = st.form_submit_button("إرسال / تطبيق الإجراء")
+        
+        if submit_btn:
+            if subscription_code and subscriber_name:
+                # يمكنك هنا إضافة منطق التحقق الخاص بك أو الحفظ في قاعدة البيانات/الملف
+                st.success(f"تم تنفيذ الإجراء ({action_type}) بنجاح للمشترك: {subscriber_name}")
+            else:
+                st.error("يرجى ملء جميع الحقول المطلوبة.")
+
+# =========================================================
+# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد
+# =========================================================
+@st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
+def edit_generator_modal(main_site, sub_site, gen_key):
+    gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
+    elec = gen_data.get("calib_elec", {})
+    eng = gen_data.get("calib_engine", {})
+
+    st.markdown(f"### ⚙️ {gen_key} - Site: {sub_site}")
+    
+    tech_name = st.text_input("اسم الفني / Technician Name:", value="فني الصيانة المناوب")
+    tab1, tab2, tab3 = st.tabs(["🏷️ Basic Data", "⚡ Electrical", "🔧 Engine"])
+
+    with tab1:
+        new_model = st.text_input("Model / الطراز", value=gen_data.get("model", ""))
+        new_run_hours = st.number_input("Run Hours / ساعات التشغيل", min_value=0.0, value=float(gen_data.get("run_hours", 0.0)))
+        new_target = st.number_input("Target Hours / الساعات المستهدفة", min_value=0.0, value=float(gen_data.get("target", 250.0)))
+        new_kw = st.number_input("Capacity (kW) / السعة", min_value=0.0, value=float(gen_data.get("kw", 0.0)))
+        new_load = st.number_input("Current Load (kW) / الحمولة", min_value=0.0, value=float(gen_data.get("load", 0.0)))
+
+    with tab2:
+        v_nom = st.number_input("Nominal Voltage (V)", value=float(elec.get("v_nominal", 400.0)))
+        v_meas = st.number_input("Measured Voltage (V)", value=float(elec.get("v_measured", 398.0)))
+        f_nom = st.number_input("Nominal Freq (Hz)", value=float(elec.get("freq_nominal", 50.0)))
+        f_meas = st.number_input("Measured Freq (Hz)", value=float(elec.get("freq_measured", 50.0)))
+        c_max = st.number_input("Max Current (A)", value=float(elec.get("current_max", 600.0)))
+        c_meas = st.number_input("Measured Current (A)", value=float(elec.get("current_measured", 360.0)))
+        pf_val = st.number_input("Power Factor (PF)", value=float(elec.get("pf", 0.85)))
+        ct_rat = st.text_input("CT Ratio", value=str(elec.get("ct_ratio", "600/5")))
+
+    with tab3:
+        o_press = st.number_input("Oil Press (Bar)", value=float(eng.get("oil_press_bar", 4.5)))
+        c_temp = st.number_input("Coolant Temp (°C)", value=float(eng.get("coolant_temp_c", 85.0)))
+        r_rpm = st.number_input("Engine Speed (RPM)", value=float(eng.get("rpm", 1500.0)))
+        b_volt = st.number_input("Battery (V)", value=float(eng.get("battery_v", 26.0)))
+        ambient_t = st.number_input("Ambient Temp (°C)", value=float(eng.get("ambient_temp", 43.0)))
+
+    if st.button("💾 Save Data / حفظ البيانات", use_container_width=True, type="primary"):
+        validation_errors = []
+        if c_temp < 0 or c_temp > 125.0:
+            validation_errors.append(f"❌ Invalid Temp: {c_temp}°C")
+        if o_press < 0.0 or o_press > 12.0:
+            validation_errors.append(f"❌ Invalid Oil Press: {o_press} Bar")
+        if v_meas < 100.0 or v_meas > 600.0:
+            validation_errors.append(f"❌ Invalid Voltage: {v_meas} V")
+
+        if validation_errors:
+            for err in validation_errors:
+                st.error(err)
+        else:
+            st.session_state.sites_data[main_site][sub_site]["generators"][gen_key] = {
+                "model": new_model,
+                "run_hours": new_run_hours,
+                "target": new_target,
+                "kw": new_kw,
+                "load": new_load,
+                "calib_elec": {
+                    "v_nominal": v_nom, "v_measured": v_meas,
+                    "freq_nominal": f_nom, "freq_measured": f_meas,
+                    "current_max": c_max, "current_measured": c_meas,
+                    "pf": pf_val, "ct_ratio": ct_rat
+                },
+                "calib_engine": {
+                    "oil_press_bar": o_press, "coolant_temp_c": c_temp,
+                    "rpm": r_rpm, "battery_v": b_volt,
+                    "ambient_temp": ambient_t
+                }
+            }
+
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            today_date = datetime.now().strftime("%Y-%m-%d")
+            
+            st.session_state.daily_logs.append({
+                "timestamp": now_str,
+                "date": today_date,
+                "site": f"{main_site} - {sub_site}",
+                "generator": gen_key,
+                "technician": tech_name,
+                "run_hours": new_run_hours,
+                "v_measured": v_meas,
+                "oil_press": o_press,
+                "coolant_temp": c_temp,
+                "status": "Updated"
+            })
+
+            st.success("✅ Saved successfully!")
+            st.rerun()
+
 # =========================================================
 # 2. نظام الاشتراكات الموحد والباقات (مع إدارة الكوكيز)
 # =========================================================
@@ -583,6 +694,13 @@ else:
         if st.button(TXT["btn_apps"], use_container_width=True):
             st.session_state.current_page = "main_apps"
             
+        # ==========================================
+        # 2. إضافة خيار فتح النافذة في القائمة الجانبية (Sidebar)
+        # ==========================================
+        st.markdown("---")
+        if st.button("🔑 نافذة تفعيل/استخراج كود المشتركين", use_container_width=True):
+            subscriber_management_modal()
+
         st.write("---")
         if st.button(TXT["btn_logout"], type="primary", use_container_width=True):
             st.session_state.authenticated = False
@@ -670,95 +788,6 @@ selected_app = st.sidebar.radio(
     on_change=on_app_change
 )
 st.sidebar.divider()
-
-# =========================================================
-# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد
-# =========================================================
-@st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
-def edit_generator_modal(main_site, sub_site, gen_key):
-    gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
-    elec = gen_data.get("calib_elec", {})
-    eng = gen_data.get("calib_engine", {})
-
-    st.markdown(f"### ⚙️ {gen_key} - Site: {sub_site}")
-    
-    tech_name = st.text_input("اسم الفني / Technician Name:", value="فني الصيانة المناوب")
-    tab1, tab2, tab3 = st.tabs(["🏷️ Basic Data", "⚡ Electrical", "🔧 Engine"])
-
-    with tab1:
-        new_model = st.text_input("Model / الطراز", value=gen_data.get("model", ""))
-        new_run_hours = st.number_input("Run Hours / ساعات التشغيل", min_value=0.0, value=float(gen_data.get("run_hours", 0.0)))
-        new_target = st.number_input("Target Hours / الساعات المستهدفة", min_value=0.0, value=float(gen_data.get("target", 250.0)))
-        new_kw = st.number_input("Capacity (kW) / السعة", min_value=0.0, value=float(gen_data.get("kw", 0.0)))
-        new_load = st.number_input("Current Load (kW) / الحمولة", min_value=0.0, value=float(gen_data.get("load", 0.0)))
-
-    with tab2:
-        v_nom = st.number_input("Nominal Voltage (V)", value=float(elec.get("v_nominal", 400.0)))
-        v_meas = st.number_input("Measured Voltage (V)", value=float(elec.get("v_measured", 398.0)))
-        f_nom = st.number_input("Nominal Freq (Hz)", value=float(elec.get("freq_nominal", 50.0)))
-        f_meas = st.number_input("Measured Freq (Hz)", value=float(elec.get("freq_measured", 50.0)))
-        c_max = st.number_input("Max Current (A)", value=float(elec.get("current_max", 600.0)))
-        c_meas = st.number_input("Measured Current (A)", value=float(elec.get("current_measured", 360.0)))
-        pf_val = st.number_input("Power Factor (PF)", value=float(elec.get("pf", 0.85)))
-        ct_rat = st.text_input("CT Ratio", value=str(elec.get("ct_ratio", "600/5")))
-
-    with tab3:
-        o_press = st.number_input("Oil Press (Bar)", value=float(eng.get("oil_press_bar", 4.5)))
-        c_temp = st.number_input("Coolant Temp (°C)", value=float(eng.get("coolant_temp_c", 85.0)))
-        r_rpm = st.number_input("Engine Speed (RPM)", value=float(eng.get("rpm", 1500.0)))
-        b_volt = st.number_input("Battery (V)", value=float(eng.get("battery_v", 26.0)))
-        ambient_t = st.number_input("Ambient Temp (°C)", value=float(eng.get("ambient_temp", 43.0)))
-
-    if st.button("💾 Save Data / حفظ البيانات", use_container_width=True, type="primary"):
-        validation_errors = []
-        if c_temp < 0 or c_temp > 125.0:
-            validation_errors.append(f"❌ Invalid Temp: {c_temp}°C")
-        if o_press < 0.0 or o_press > 12.0:
-            validation_errors.append(f"❌ Invalid Oil Press: {o_press} Bar")
-        if v_meas < 100.0 or v_meas > 600.0:
-            validation_errors.append(f"❌ Invalid Voltage: {v_meas} V")
-
-        if validation_errors:
-            for err in validation_errors:
-                st.error(err)
-        else:
-            st.session_state.sites_data[main_site][sub_site]["generators"][gen_key] = {
-                "model": new_model,
-                "run_hours": new_run_hours,
-                "target": new_target,
-                "kw": new_kw,
-                "load": new_load,
-                "calib_elec": {
-                    "v_nominal": v_nom, "v_measured": v_meas,
-                    "freq_nominal": f_nom, "freq_measured": f_meas,
-                    "current_max": c_max, "current_measured": c_meas,
-                    "pf": pf_val, "ct_ratio": ct_rat
-                },
-                "calib_engine": {
-                    "oil_press_bar": o_press, "coolant_temp_c": c_temp,
-                    "rpm": r_rpm, "battery_v": b_volt,
-                    "ambient_temp": ambient_t
-                }
-            }
-
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            today_date = datetime.now().strftime("%Y-%m-%d")
-            
-            st.session_state.daily_logs.append({
-                "timestamp": now_str,
-                "date": today_date,
-                "site": f"{main_site} - {sub_site}",
-                "generator": gen_key,
-                "technician": tech_name,
-                "run_hours": new_run_hours,
-                "v_measured": v_meas,
-                "oil_press": o_press,
-                "coolant_temp": c_temp,
-                "status": "Updated"
-            })
-
-            st.success("✅ Saved successfully!")
-            st.rerun()
 
 # =========================================================
 # --- عرض الواجهات الرئيسية (المدمجة) ---
@@ -1202,106 +1231,4 @@ else:
             if today_logs:
                 st.dataframe(pd.DataFrame(today_logs), use_container_width=True)
             else:
-                st.warning("No logs registered today.")
-
-        with tab_mgr2:
-            tech_phone = st.text_input("Technician Phone Number:", value="249912345678")
-            reminder_msg = f"Addoma Maintenance Reminder: Please register daily genset logs for ({today_str})."
-            encoded_msg = urllib.parse.quote(reminder_msg)
-            whatsapp_url = f"https://wa.me/{tech_phone}?text={encoded_msg}"
-            
-            st.markdown(f'''
-                <a href="{whatsapp_url}" target="_blank">
-                    <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">
-                        💬 Send WhatsApp Reminder
-                    </button>
-                </a>
-            ''', unsafe_allow_html=True)
-
-    elif "4." in selected_app:
-        st.title("🤖 " + ("المساعد الذكي والكتالوجات وقراءة الأكواد" if L == "ar" else "AI Diagnostics & Fault Code Reader"))
-
-        col_files1, col_files2 = st.columns(2)
-        with col_files1:
-            st.subheader("📚 Catalog Upload (PDF)")
-            manual_file = st.file_uploader("Upload Equipment Catalog", type=["pdf"])
-            if manual_file:
-                if "loaded_manual_name" not in st.session_state or st.session_state.loaded_manual_name != manual_file.name:
-                    with st.spinner("Extracting text..."):
-                        catalog_pages = []
-                        with pdfplumber.open(manual_file) as pdf:
-                            for i, page in enumerate(pdf.pages):
-                                catalog_pages.append({"page_num": i + 1, "content": page.extract_text() or ""})
-                        st.session_state.catalog_pages = catalog_pages
-                        st.session_state.loaded_manual_name = manual_file.name
-                        st.success(f"Parsed {len(catalog_pages)} pages.")
-
-        with col_files2:
-            st.subheader("📷 Screen & Barcode Reader")
-            fault_image = st.file_uploader("Upload Alarm Screenshot", type=["png", "jpg", "jpeg"])
-            fault_cam = st.camera_input("📸 Capture Screen")
-
-        st.divider()
-
-        fault_input = st.text_input("Enter Fault Code (e.g., Over Current / DSE 8610 Error / Oil Low):", value="Over Current")
-
-        if st.button("🔍 Analyze Fault", use_container_width=True):
-            clean_fault = fault_input.strip()
-            st.markdown(f"### Diagnostic Report: `{clean_fault}`")
-            
-            ai_res = analyze_fault_with_gemini(clean_fault, language=L)
-            st.markdown(ai_res)
-
-    elif "5." in selected_app:
-        st.title("🔍 " + ("نظام فحص المعدات مقارنة بصرية" if L == "ar" else "Equipment Visual Inspection (WIC & Gensets)"))
-
-        eq_type = st.selectbox("Equipment Type:", [
-            "Industrial Diesel Generator",
-            "WIC 10 & WIC 40 Cold Rooms / غرف تبريد",
-            "3-Phase Electric Motor"
-        ])
-
-        c_img1, c_img2 = st.columns(2)
-        with c_img1:
-            st.write("🟢 Reference (Normal)")
-            good_img = st.file_uploader("Good Part Photo", type=["png", "jpg"], key="gi")
-            if good_img: st.image(Image.open(good_img), use_container_width=True)
-        with c_img2:
-            st.write("🔴 Inspection Item (Defective)")
-            bad_img = st.file_uploader("Inspected Part Photo", type=["png", "jpg"], key="bi")
-            if bad_img: st.image(Image.open(bad_img), use_container_width=True)
-
-        if "WIC" in eq_type:
-            st.warning("⚠️ **WIC Cold Room Checklist:** Check expansion valves, defrost heaters, and refrigerant flow for WIC 10 and WIC 40 units.")
-
-    elif "6." in selected_app:
-        st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
-        
-        tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint"])
-        
-        with tab_calc1:
-            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
-            c1, c2, c3 = st.columns(3)
-            i_amp = c1.number_input("Current (Amperes / أمبير):", value=250.0)
-            dist_m = c2.number_input("Cable Length (Meters / متر):", value=120.0)
-            c_size = c3.selectbox("Cable Size (mm² / مقطع الكابل):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4)
-            
-            v_drop, v_drop_pct = calculate_cable_voltage_drop(i_amp, dist_m, c_size)
-            
-            st.metric("Voltage Drop (فقد الجهد)", f"{v_drop} V", f"{v_drop_pct}%")
-            if v_drop_pct > 4.0:
-                st.error("⚠️ Warning: Voltage drop exceeds standard 4% limit! Consider using a larger cable size.")
-            else:
-                st.success("✅ Cable size is acceptable under IEC standards.")
-
-        with tab_calc2:
-            st.subheader("🌱 Fuel Consumption & CO2 Emission Estimator")
-            ec1, ec2 = st.columns(2)
-            load_kw = ec1.number_input("Running Load (kW):", value=200.0)
-            hours_run = ec2.number_input("Operating Hours:", value=24.0)
-            
-            est_liters, est_co2 = calculate_fuel_consumption_and_emissions(load_kw, hours_run)
-            
-            mc1, mc2 = st.columns(2)
-            mc1.metric("Estimated Diesel Used", f"{est_liters} Liters")
-            mc2.metric("Estimated CO2 Output", f"{est_co2} kg")
+                st.warning("No logs registered")
