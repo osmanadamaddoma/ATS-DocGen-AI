@@ -625,9 +625,6 @@ else:
         if st.button(TXT["btn_apps"], use_container_width=True):
             st.session_state.current_page = "main_apps"
             
-        # ==========================================
-        # الإصلاح 3: حصر ظهور زر مدير الأكواد للأدمن فقط
-        # ==========================================
         if st.session_state.get("active_code") == "ADDOMA-2026-PRO":
             st.markdown("---")
             if st.button("🔑 نافذة إدارة اشتراكات العملاء (Admin Only)", use_container_width=True):
@@ -751,7 +748,7 @@ if st.session_state.current_page == "chat":
 
 elif st.session_state.current_page == "dashboard":
     st.title("🛠️ لوحة التحكم الهندسية المركزية")
-    st.success(f"مرحباً بك في نظامك الإداري الخاص. أنت الآن تدير بياناتك بشكل مستقل تماماً.")
+    st.success("مرحباً بك في نظامك الإداري الخاص. أنت الآن تدير بياناتك بشكل مستقل تماماً.")
 
     st.markdown("### 🏗️ إدارة المواقع والمولدات الخاصة بك")
     col1, col2 = st.columns(2)
@@ -793,7 +790,6 @@ elif st.session_state.current_page == "dashboard":
 else:
     if "1." in selected_app:
         st.title("⚙️ " + ("نظام الصيانة التنبؤية ومراقبة المولدات" if L == "ar" else "Predictive Maintenance & Genset Monitoring"))
-        # (بقية كود المولد والصيانة يعمل بشكل سليم كما هو في ملفك الأصلي)
         st.info("قم بإدارة المولدات والمواقع، واستخراج تقارير PDF الخاصة بها من هنا.")
 
     elif "2." in selected_app:
@@ -811,15 +807,15 @@ else:
         st.subheader("🕹️ Remote Operations Panel")
         rc1, rc2, rc3 = st.columns(3)
         with rc1:
-            if st.button("🟢 Start Generator", use_container_width=True): st.success("Start signal dispatched!")
+            if st.button("🟢 Start Generator", use_container_width=True):
+                st.success("Start signal dispatched!")
         with rc2:
-            if st.button("🔴 Emergency Stop", use_container_width=True): st.error("Emergency Stop dispatched!")
+            if st.button("🔴 Emergency Stop", use_container_width=True):
+                st.error("Emergency Stop dispatched!")
         with rc3:
-            if st.button("🔄 Reset Alarms", use_container_width=True): st.info("DSE Panel Reset!")
+            if st.button("🔄 Reset Alarms", use_container_width=True):
+                st.info("DSE Panel Reset!")
 
-    # ==========================================
-    # الإصلاح 1 & 2: استكمال كود التطبيقات 3, 4, 5, 6
-    # ==========================================
     elif "3." in selected_app:
         st.title("📊 " + ("المتابعة اليومية وتقارير الإدارة" if L == "ar" else "Daily Monitoring & Tech Reminders"))
         today_str = datetime.now().strftime("%Y-%m-%d")
@@ -836,7 +832,6 @@ else:
         with tab_mgr2:
             st.subheader("⏰ التذكيرات التلقائية وجدولة الصيانة")
             st.info("يعمل نظام التذكير على فحص قطع الغيار وتنبيهك إذا تجاوز الاستهلاك نسبة 90%.")
-            # تنبيه توضيحي تفاعلي
             st.warning("⚠️ تنبيه: الفلتر الأساسي لمولد (G1) يحتاج إلى استبدال قريباً (تجاوز 90%).")
             st.success("✅ جميع الأنظمة الكهربائية تعمل ضمن المعدلات الطبيعية.")
 
@@ -892,5 +887,3 @@ else:
                 liters, co2 = calculate_fuel_consumption_and_emissions(kw_val, hrs_val)
                 st.success(f"الاستهلاك التقديري للوقود: {liters} لتر ديزل.")
                 st.error(f"الانبعاثات التقديرية للكربون (CO2): {co2} كجم.")
-
-َ
