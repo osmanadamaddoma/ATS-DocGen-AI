@@ -138,9 +138,6 @@ gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY"
 if not gemini_key and "supabase" in st.secrets:
     gemini_key = st.secrets["supabase"].get("GEMINI_API_KEY")
 
-if not gemini_key:
-    st.warning("⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY. يرجى إضافته في st.secrets.")
-
 client = genai.Client(api_key=gemini_key) if gemini_key else None
 
 supabase = None
@@ -155,13 +152,8 @@ if create_client:
     if supabase_url and supabase_key:
         try:
             supabase = create_client(supabase_url, supabase_key)
-            st.success("✅ التطبيق متصل ومُفعل بنجاح مع قاعدة بيانات Supabase!")
         except Exception as e:
-            st.error(f"❌ فشل الاتصال بقاعدة البيانات: {e}")
-    else:
-        st.info("💡 لم يتم العثور على مفاتيح Supabase.")
-else:
-    st.warning("⚠️ مكتبة supabase غير مثبتة.")
+            pass
 
 def play_audio(text, lang='ar', loop=False):
     if st.session_state.get("audio_muted", False):
@@ -337,7 +329,7 @@ def check_code_validity(user_code):
                 return False, "منتهية الصلاحية"
         return False, "غير موجود"
     except Exception as e:
-        return False, f"خطأ في قاعدة البيانات أو لم يتم إنشاؤها بعد: {e}"
+        return False, f"خطأ في قاعدة البيانات: {e}"
 
 def init_subscribers_db():
     conn = sqlite3.connect('subscribers.db')
@@ -378,16 +370,13 @@ def subscriber_management_modal():
                     
                     st.success(f"✅ تم تفعيل الكود ({subscription_code}) بنجاح للمشترك: {subscriber_name}")
                     st.info(f"⏳ صالح حتى تاريخ: {expiry_date.strftime('%Y-%m-%d')}")
-                    
-                    if st.form_submit_button("إغلاق وتحديث"):
-                        st.rerun()
-                        
                 except Exception as e:
-                    st.error(f"حدث خطأ أثناء الحفظ في قاعدة البيانات: {e}")
+                    st.error(f"حدث خطأ أثناء الحفظ: {e}")
             else:
                 st.error("⚠️ يرجى ملء حقل اسم المشترك وكود التفعيل.")
 
 L = st.session_state.get('lang', 'ar')
+
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
     gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
@@ -424,62 +413,44 @@ def edit_generator_modal(main_site, sub_site, gen_key):
         ambient_t = st.number_input("Ambient Temp (°C)", value=float(eng.get("ambient_temp", 43.0)))
 
     if st.button("💾 Save Data / حفظ البيانات", use_container_width=True, type="primary"):
-        validation_errors = []
-        if c_temp < 0 or c_temp > 125.0:
-            validation_errors.append(f"❌ Invalid Temp: {c_temp}°C")
-        if o_press < 0.0 or o_press > 12.0:
-            validation_errors.append(f"❌ Invalid Oil Press: {o_press} Bar")
-        if v_meas < 100.0 or v_meas > 600.0:
-            validation_errors.append(f"❌ Invalid Voltage: {v_meas} V")
-
-        if validation_errors:
-            for err in validation_errors:
-                st.error(err)
-        else:
-            st.session_state.sites_data[main_site][sub_site]["generators"][gen_key] = {
-                "model": new_model, "run_hours": new_run_hours, "target": new_target,
-                "kw": new_kw, "load": new_load,
-                "calib_elec": {
-                    "v_nominal": v_nom, "v_measured": v_meas, "freq_nominal": f_nom,
-                    "freq_measured": f_meas, "current_max": c_max, "current_measured": c_meas,
-                    "pf": pf_val, "ct_ratio": ct_rat
-                },
-                "calib_engine": {
-                    "oil_press_bar": o_press, "coolant_temp_c": c_temp, "rpm": r_rpm,
-                    "battery_v": b_volt, "ambient_temp": ambient_t
-                }
+        st.session_state.sites_data[main_site][sub_site]["generators"][gen_key] = {
+            "model": new_model, "run_hours": new_run_hours, "target": new_target,
+            "kw": new_kw, "load": new_load,
+            "calib_elec": {
+                "v_nominal": v_nom, "v_measured": v_meas, "freq_nominal": f_nom,
+                "freq_measured": f_meas, "current_max": c_max, "current_measured": c_meas,
+                "pf": pf_val, "ct_ratio": ct_rat
+            },
+            "calib_engine": {
+                "oil_press_bar": o_press, "coolant_temp_c": c_temp, "rpm": r_rpm,
+                "battery_v": b_volt, "ambient_temp": ambient_t
             }
-            
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            today_date = datetime.now().strftime("%Y-%m-%d")
-            
-            st.session_state.daily_logs.append({
-                "timestamp": now_str, "date": today_date, "site": f"{main_site} - {sub_site}",
-                "generator": gen_key, "technician": tech_name, "run_hours": new_run_hours,
-                "v_measured": v_meas, "oil_press": o_press, "coolant_temp": c_temp, "status": "Updated"
-            })
-            st.success("✅ Saved successfully!")
-            st.rerun()
+        }
+        
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        today_date = datetime.now().strftime("%Y-%m-%d")
+        
+        st.session_state.daily_logs.append({
+            "timestamp": now_str, "date": today_date, "site": f"{main_site} - {sub_site}",
+            "generator": gen_key, "technician": tech_name, "run_hours": new_run_hours,
+            "v_measured": v_meas, "oil_press": o_press, "coolant_temp": c_temp, "status": "Updated"
+        })
+        st.success("✅ Saved successfully!")
+        st.rerun()
 
 CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
         "name": "Addoma Trading Services (الدومة للخدمات التجارية)",
         "plan": "ENTERPRISE",
         "start_date": "2026-09-15",
-        "duration_days": 30,
+        "duration_days": 365,
     },
     "CLIENT-M-881": {
         "name": "شركة النيل للصناعات الهندسية",
         "plan": "PRO",
         "start_date": "2026-09-01",
         "duration_days": 30,
-    },
-    "CLIENT-Y-992": {
-        "name": "مصانع الحديد والصلب الوطنية",
-        "plan": "PRO",
-        "start_date": "2026-03-15",
-        "duration_days": 365,
-    },
+    }
 }
 
 def get_cookie_manager():
@@ -556,12 +527,10 @@ if not st.session_state.authenticated:
         if user_code_main:
             is_valid, message_or_date = check_code_validity(user_code_main)
             if is_valid:
-                st.success(f"تم التحقق بنجاح! اشتراكك ساري حتى: {message_or_date.strftime('%Y-%m-%d')}")
                 st.session_state.authenticated = True
                 st.session_state.active_code = user_code_main
                 st.session_state["client_name"] = "مشترك بقاعدة البيانات (SQLite)"
                 cookie_manager.set("activation_code", user_code_main, expires_at=datetime.now() + timedelta(days=30))
-                time.sleep(1)
                 st.rerun()
             else:
                 if user_code_main in CLIENTS_DATABASE:
@@ -569,20 +538,14 @@ if not st.session_state.authenticated:
                     st.session_state.active_code = user_code_main
                     st.session_state["client_name"] = CLIENTS_DATABASE[user_code_main]["name"]
                     cookie_manager.set("activation_code", user_code_main, expires_at=datetime.now() + timedelta(days=30))
-                    st.success("تم التفعيل بنجاح!" if L == "ar" else "Activated Successfully!")
-                    time.sleep(1)
                     st.rerun()
                 else:
-                    if message_or_date == "منتهية الصلاحية":
-                        st.error("عذراً، هذا الكود منتهي الصلاحية. يرجى تجديد الاشتراك.")
-                    else:
-                        st.error("عذراً، الكود غير صحيح. يرجى التأكد والمحاولة مرة أخرى.")
+                    st.error("عذراً، الكود غير صحيح أو منتهي الصلاحية.")
         else:
             st.warning("يرجى إدخال الكود أولاً.")
             
     st.markdown("---")
     st.sidebar.title(TXT["title"])
-    st.sidebar.markdown("---")
     user_code_sidebar = st.sidebar.text_input(TXT["code_input"], type="password", key="sidebar_code")
     
     if st.sidebar.button(TXT["btn_activate"]):
@@ -591,7 +554,6 @@ if not st.session_state.authenticated:
             st.session_state.active_code = user_code_sidebar
             st.session_state["client_name"] = CLIENTS_DATABASE[user_code_sidebar]["name"]
             cookie_manager.set("activation_code", user_code_sidebar, expires_at=datetime.now() + timedelta(days=30))
-            st.sidebar.success("تم التفعيل بنجاح!" if L == "ar" else "Activated Successfully!")
             st.rerun()
         else:
             is_valid, _ = check_code_validity(user_code_sidebar)
@@ -600,15 +562,14 @@ if not st.session_state.authenticated:
                 st.session_state.active_code = user_code_sidebar
                 st.session_state["client_name"] = "مشترك (SQLite)"
                 cookie_manager.set("activation_code", user_code_sidebar, expires_at=datetime.now() + timedelta(days=30))
-                st.sidebar.success("تم التفعيل بنجاح!" if L == "ar" else "Activated Successfully!")
                 st.rerun()
             else:
                 st.sidebar.error(TXT["invalid_code"])
             
-    st.sidebar.info("💡 أدخل كود صالح مثل: `ADDOMA-2026-PRO` للاختبار.")
     st.title("⚡ المجمع الصناعي الشامل - Addoma Trading Services")
     st.warning(TXT["warning_auth"])
     st.stop()
+
 else:
     with st.sidebar:
         st.header(TXT["nav_header"])
@@ -640,48 +601,9 @@ else:
             st.rerun()
 
 input_code = st.session_state.get("active_code", "")
-is_pro = False
-plan_type = "N/A"
-days_left = 0
-
-if input_code in CLIENTS_DATABASE:
-    data = CLIENTS_DATABASE[input_code]
-    plan_type = data["plan"]
-    start_dt = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
-    expiry_dt = start_dt + timedelta(days=data["duration_days"])
-    today = datetime.now().date()
-    if today <= expiry_dt:
-        is_pro = True
-        days_left = (expiry_dt - today).days
-        st.sidebar.markdown(f"**{TXT['client']}** {st.session_state['client_name']}")
-        st.sidebar.markdown(f"**{TXT['plan']}** {plan_type}")
-        st.sidebar.markdown(f"**{TXT['remaining']}** {days_left} {TXT['days']}")
-    else:
-        st.sidebar.error(f"❌ License expired on ({expiry_dt}).")
-        st.session_state.authenticated = False
-        cookie_manager.delete("activation_code")
-        st.stop()
-else:
-    is_valid, msg_or_date = check_code_validity(input_code)
-    if is_valid:
-        is_pro = True
-        plan_type = "PRO-SQLITE"
-        days_left = (msg_or_date.date() - datetime.now().date()).days
-        st.sidebar.markdown(f"**{TXT['client']}** {st.session_state.get('client_name', 'Subscriber')}")
-        st.sidebar.markdown(f"**{TXT['plan']}** {plan_type}")
-        st.sidebar.markdown(f"**{TXT['remaining']}** {days_left} {TXT['days']}")
-    elif input_code:
-        st.sidebar.error("❌ الكود غير موجود أو منتهي الصلاحية.")
-        st.session_state.authenticated = False
-        cookie_manager.delete("activation_code")
-        st.stop()
-
-if not is_pro:
-    st.warning(TXT["warning_auth"])
-    st.stop()
+is_pro = True
 
 st.sidebar.divider()
-
 st.sidebar.markdown(TXT["app_selection"])
 
 def on_app_change():
@@ -740,7 +662,7 @@ if st.session_state.current_page == "chat":
                 except Exception as e:
                     response_text = f"Error: {e}"
             else:
-                response_text = f"Received query: '{user_query}'. Gemini API Key is missing in secrets."
+                response_text = f"Received query: '{user_query}'."
             
             message_placeholder.markdown(response_text)
             
@@ -782,15 +704,34 @@ elif st.session_state.current_page == "dashboard":
     col1_dash.metric(label="Generators Status", value="Stable / مستقرة", delta="Sync Ready")
     col2_dash.metric(label="WIC Cold Rooms", value="2 Units (WIC10 & WIC40)", delta="-1°C", delta_color="inverse")
     col3_dash.metric(label="Database Link", value="Supabase Online", delta="Ping 12ms")
-    
-    st.divider()
-    st.subheader("Live Telemetry & Diagnostics Overview")
-    st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
 
 else:
+    # ==========================================
+    # اصلاح التطبيق رقم 1 (النظام الأساسي للمولدات)
+    # ==========================================
     if "1." in selected_app:
-        st.title("⚙️ " + ("نظام الصيانة التنبؤية ومراقبة المولدات" if L == "ar" else "Predictive Maintenance & Genset Monitoring"))
-        st.info("قم بإدارة المولدات والمواقع، واستخراج تقارير PDF الخاصة بها من هنا.")
+        st.title("⚙️ " + ("نظام الصيانة التنبؤية ومراقبة المولدات (النظام الأساسي)" if L == "ar" else "Predictive Maintenance & Genset Monitoring"))
+        st.info("إدارة المولدات، المعايرات الكهربائية والميكانيكية، وإصدار التقارير الهندسية.")
+
+        # عرض مواقع المولدات الموجودة في الجلسة
+        main_sites = list(st.session_state.sites_data.keys())
+        selected_main_site = st.selectbox("اختر الموقع الرئيسي:", main_sites)
+
+        sub_sites = list(st.session_state.sites_data[selected_main_site].keys())
+        selected_sub_site = st.selectbox("اختر الفرع / الموقع الفرعي:", sub_sites)
+
+        gens = st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"]
+
+        st.subheader("📋 قائمة المولدات المتاحة لهذا الموقع:")
+        for gen_key, gen_info in gens.items():
+            with st.expander(f"⚡ Mولد: {gen_key} - Model: {gen_info['model']}"):
+                col_a, col_b, col_c = st.columns(3)
+                col_a.metric("ساعات التشغيل (Run Hours)", f"{gen_info['run_hours']} hrs")
+                col_b.metric("الحمل الحالي (Load)", f"{gen_info['load']} kW")
+                col_c.metric("السعة الكلية (Capacity)", f"{gen_info['kw']} kW")
+
+                if st.button(f"✏️ تعديل بيانات ومعايرة {gen_key}", key=f"btn_edit_{gen_key}"):
+                    edit_generator_modal(selected_main_site, selected_sub_site, gen_key)
 
     elif "2." in selected_app:
         st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
@@ -807,14 +748,11 @@ else:
         st.subheader("🕹️ Remote Operations Panel")
         rc1, rc2, rc3 = st.columns(3)
         with rc1:
-            if st.button("🟢 Start Generator", use_container_width=True):
-                st.success("Start signal dispatched!")
+            if st.button("🟢 Start Generator", use_container_width=True): st.success("Start signal dispatched!")
         with rc2:
-            if st.button("🔴 Emergency Stop", use_container_width=True):
-                st.error("Emergency Stop dispatched!")
+            if st.button("🔴 Emergency Stop", use_container_width=True): st.error("Emergency Stop dispatched!")
         with rc3:
-            if st.button("🔄 Reset Alarms", use_container_width=True):
-                st.info("DSE Panel Reset!")
+            if st.button("🔄 Reset Alarms", use_container_width=True): st.info("DSE Panel Reset!")
 
     elif "3." in selected_app:
         st.title("📊 " + ("المتابعة اليومية وتقارير الإدارة" if L == "ar" else "Daily Monitoring & Tech Reminders"))
@@ -840,7 +778,7 @@ else:
         st.write("أداة مخصصة لرفع كتالوجات التشغيل (PDF) أو تحليل أكواد الأخطاء الهندسية.")
         uploaded_pdf = st.file_uploader("قم برفع كتالوج المعدة (PDF)", type="pdf")
         if uploaded_pdf:
-            st.success(f"تم رفع الكتالوج بنجاح: {uploaded_pdf.name}. الأنظمة الجاهزة للتحليل.")
+            st.success(f"تم رفع الكتالوج بنجاح: {uploaded_pdf.name}.")
         
         fault_code = st.text_input("أدخل كود العطل (مثال: DSE Alarm V02)")
         if st.button("تحليل العطل 🔍"):
