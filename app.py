@@ -420,6 +420,7 @@ def subscriber_management_modal():
 # =========================================================
 # النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد
 # =========================================================
+L = st.session_state.get('lang', 'ar')
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
     gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
