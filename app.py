@@ -20,7 +20,7 @@ import requests
 from fpdf import FPDF
 import pdfplumber
 import streamlit as st
-import extra_streamlit_components as stx  # مكتبة إدارة الكوكيز المضافة
+import extra_streamlit_components as stx
 from google import genai
 from gtts import gTTS
 
@@ -46,19 +46,25 @@ except ImportError:
 # 0. إعدادات الصفحة الرئيسية وتهيئة الذكاء الاصطناعي والصوت واللغة
 # =========================================================
 st.set_page_config(
-    page_title="المجمع الصناعي الشامل - Addoma Trading Services",
-    page_icon="🔐",
+    page_title="منصة الدومة للخدمات الهندسية والصناعية",
+    page_icon="⚡",
     layout="wide",
 )
 
-# التهيئة المبدئية لمتغيرات الجلسة (Session State)
+# 1. تهيئة حالة الجلسة (Session State) المدمجة
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+if "client_name" not in st.session_state:
+    st.session_state["client_name"] = ""
+if "user_sites" not in st.session_state:
+    st.session_state["user_sites"] = {}  # تخزين المواقع والمولدات الخاصة بالمستخدم الحالي
+
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
 
 if "lang" not in st.session_state:
     st.session_state.lang = "ar"  # 'ar' or 'en'
 
-# تحديد الصفحة الافتراضية عند الدخول
 if "current_page" not in st.session_state:
     st.session_state.current_page = "chat"
 
@@ -140,7 +146,7 @@ if not gemini_key:
 # تهيئة عميل Gemini API
 client = genai.Client(api_key=gemini_key) if gemini_key else None
 
-# إعدادات قاعدة بيانات Supabase للاتصال بتطبيقاتي
+# إعدادات قاعدة بيانات Supabase
 supabase = None
 if create_client:
     supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
@@ -162,7 +168,6 @@ if create_client:
 else:
     st.warning("⚠️ مكتبة supabase غير مثبتة. يرجى تثبيتها باستخدام pip install supabase")
 
-# دالة تشغيل الصوت المحدثة مع دعم اللغتين خيار الكتم والتكرار المستمر للانذارات
 def play_audio(text, lang='ar', loop=False):
     """تحويل النص إلى صوت باستخدام gTTS وتشغيله إن لم يتم تفعيل Mute مع دعم التكرار"""
     if st.session_state.get("audio_muted", False):
@@ -243,7 +248,6 @@ def sanitize_latin_only(text):
     return clean_text if clean_text else "N/A"
 
 class ComprehensivePDF(FPDF):
-
     def __init__(
         self,
         title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT",
@@ -357,16 +361,15 @@ def fetch_live_iot_data():
 # =========================================================
 def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85):
     """حساب هبوط الجهد ثلاثي الأوجه للكهرباء (3-Phase Voltage Drop)"""
-    rho_copper = 0.0178  # المقاومة النوعية للنحاس
+    rho_copper = 0.0178
     v_drop = (math.sqrt(3) * current_a * distance_m * rho_copper * cos_phi) / cable_mm2
     v_drop_pct = (v_drop / 400.0) * 100
     return round(v_drop, 2), round(v_drop_pct, 2)
 
 def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
     """تقدير استهلاك الديزل والانبعاثات المباشرة للمولدات"""
-    # متوسط الاستهلاك = ~0.24 لتر/كيلوواط.ساعة
     liters = kw_load * 0.24 * run_hours
-    co2_kg = liters * 2.68  # 2.68 كجم كربون لكل لتر ديزل
+    co2_kg = liters * 2.68
     return round(liters, 1), round(co2_kg, 1)
 
 # =========================================================
@@ -374,27 +377,24 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
 # =========================================================
 CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
-        "name": "عثمان آدم أدومة (Addoma Trading Services)",
-        "plan": "شهري (Monthly)",
+        "name": "Addoma Trading Services (الدومة للخدمات التجارية)",
+        "plan": "ENTERPRISE",
         "start_date": "2026-09-15",
         "duration_days": 30,
     },
     "CLIENT-M-881": {
         "name": "شركة النيل للصناعات الهندسية",
-        "plan": "شهري (Monthly)",
+        "plan": "PRO",
         "start_date": "2026-09-01",
         "duration_days": 30,
     },
     "CLIENT-Y-992": {
         "name": "مصانع الحديد والصلب الوطنية",
-        "plan": "سنوي (Yearly)",
+        "plan": "PRO",
         "start_date": "2026-03-15",
         "duration_days": 365,
     },
 }
-
-import extra_streamlit_components as stx
-import streamlit as st
 
 def get_cookie_manager():
     if "cookie_manager" not in st.session_state:
@@ -402,38 +402,34 @@ def get_cookie_manager():
     return st.session_state["cookie_manager"]
 
 cookie_manager = get_cookie_manager()
-
 saved_code = cookie_manager.get(cookie="activation_code")
-
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
 
 if saved_code and not st.session_state.authenticated:
     if saved_code in CLIENTS_DATABASE:
         st.session_state.authenticated = True
         st.session_state.active_code = saved_code
+        st.session_state["client_name"] = CLIENTS_DATABASE[saved_code]["name"]
 
 # --- خيار تحديد اللغة في الشريط الجانبي ---
 st.sidebar.subheader("🌐 Language / اللغة")
 selected_lang = st.sidebar.radio("Select Language:", ["العربية (Arabic)", "English"], index=0 if st.session_state.lang == "ar" else 1)
 st.session_state.lang = "ar" if "العربية" in selected_lang else "en"
-
 L = st.session_state.lang
 
 # نصوص ثنائية اللغة
 TXT = {
     "ar": {
         "title": "🔐 بوابة تفعيل النظام الموحد",
-        "code_input": "كود التفعيل:",
-        "btn_activate": "تفعيل",
-        "invalid_code": "❌ كود التفعيل غير صحيح.",
-        "warning_auth": "🔒 يرجى إدخال كود اشتراك صالح للوصول إلى التطبيقات والمساعد الذكي.",
+        "code_input": "أدخل كود الاشتراك:",
+        "btn_activate": "تحقق ودخول",
+        "invalid_code": "❌ كود الاشتراك غير صحيح.",
+        "warning_auth": "🔒 يرجى إدخال كود الاشتراك في الشريط الجانبي للوصول إلى الأنظمة التشغيلية والمساعد الذكي.",
         "nav_header": "⚙️ نظام الدومة للخدمات التجارية",
         "nav_status": "🟢 النظام متصل ومفعل",
         "btn_chat": "💬 المساعد الذكي الهندسي",
         "btn_dashboard": "📊 لوحة تحكم الأنظمة",
         "btn_apps": "🛠️ التطبيقات الهندسية الشاملة",
-        "btn_logout": "🚪 تسجيل الخروج / مسح التفعيل",
+        "btn_logout": "تسجيل الخروج",
         "client": "👤 العميل:",
         "plan": "📦 الباقة:",
         "remaining": "⏳ المتبقي:",
@@ -444,15 +440,15 @@ TXT = {
     "en": {
         "title": "🔐 Unified Activation Portal",
         "code_input": "Activation Code:",
-        "btn_activate": "Activate",
+        "btn_activate": "Verify & Enter",
         "invalid_code": "❌ Invalid activation code.",
-        "warning_auth": "🔒 Please enter a valid activation code to access system applications.",
+        "warning_auth": "🔒 Please enter a valid activation code in the sidebar to access operational systems.",
         "nav_header": "⚙️ Addoma Trading Services System",
         "nav_status": "🟢 System Connected & Active",
         "btn_chat": "💬 Smart Engineering Assistant",
         "btn_dashboard": "📊 Systems Control Dashboard",
         "btn_apps": "🛠️ Engineering Apps Suite",
-        "btn_logout": "🚪 Logout / Clear License",
+        "btn_logout": "Logout",
         "client": "👤 Client:",
         "plan": "📦 Plan:",
         "remaining": "⏳ Days Left:",
@@ -464,25 +460,32 @@ TXT = {
 
 # --- الواجهة والتأكيد ---
 if not st.session_state.authenticated:
-    st.title(TXT["title"])
+    st.sidebar.title(TXT["title"])
+    st.sidebar.markdown("---")
     user_code = st.sidebar.text_input(TXT["code_input"], type="password")
     
     if st.sidebar.button(TXT["btn_activate"]):
         if user_code in CLIENTS_DATABASE:
             st.session_state.authenticated = True
             st.session_state.active_code = user_code
+            st.session_state["client_name"] = CLIENTS_DATABASE[user_code]["name"]
             expires_at = datetime.now() + timedelta(days=30)
             cookie_manager.set("activation_code", user_code, expires_at=expires_at)
+            st.sidebar.success("تم التفعيل بنجاح!" if L == "ar" else "Activated Successfully!")
             st.rerun()
         else:
             st.sidebar.error(TXT["invalid_code"])
             
+    st.sidebar.info("💡 أدخل كود صالح مثل: `ADDOMA-2026-PRO` للاختبار." if L == "ar" else "💡 Enter a valid code like: `ADDOMA-2026-PRO` to test.")
+    
+    st.title("⚡ المجمع الصناعي الشامل - Addoma Trading Services")
     st.warning(TXT["warning_auth"])
     st.stop()
 else:
     with st.sidebar:
         st.header(TXT["nav_header"])
         st.success(TXT["nav_status"])
+        st.success(f"مرحباً بك\n**{st.session_state['client_name']}**" if L == "ar" else f"Welcome\n**{st.session_state['client_name']}**")
         st.write("---")
         
         if st.button(TXT["btn_chat"], use_container_width=True):
@@ -497,6 +500,7 @@ else:
         st.write("---")
         if st.button(TXT["btn_logout"], type="primary", use_container_width=True):
             st.session_state.authenticated = False
+            st.session_state["client_name"] = ""
             cookie_manager.delete("activation_code")
             if "active_code" in st.session_state:
                 del st.session_state["active_code"]
@@ -504,13 +508,11 @@ else:
 
 input_code = st.session_state.get("active_code", "")
 is_pro = False
-client_name = "Visitor"
 plan_type = "N/A"
 days_left = 0
 
 if input_code in CLIENTS_DATABASE:
     data = CLIENTS_DATABASE[input_code]
-    client_name = data["name"]
     plan_type = data["plan"]
     
     start_dt = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
@@ -520,8 +522,7 @@ if input_code in CLIENTS_DATABASE:
     if today <= expiry_dt:
         is_pro = True
         days_left = (expiry_dt - today).days
-        st.sidebar.success("✅ Subscription Verified!")
-        st.sidebar.markdown(f"**{TXT['client']}** {client_name}")
+        st.sidebar.markdown(f"**{TXT['client']}** {st.session_state['client_name']}")
         st.sidebar.markdown(f"**{TXT['plan']}** {plan_type}")
         st.sidebar.markdown(f"**{TXT['remaining']}** {days_left} {TXT['days']}")
     else:
@@ -537,7 +538,7 @@ if not is_pro:
 st.sidebar.divider()
 
 # =========================================================
-# 3. قائمة اختيار التطبيق المركزي (ربط مع التنقل الجديد)
+# 3. قائمة اختيار التطبيق المركزي 
 # =========================================================
 st.sidebar.markdown(TXT["app_selection"])
 
@@ -570,7 +571,7 @@ selected_app = st.sidebar.radio(
 st.sidebar.divider()
 
 # =========================================================
-# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد مع التحقق الفوري
+# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد
 # =========================================================
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
@@ -699,12 +700,44 @@ if st.session_state.current_page == "chat":
 
 # --- 3. واجهة لوحة التحكم (Dashboard UI) ---
 elif st.session_state.current_page == "dashboard":
-    st.title("📊 " + ("لوحة تحكم الأنظمة والمتابعة" if L == "ar" else "Systems Control Dashboard"))
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric(label="Generators Status", value="Stable / مستقرة", delta="Sync Ready")
-    col2.metric(label="WIC Cold Rooms", value="2 Units (WIC10 & WIC40)", delta="-1°C", delta_color="inverse")
-    col3.metric(label="Database Link", value="Supabase Online", delta="Ping 12ms")
+    st.title("🛠️ لوحة التحكم الهندسية المركزية")
+    st.success(f"مرحباً بك في نظامك الإداري الخاص. أنت الآن تدير بياناتك بشكل مستقل تماماً.")
+
+    # نموذج إدخال يدوي للمواقع والمولدات الخاصة بالمستخدم الحالي
+    st.markdown("### 🏗️ إدارة المواقع والمولدات الخاصة بك")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        site_name = st.text_input("اسم الموقع الرئيسي (مثال: مصنع الأغذية - الخرطوم):")
+        generator_model = st.text_input("موديل المولد (مثال: Perkins 410 kVA):")
+        
+        if st.button("➕ إضافة الموقع والمولد"):
+            if site_name and generator_model:
+                if site_name not in st.session_state["user_sites"]:
+                    st.session_state["user_sites"][site_name] = []
+                st.session_state["user_sites"][site_name].append(generator_model)
+                st.success(f"تمت إضافة المولد ({generator_model}) إلى الموقع ({site_name}) بنجاح!")
+            else:
+                st.error("الرجاء إدخال اسم الموقع ورقم المولد.")
+
+    with col2:
+        st.markdown("#### 📋 قائمة مواقعك ومولداتك المسجلة:")
+        if st.session_state["user_sites"]:
+            for site, gens in st.session_state["user_sites"].items():
+                st.markdown(f"**📍 الموقع:** {site}")
+                for g in gens:
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;- مولد: {g}")
+        else:
+            st.info("لا توجد مواقع مسجلة حتى الآن. استخدم النموذج لإضافة موقعك الأول.")
+
+    st.divider()
+
+    st.markdown("### 📊 حالة الأنظمة العامة")
+    col1_dash, col2_dash, col3_dash = st.columns(3)
+    col1_dash.metric(label="Generators Status", value="Stable / مستقرة", delta="Sync Ready")
+    col2_dash.metric(label="WIC Cold Rooms", value="2 Units (WIC10 & WIC40)", delta="-1°C", delta_color="inverse")
+    col3_dash.metric(label="Database Link", value="Supabase Online", delta="Ping 12ms")
     
     st.divider()
     st.subheader("Live Telemetry & Diagnostics Overview")
@@ -1141,7 +1174,6 @@ else:
             st.warning("⚠️ **WIC Cold Room Checklist:** Check expansion valves, defrost heaters, and refrigerant flow for WIC 10 and WIC 40 units.")
 
     elif "6." in selected_app:
-        # الميزة الهندسية المستحدثة الجديدة: الحاسبة الذكية للهبوط في الجهد والانبعاثات
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
         
         tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint"])
