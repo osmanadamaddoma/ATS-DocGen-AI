@@ -9,6 +9,7 @@ import threading
 import io
 import base64
 import math
+import sqlite3
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -373,6 +374,28 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
     return round(liters, 1), round(co2_kg, 1)
 
 # =========================================================
+# دالة للتحقق من صحة الكود من قاعدة البيانات (SQLite)
+# =========================================================
+def check_code_validity(user_code):
+    try:
+        conn = sqlite3.connect('subscribers.db')
+        c = conn.cursor()
+        c.execute("SELECT expiry_date FROM codes WHERE code=?", (user_code,))
+        result = c.fetchone()
+        conn.close()
+        
+        if result:
+            # تحويل النص المحفوظ في قاعدة البيانات إلى صيغة وقت
+            expiry_date = datetime.strptime(result[0], '%Y-%m-%d %H:%M:%S.%f')
+            if datetime.now() < expiry_date:
+                return True, expiry_date
+            else:
+                return False, "منتهية الصلاحية"
+        return False, "غير موجود"
+    except Exception as e:
+        return False, f"خطأ في قاعدة البيانات أو لم يتم إنشاؤها بعد: {e}"
+
+# =========================================================
 # 2. نظام الاشتراكات الموحد والباقات (مع إدارة الكوكيز)
 # =========================================================
 CLIENTS_DATABASE = {
@@ -409,6 +432,13 @@ if saved_code and not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.session_state.active_code = saved_code
         st.session_state["client_name"] = CLIENTS_DATABASE[saved_code]["name"]
+    else:
+        # التحقق من قاعدة البيانات SQLite في حالة وجود كود محفوظ
+        is_valid, _ = check_code_validity(saved_code)
+        if is_valid:
+            st.session_state.authenticated = True
+            st.session_state.active_code = saved_code
+            st.session_state["client_name"] = "مشترك (SQLite)"
 
 # --- خيار تحديد اللغة في الشريط الجانبي ---
 st.sidebar.subheader("🌐 Language / اللغة")
@@ -460,21 +490,77 @@ TXT = {
 
 # --- الواجهة والتأكيد ---
 if not st.session_state.authenticated:
+    
+    # === الواجهة الجديدة: بوابة دخول المشتركين (في الشاشة الرئيسية) ===
+    st.title("بوابة دخول المشتركين 🔐")
+
+    # واجهة إدخال الكود
+    user_code_main = st.text_input("أدخل كود الاشتراك الخاص بك:", type="password", key="main_db_code")
+
+    if st.button("دخول"):
+        if user_code_main:
+            is_valid, message_or_date = check_code_validity(user_code_main)
+            
+            if is_valid:
+                st.success(f"تم التحقق بنجاح! اشتراكك ساري حتى: {message_or_date.strftime('%Y-%m-%d')}")
+                
+                # --- تفعيل الدخول للتطبيق الأساسي ---
+                st.session_state.authenticated = True
+                st.session_state.active_code = user_code_main
+                st.session_state["client_name"] = "مشترك بقاعدة البيانات (SQLite)"
+                
+                expires_at = datetime.now() + timedelta(days=30)
+                cookie_manager.set("activation_code", user_code_main, expires_at=expires_at)
+                time.sleep(1)
+                st.rerun()
+            else:
+                # محاولة التحقق من قاعدة البيانات الثابتة (CLIENTS_DATABASE)
+                if user_code_main in CLIENTS_DATABASE:
+                    st.session_state.authenticated = True
+                    st.session_state.active_code = user_code_main
+                    st.session_state["client_name"] = CLIENTS_DATABASE[user_code_main]["name"]
+                    expires_at = datetime.now() + timedelta(days=30)
+                    cookie_manager.set("activation_code", user_code_main, expires_at=expires_at)
+                    st.success("تم التفعيل بنجاح!" if L == "ar" else "Activated Successfully!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    if message_or_date == "منتهية الصلاحية":
+                        st.error("عذراً، هذا الكود منتهي الصلاحية. يرجى تجديد الاشتراك.")
+                    else:
+                        st.error("عذراً، الكود غير صحيح. يرجى التأكد والمحاولة مرة أخرى.")
+        else:
+            st.warning("يرجى إدخال الكود أولاً.")
+            
+    st.markdown("---")
+    
+    # === الواجهة السابقة: بوابة التفعيل (في الشريط الجانبي) ===
     st.sidebar.title(TXT["title"])
     st.sidebar.markdown("---")
-    user_code = st.sidebar.text_input(TXT["code_input"], type="password")
+    user_code_sidebar = st.sidebar.text_input(TXT["code_input"], type="password", key="sidebar_code")
     
     if st.sidebar.button(TXT["btn_activate"]):
-        if user_code in CLIENTS_DATABASE:
+        if user_code_sidebar in CLIENTS_DATABASE:
             st.session_state.authenticated = True
-            st.session_state.active_code = user_code
-            st.session_state["client_name"] = CLIENTS_DATABASE[user_code]["name"]
+            st.session_state.active_code = user_code_sidebar
+            st.session_state["client_name"] = CLIENTS_DATABASE[user_code_sidebar]["name"]
             expires_at = datetime.now() + timedelta(days=30)
-            cookie_manager.set("activation_code", user_code, expires_at=expires_at)
+            cookie_manager.set("activation_code", user_code_sidebar, expires_at=expires_at)
             st.sidebar.success("تم التفعيل بنجاح!" if L == "ar" else "Activated Successfully!")
             st.rerun()
         else:
-            st.sidebar.error(TXT["invalid_code"])
+            # محاولة التحقق من قاعدة البيانات SQLite
+            is_valid, _ = check_code_validity(user_code_sidebar)
+            if is_valid:
+                st.session_state.authenticated = True
+                st.session_state.active_code = user_code_sidebar
+                st.session_state["client_name"] = "مشترك (SQLite)"
+                expires_at = datetime.now() + timedelta(days=30)
+                cookie_manager.set("activation_code", user_code_sidebar, expires_at=expires_at)
+                st.sidebar.success("تم التفعيل بنجاح!" if L == "ar" else "Activated Successfully!")
+                st.rerun()
+            else:
+                st.sidebar.error(TXT["invalid_code"])
             
     st.sidebar.info("💡 أدخل كود صالح مثل: `ADDOMA-2026-PRO` للاختبار." if L == "ar" else "💡 Enter a valid code like: `ADDOMA-2026-PRO` to test.")
     
@@ -527,6 +613,21 @@ if input_code in CLIENTS_DATABASE:
         st.sidebar.markdown(f"**{TXT['remaining']}** {days_left} {TXT['days']}")
     else:
         st.sidebar.error(f"❌ License expired on ({expiry_dt}).")
+        st.session_state.authenticated = False
+        cookie_manager.delete("activation_code")
+        st.stop()
+else:
+    # دعم نظام الاشتراكات من SQLite
+    is_valid, msg_or_date = check_code_validity(input_code)
+    if is_valid:
+        is_pro = True
+        plan_type = "PRO-SQLITE"
+        days_left = (msg_or_date.date() - datetime.now().date()).days
+        st.sidebar.markdown(f"**{TXT['client']}** {st.session_state.get('client_name', 'Subscriber')}")
+        st.sidebar.markdown(f"**{TXT['plan']}** {plan_type}")
+        st.sidebar.markdown(f"**{TXT['remaining']}** {days_left} {TXT['days']}")
+    elif input_code:
+        st.sidebar.error("❌ الكود غير موجود أو منتهي الصلاحية.")
         st.session_state.authenticated = False
         cookie_manager.delete("activation_code")
         st.stop()
