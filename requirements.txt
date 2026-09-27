@@ -30,3 +30,4 @@ gtts
 influxdb-client
 extra-streamlit-components
 kaleido
+kaleido==0.2.1
