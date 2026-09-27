@@ -1,3 +1,4 @@
+
 import os
 import re
 import json
@@ -9,7 +10,6 @@ import threading
 import io
 import base64
 import math
-import tempfile # تمت إضافته لمعالجة صور الرسوم البيانية للـ PDF
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -21,7 +21,7 @@ import requests
 from fpdf import FPDF
 import pdfplumber
 import streamlit as st
-import extra_streamlit_components as stx  
+import extra_streamlit_components as stx  # مكتبة إدارة الكوكيز المضافة
 from google import genai
 from gtts import gTTS
 
@@ -63,29 +63,47 @@ if "lang" not in st.session_state:
 if "current_page" not in st.session_state:
     st.session_state.current_page = "chat"
 
-# تحديث هيكل قاعدة البيانات المصغرة ليدعم القوائم الرئيسية والفرعية (المناطق الجغرافية)
+# تحديث هيكل قاعدة البيانات المصغرة ليدعم القوائم الرئيسية والفرعية
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
-        "[ولاية الخرطوم - المنطقة 01]": {
-            "مصنع التعدين (موقع رئيسي)": {
-                "address": "الخرطوم - المنطقة الصناعية",
+        "الخرطوم (القائمة الرئيسية)": {
+            "الموقع الرئيسي - كافوري (موقع فرعي)": {
+                "address": "الخرطوم - المنطقة الصناعية - كافوري",
                 "generators": {
                     "G1": {
-                        "model": "Perkins 150 kVA (طلمبة ديزل قلب عادية)",
+                        "model": "Perkins 410 kVA",
                         "run_hours": 700.0,
                         "target": 940.0,
-                        "kw": 150.0,
-                        "load": 120.0,
+                        "kw": 410.0,
+                        "load": 250.0,
                         "calib_elec": {
                             "v_nominal": 400.0, "v_measured": 398.0,
                             "freq_nominal": 50.0, "freq_measured": 50.1,
-                            "current_max": 250.0, "current_measured": 180.0,
-                            "pf": 0.85, "ct_ratio": "250/5"
+                            "current_max": 600.0, "current_measured": 360.0,
+                            "pf": 0.85, "ct_ratio": "600/5"
                         },
                         "calib_engine": {
                             "oil_press_bar": 4.5, "coolant_temp_c": 85.0,
                             "rpm": 1500.0, "battery_v": 26.5,
                             "ambient_temp": 43.0
+                        }
+                    },
+                    "G2": {
+                        "model": "Cummins 250 kVA",
+                        "run_hours": 1200.0,
+                        "target": 1500.0,
+                        "kw": 250.0,
+                        "load": 180.0,
+                        "calib_elec": {
+                            "v_nominal": 400.0, "v_measured": 402.0,
+                            "freq_nominal": 50.0, "freq_measured": 49.9,
+                            "current_max": 360.0, "current_measured": 260.0,
+                            "pf": 0.82, "ct_ratio": "400/5"
+                        },
+                        "calib_engine": {
+                            "oil_press_bar": 4.2, "coolant_temp_c": 88.0,
+                            "rpm": 1500.0, "battery_v": 25.8,
+                            "ambient_temp": 45.0
                         }
                     }
                 }
@@ -100,9 +118,9 @@ if "daily_logs" not in st.session_state:
         {
             "timestamp": f"{today_str} 08:30:00",
             "date": today_str,
-            "site": "[ولاية الخرطوم - المنطقة 01] - مصنع التعدين (موقع رئيسي)",
+            "site": "الخرطوم (القائمة الرئيسية) - الموقع الرئيسي - كافوري (موقع فرعي)",
             "generator": "G1",
-            "technician": "فني الصيانة",
+            "technician": "أحمد فني الصيانة",
             "run_hours": 700.0,
             "v_measured": 398.0,
             "oil_press": 4.5,
@@ -147,6 +165,7 @@ else:
 
 # دالة تشغيل الصوت المحدثة مع دعم اللغتين خيار الكتم والتكرار المستمر للانذارات
 def play_audio(text, lang='ar', loop=False):
+    """تحويل النص إلى صوت باستخدام gTTS وتشغيله إن لم يتم تفعيل Mute مع دعم التكرار"""
     if st.session_state.get("audio_muted", False):
         return
     try:
@@ -173,6 +192,7 @@ def play_audio(text, lang='ar', loop=False):
 
 @st.cache_data(ttl=3600)
 def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
+    """دالة استدعاء الذكاء الاصطناعي مع معالجة حزمة الضغط العالي (503) وإعادة المحاولة ودعم ثنائية اللغة"""
     if not client:
         return "⚠️ GEMINI_API_KEY not found." if language == "en" else "⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY."
 
@@ -284,7 +304,7 @@ class ComprehensivePDF(FPDF):
         self.cell(
             0,
             4,
-            "Prepared by: Osman Adam Addoma | Consultant Engineer",
+            "Prepared by: Osman Adam Addoma | Power Systems Engineer",
             ln=True,
             align="C",
         )
@@ -299,6 +319,7 @@ class ComprehensivePDF(FPDF):
 # 1.5 دوال الربط بقاعدة البيانات الحية وإنترنت الأشياء (IoT)
 # =========================================================
 def fetch_live_iot_data():
+    """جلب القراءات اللحظية من قاعدة بيانات السلاسل الزمنية الحية إن وجدت"""
     if not InfluxDBClient or "influxdb" not in st.secrets:
         import random
         today = datetime.now()
@@ -336,14 +357,17 @@ def fetch_live_iot_data():
 # 1.8 أدوات وحاسبات هندسية مستحدثة (Engineering Smart Tools)
 # =========================================================
 def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85):
-    rho_copper = 0.0178 
+    """حساب هبوط الجهد ثلاثي الأوجه للكهرباء (3-Phase Voltage Drop)"""
+    rho_copper = 0.0178  # المقاومة النوعية للنحاس
     v_drop = (math.sqrt(3) * current_a * distance_m * rho_copper * cos_phi) / cable_mm2
     v_drop_pct = (v_drop / 400.0) * 100
     return round(v_drop, 2), round(v_drop_pct, 2)
 
 def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
+    """تقدير استهلاك الديزل والانبعاثات المباشرة للمولدات"""
+    # متوسط الاستهلاك = ~0.24 لتر/كيلوواط.ساعة
     liters = kw_load * 0.24 * run_hours
-    co2_kg = liters * 2.68 
+    co2_kg = liters * 2.68  # 2.68 كجم كربون لكل لتر ديزل
     return round(liters, 1), round(co2_kg, 1)
 
 # =========================================================
@@ -370,6 +394,9 @@ CLIENTS_DATABASE = {
     },
 }
 
+import extra_streamlit_components as stx
+import streamlit as st
+
 def get_cookie_manager():
     if "cookie_manager" not in st.session_state:
         st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager")
@@ -387,15 +414,14 @@ if saved_code and not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.session_state.active_code = saved_code
 
+# --- خيار تحديد اللغة في الشريط الجانبي ---
 st.sidebar.subheader("🌐 Language / اللغة")
-
-# --- التعديل هنا: سطر واحد لاختيار اللغة بدون مشاكل Indentation ---
-selected_lang = st.sidebar.radio("Select Language:", ["العربية (Arabic)", "English"], index=0 if st.session_state.lang == "ar" else 1, key="main_lang_selector")
-
+selected_lang = st.sidebar.radio("Select Language:", ["العربية (Arabic)", "English"], index=0 if st.session_state.lang == "ar" else 1)
 st.session_state.lang = "ar" if "العربية" in selected_lang else "en"
 
 L = st.session_state.lang
 
+# نصوص ثنائية اللغة
 TXT = {
     "ar": {
         "title": "🔐 بوابة تفعيل النظام الموحد",
@@ -437,6 +463,7 @@ TXT = {
     }
 }[L]
 
+# --- الواجهة والتأكيد ---
 if not st.session_state.authenticated:
     st.title(TXT["title"])
     user_code = st.sidebar.text_input(TXT["code_input"], type="password")
@@ -511,7 +538,7 @@ if not is_pro:
 st.sidebar.divider()
 
 # =========================================================
-# 3. قائمة اختيار التطبيق المركزي 
+# 3. قائمة اختيار التطبيق المركزي (ربط مع التنقل الجديد)
 # =========================================================
 st.sidebar.markdown(TXT["app_selection"])
 
@@ -543,6 +570,9 @@ selected_app = st.sidebar.radio(
 )
 st.sidebar.divider()
 
+# =========================================================
+# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد مع التحقق الفوري
+# =========================================================
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
     gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
@@ -558,7 +588,7 @@ def edit_generator_modal(main_site, sub_site, gen_key):
         new_model = st.text_input("Model / الطراز", value=gen_data.get("model", ""))
         new_run_hours = st.number_input("Run Hours / ساعات التشغيل", min_value=0.0, value=float(gen_data.get("run_hours", 0.0)))
         new_target = st.number_input("Target Hours / الساعات المستهدفة", min_value=0.0, value=float(gen_data.get("target", 250.0)))
-        new_kw = st.number_input("Capacity (kVA/kW) / السعة", min_value=0.0, value=float(gen_data.get("kw", 0.0)))
+        new_kw = st.number_input("Capacity (kW) / السعة", min_value=0.0, value=float(gen_data.get("kw", 0.0)))
         new_load = st.number_input("Current Load (kW) / الحمولة", min_value=0.0, value=float(gen_data.get("load", 0.0)))
 
     with tab2:
@@ -630,9 +660,10 @@ def edit_generator_modal(main_site, sub_site, gen_key):
             st.rerun()
 
 # =========================================================
-# --- عرض الواجهات الرئيسية ---
+# --- عرض الواجهات الرئيسية (المدمجة) ---
 # =========================================================
 
+# --- 2. واجهة المساعد الذكي (Chat UI) ---
 if st.session_state.current_page == "chat":
     st.title("🤖 " + ("المساعد الذكي الهندسي" if L == "ar" else "Smart AI Assistant"))
     st.caption("Addoma Trading Services - Industrial AI Engine")
@@ -667,18 +698,20 @@ if st.session_state.current_page == "chat":
             
         st.session_state.messages.append({"role": "assistant", "content": response_text})
 
+# --- 3. واجهة لوحة التحكم (Dashboard UI) ---
 elif st.session_state.current_page == "dashboard":
     st.title("📊 " + ("لوحة تحكم الأنظمة والمتابعة" if L == "ar" else "Systems Control Dashboard"))
     
     col1, col2, col3 = st.columns(3)
     col1.metric(label="Generators Status", value="Stable / مستقرة", delta="Sync Ready")
-    col2.metric(label="WIC Cold Rooms", value="2 Units (WIC 10 & WIC 40)", delta="-1°C", delta_color="inverse")
+    col2.metric(label="WIC Cold Rooms", value="2 Units (WIC10 & WIC40)", delta="-1°C", delta_color="inverse")
     col3.metric(label="Database Link", value="Supabase Online", delta="Ping 12ms")
     
     st.divider()
     st.subheader("Live Telemetry & Diagnostics Overview")
     st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
 
+# --- 4. التطبيقات الهندسية الشاملة ---
 else:
     if "1." in selected_app:
         st.title("⚙️ " + ("نظام الصيانة التنبؤية ومراقبة المولدات" if L == "ar" else "Predictive Maintenance & Genset Monitoring"))
@@ -693,105 +726,98 @@ else:
         st.sidebar.subheader("🎨 PDF Branding / الشعار")
         logo_file = st.sidebar.file_uploader("Upload Logo", type=["png", "jpg", "jpeg"], key="logo_up")
 
-        # =====================================================================
-        # التعديل الرئيسي المطلوب: أداة متطورة لإضافة مواقع ومولدات ببياناتها يدوياً
-        # =====================================================================
-        st.subheader("📍 Site & Generator Setup / إعداد وتأسيس المواقع والمولدات")
-        
-        with st.expander("➕ إضافة منطقة جغرافية وموقع ومولدات جديدة (Setup Wizard)", expanded=False):
-            st.markdown("استخدم هذا النموذج لإنشاء هيكل موقع جديد وإدخال مولداته دفعة واحدة.")
-            new_area_input = st.text_input("عنوان المنطقة الجغرافية للموقع ورقمها:", placeholder="مثال: [ولاية الخرطوم - المنطقة 01]")
-            new_site_input = st.text_input("اسم الموقع:", placeholder="مثال: مصنع التعدين")
-            
-            num_gens = st.number_input("تحديد عدد المولدات في هذا الموقع:", min_value=1, max_value=20, value=1, step=1)
-            
-            gen_details_list = []
-            for i in range(num_gens):
-                st.markdown(f"**المولد رقم {i+1}**")
-                c1, c2, c3 = st.columns(3)
-                g_id = c1.text_input(f"معرف المولد (مثال G{i+1})", value=f"G{i+1}", key=f"gen_id_{i}")
-                g_model = c2.text_input("موديل المولد", value="Perkins", key=f"gen_model_{i}")
-                g_size = c3.number_input("الحجم (kVA)", value=150.0, key=f"gen_size_{i}")
-                gen_details_list.append({"id": g_id, "model": g_model, "kw": g_size})
-                
-            if st.button("💾 حفظ البيانات وهيكل الموقع الجديد", type="primary"):
-                if new_area_input and new_site_input:
-                    if new_area_input not in st.session_state.sites_data:
-                        st.session_state.sites_data[new_area_input] = {}
-                        
-                    if new_site_input not in st.session_state.sites_data[new_area_input]:
-                        st.session_state.sites_data[new_area_input][new_site_input] = {
-                            "address": new_area_input,
-                            "generators": {}
-                        }
-                    
-                    for gen in gen_details_list:
-                        g_key = gen["id"]
-                        st.session_state.sites_data[new_area_input][new_site_input]["generators"][g_key] = {
-                            "model": gen["model"],
-                            "run_hours": 0.0,
-                            "target": 250.0,
-                            "kw": gen["kw"],
-                            "load": 0.0,
-                            "calib_elec": {"v_nominal": 400.0, "v_measured": 400.0, "freq_nominal": 50.0, "freq_measured": 50.0, "current_max": 200.0, "current_measured": 100.0, "pf": 0.8, "ct_ratio": "200/5"},
-                            "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0, "ambient_temp": 43.0}
-                        }
-                    st.success(f"تمت إضافة الموقع '{new_site_input}' بنجاح إلى '{new_area_input}' مع {num_gens} مولد(ات)!")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.error("الرجاء تعبئة عنوان المنطقة واسم الموقع.")
-
-        st.divider()
-
-        # اختيار وعرض المواقع من الهيكل
+        st.subheader("📍 Site Management / إدارة المواقع والعناوين")
         col_site1, col_site2 = st.columns(2)
-        main_areas = list(st.session_state.sites_data.keys())
+        
+        main_sites = list(st.session_state.sites_data.keys())
         
         with col_site1:
-            selected_main_area = st.selectbox("🌍 Select Geographic Area / اختر المنطقة:", main_areas) if main_areas else None
+            st.markdown("### 🏢 Main Sites / المواقع الرئيسية")
+            new_main_site = st.text_input("New Main Site Name:")
+            if st.button("➕ Add Main Site"):
+                if new_main_site and new_main_site not in st.session_state.sites_data:
+                    st.session_state.sites_data[new_main_site] = {}
+                    st.success(f"Added: {new_main_site}")
+                    st.rerun()
+                    
+            selected_main_site = st.selectbox("📌 Select Main Site:", main_sites) if main_sites else None
 
         with col_site2:
-            if selected_main_area:
-                sub_sites = list(st.session_state.sites_data[selected_main_area].keys())
-                selected_sub_site = st.selectbox("📍 Select Site / اختر الموقع:", sub_sites) if sub_sites else None
+            st.markdown("### 🏗️ Sub-Sites / المواقع الفرعية")
+            if selected_main_site:
+                sub_sites = list(st.session_state.sites_data[selected_main_site].keys())
+                
+                new_sub_site = st.text_input(f"Sub Site Name for ({selected_main_site}):")
+                new_sub_address = st.text_input("Sub Site Address / العنوان:")
+                
+                if st.button("➕ Add Sub Site"):
+                    if new_sub_site and new_sub_site not in st.session_state.sites_data[selected_main_site]:
+                        st.session_state.sites_data[selected_main_site][new_sub_site] = {
+                            "address": new_sub_address if new_sub_address else "N/A",
+                            "generators": {}
+                        }
+                        st.success(f"Added: {new_sub_site}")
+                        st.rerun()
+                        
+                selected_sub_site = st.selectbox("📍 Select Sub Site:", sub_sites) if sub_sites else None
                 
                 if selected_sub_site:
-                    current_site_address = st.text_input("Edit Site Details:", value=st.session_state.sites_data[selected_main_area][selected_sub_site].get("address", ""))
+                    current_site_address = st.text_input("Edit Address:", value=st.session_state.sites_data[selected_main_site][selected_sub_site].get("address", ""))
                     if st.button("✏️ Update Address"):
-                        st.session_state.sites_data[selected_main_area][selected_sub_site]["address"] = current_site_address
-                        st.success("Updated!")
+                        st.session_state.sites_data[selected_main_site][selected_sub_site]["address"] = current_site_address
+                        st.success("Updated Address!")
             else:
                 selected_sub_site = None
 
-        if not main_areas or not selected_main_area or not selected_sub_site:
-            st.warning("الرجاء إضافة منطقة وموقع من الأداة أعلاه أو اختيارها.")
+        if not main_sites or not selected_main_site or not selected_sub_site:
+            st.warning("Please add and select a main site and sub-site to manage generators.")
             st.stop()
 
         st.divider()
 
-        # إدارة المولدات داخل الموقع المحدد
-        gen_list = list(st.session_state.sites_data[selected_main_area][selected_sub_site]["generators"].keys())
+        col_gen_m1, col_gen_m2 = st.columns([2, 1])
+        with col_gen_m1:
+            st.markdown(f"### ⚙️ Generators in [ {selected_main_site} 🔗 {selected_sub_site} ]")
+            new_gen_id = st.text_input("New Genset ID:", placeholder="e.g. G3")
+        with col_gen_m2:
+            st.write("")
+            st.write("")
+            st.write("")
+            if st.button("➕ Create Genset"):
+                if new_gen_id and new_gen_id not in st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"]:
+                    st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][new_gen_id] = {
+                        "model": "Perkins Standard",
+                        "run_hours": 0.0,
+                        "target": 250.0,
+                        "kw": 100.0,
+                        "load": 50.0,
+                        "calib_elec": {"v_nominal": 400.0, "v_measured": 400.0, "freq_nominal": 50.0, "freq_measured": 50.0, "current_max": 200.0, "current_measured": 100.0, "pf": 0.8, "ct_ratio": "200/5"},
+                        "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0, "ambient_temp": 43.0}
+                    }
+                    st.success(f"Created {new_gen_id}")
+                    st.rerun()
+
+        gen_list = list(st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"].keys())
 
         if not gen_list:
-            st.info("لا توجد مولدات في هذا الموقع. أضفها عبر أداة التأسيس أعلاه.")
+            st.info("No generators in this sub-site. Add one above.")
         else:
             col_select_g, col_modal_btn = st.columns([2, 1])
             with col_select_g:
-                selected_gen = st.selectbox("⚙️ Select Generator / اختر المولد للتحليل:", gen_list)
+                selected_gen = st.selectbox("Select Generator:", gen_list)
             with col_modal_btn:
                 st.write("")
                 st.write("")
-                if st.button("📝 Open Calibration Modal (إدخال القراءات)"):
-                    edit_generator_modal(selected_main_area, selected_sub_site, selected_gen)
+                if st.button("📝 Open Calibration Modal"):
+                    edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
 
-            gen_info = st.session_state.sites_data[selected_main_area][selected_sub_site]["generators"][selected_gen]
+            gen_info = st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
             calib_e = gen_info.get("calib_elec", {})
             calib_m = gen_info.get("calib_engine", {})
 
             st.subheader(f"📊 Calibration Dashboard ({selected_gen})")
             m_c1, m_c2, m_c3, m_c4 = st.columns(4)
-            m_c1.metric("Model & Capacity", f"{gen_info['model']}", f"{gen_info['kw']} kVA")
+            m_c1.metric("Model & Capacity", f"{gen_info['model']}", f"{gen_info['kw']} kW")
             m_c2.metric("Run Hours / Target", f"{gen_info['run_hours']} hrs", f"Target: {gen_info['target']} hrs")
             m_c3.metric("Measured Voltage", f"{calib_e.get('v_measured', 0)} V", f"Nominal: {calib_e.get('v_nominal', 0)} V")
             m_c4.metric("Coolant / Ambient Temp", f"{calib_m.get('coolant_temp_c', 0)} °C", f"Ambient: {calib_m.get('ambient_temp', 0)} °C")
@@ -811,7 +837,7 @@ else:
                     st.error(f"🚨 {msg}")
                 play_audio(" . ".join(alarm_messages), loop=True)
 
-            parts_key = f"parts_{selected_main_area}_{selected_sub_site}_{selected_gen}"
+            parts_key = f"parts_{selected_main_site}_{selected_sub_site}_{selected_gen}"
             if parts_key not in st.session_state:
                 st.session_state[parts_key] = [
                     {"الوحدة": 1, "تصنيف القطعة": "Schedule Services", "قطع الغيار / الفلاتر": "Oil Filter", "العمر الافتراضي (ساعة)": 250.0, "الساعات المنقضية (ساعة)": 180.0, "تجديد (تصفير)": False},
@@ -943,12 +969,11 @@ else:
                 pdf.set_font("Helvetica", "B", 9)
                 pdf.set_text_color(24, 43, 73)
                 
-                # طباعة بيانات المولد والموقع المحفوظة يدوياً داخل التقرير
-                pdf.cell(0, 5, f"Geo Area / المنطقة الجغرافية: {sanitize_latin_only(selected_main_area)}", ln=True)
+                pdf.cell(0, 5, f"Generator Data Site Address: {sanitize_latin_only(current_site_address)}", ln=True)
                 pdf.set_x(12)
-                pdf.cell(0, 5, f"Site Name / اسم الموقع: {sanitize_latin_only(selected_sub_site)}", ln=True)
+                pdf.cell(0, 5, f"Main Site: {sanitize_latin_only(selected_main_site)} | Sub Site: {sanitize_latin_only(selected_sub_site)}", ln=True)
                 pdf.set_x(12)
-                pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | Capacity: {gen_info['kw']} kVA", ln=True)
+                pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | Capacity: {gen_info['kw']} kW", ln=True)
                 pdf.set_x(12)
                 pdf.cell(0, 5, f"Current Run Hours: {gen_info['run_hours']} hrs | Target Hours: {gen_info['target']} hrs", ln=True)
                 
@@ -993,34 +1018,6 @@ else:
                     pdf.cell(widths[4], 5, str(row["المدة المتبقية (ساعة)"]), border=1, align="C", fill=fill)
                     pdf.cell(widths[5], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1, fill=fill)
                     pdf.ln()
-
-                # إضافة الرسوم البيانية (Charts) إلى تقرير الـ PDF
-                try:
-                    pdf.add_page()
-                    pdf.set_font("Helvetica", "B", 11)
-                    pdf.set_text_color(24, 43, 73)
-                    pdf.cell(0, 10, "Generator Performance & Maintenance Analytics", ln=True)
-                    
-                    # استخراج الرسوم كصور مؤقتة
-                    bar_img_bytes = fig_bar.to_image(format="png", engine="kaleido")
-                    pie_img_bytes = fig_pie.to_image(format="png", engine="kaleido")
-                    
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_bar:
-                        f_bar.write(bar_img_bytes)
-                        f_bar_path = f_bar.name
-                        
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_pie:
-                        f_pie.write(pie_img_bytes)
-                        f_pie_path = f_pie.name
-                        
-                    pdf.image(f_bar_path, x=10, y=30, w=190)
-                    pdf.image(f_pie_path, x=55, y=140, w=100)
-                    
-                except Exception as e:
-                    pdf.ln(10)
-                    pdf.set_font("Helvetica", "I", 9)
-                    pdf.set_text_color(150, 0, 0)
-                    pdf.cell(0, 5, "(Notice: Charts cannot be generated. Please ensure 'kaleido' python library is installed.)", ln=True)
 
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
@@ -1113,4 +1110,66 @@ else:
 
         st.divider()
 
-        fault_input = st.text_input("Enter Fault Code (e.g., Over Current)")
+        fault_input = st.text_input("Enter Fault Code (e.g., Over Current / DSE 8610 Error / Oil Low):", value="Over Current")
+
+        if st.button("🔍 Analyze Fault", use_container_width=True):
+            clean_fault = fault_input.strip()
+            st.markdown(f"### Diagnostic Report: `{clean_fault}`")
+            
+            ai_res = analyze_fault_with_gemini(clean_fault, language=L)
+            st.markdown(ai_res)
+
+    elif "5." in selected_app:
+        st.title("🔍 " + ("نظام فحص المعدات مقارنة بصرية" if L == "ar" else "Equipment Visual Inspection (WIC & Gensets)"))
+
+        eq_type = st.selectbox("Equipment Type:", [
+            "Industrial Diesel Generator",
+            "WIC 10 & WIC 40 Cold Rooms / غرف تبريد",
+            "3-Phase Electric Motor"
+        ])
+
+        c_img1, c_img2 = st.columns(2)
+        with c_img1:
+            st.write("🟢 Reference (Normal)")
+            good_img = st.file_uploader("Good Part Photo", type=["png", "jpg"], key="gi")
+            if good_img: st.image(Image.open(good_img), use_container_width=True)
+        with c_img2:
+            st.write("🔴 Inspection Item (Defective)")
+            bad_img = st.file_uploader("Inspected Part Photo", type=["png", "jpg"], key="bi")
+            if bad_img: st.image(Image.open(bad_img), use_container_width=True)
+
+        if "WIC" in eq_type:
+            st.warning("⚠️ **WIC Cold Room Checklist:** Check expansion valves, defrost heaters, and refrigerant flow for WIC 10 and WIC 40 units.")
+
+    elif "6." in selected_app:
+        # الميزة الهندسية المستحدثة الجديدة: الحاسبة الذكية للهبوط في الجهد والانبعاثات
+        st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
+        
+        tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint"])
+        
+        with tab_calc1:
+            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
+            c1, c2, c3 = st.columns(3)
+            i_amp = c1.number_input("Current (Amperes / أمبير):", value=250.0)
+            dist_m = c2.number_input("Cable Length (Meters / متر):", value=120.0)
+            c_size = c3.selectbox("Cable Size (mm² / مقطع الكابل):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4)
+            
+            v_drop, v_drop_pct = calculate_cable_voltage_drop(i_amp, dist_m, c_size)
+            
+            st.metric("Voltage Drop (فقد الجهد)", f"{v_drop} V", f"{v_drop_pct}%")
+            if v_drop_pct > 4.0:
+                st.error("⚠️ Warning: Voltage drop exceeds standard 4% limit! Consider using a larger cable size.")
+            else:
+                st.success("✅ Cable size is acceptable under IEC standards.")
+
+        with tab_calc2:
+            st.subheader("🌱 Fuel Consumption & CO2 Emission Estimator")
+            ec1, ec2 = st.columns(2)
+            load_kw = ec1.number_input("Running Load (kW):", value=200.0)
+            hours_run = ec2.number_input("Operating Hours:", value=24.0)
+            
+            est_liters, est_co2 = calculate_fuel_consumption_and_emissions(load_kw, hours_run)
+            
+            mc1, mc2 = st.columns(2)
+            mc1.metric("Estimated Diesel Used", f"{est_liters} Liters")
+            mc2.metric("Estimated CO2 Output", f"{est_co2} kg")
