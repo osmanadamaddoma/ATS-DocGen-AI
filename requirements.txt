@@ -31,3 +31,6 @@ influxdb-client
 extra-streamlit-components
 kaleido
 kaleido==0.2.1
+streamlit>=1.32.0
+plotly>=5.18.0
+kaleido==0.2.1
