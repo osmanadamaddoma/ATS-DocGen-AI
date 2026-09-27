@@ -365,8 +365,9 @@ def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85)
 
 def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
     """تقدير استهلاك الديزل والانبعاثات المباشرة للمولدات"""
+    # متوسط الاستهلاك = ~0.24 لتر/كيلوواط.ساعة
     liters = kw_load * 0.24 * run_hours
-    co2_kg = liters * 2.68
+    co2_kg = liters * 2.68  # 2.68 كجم كربون لكل لتر ديزل
     return round(liters, 1), round(co2_kg, 1)
 
 # ==========================================
@@ -381,49 +382,47 @@ def init_subscribers_db():
     conn.close()
 
 # ==========================================
-# دالة النافذة المنبثقة لإدارة/تفعيل المشتركين للمالك حصراً
+# 1. دالة النافذة المنبثقة لإدارة/تفعيل المشتركين (المحدثة)
 # ==========================================
-@st.dialog("🔑 إدارة وتفعيل كود المشتركين (خاص بالمالك)")
-def owner_subscriber_management_modal():
-    init_subscribers_db()
-    st.write("أدخل بيانات المشترك والمدة لإصدار كود تفعيل جديد شهري أو سنوي:")
+@st.dialog("🔑 إدارة وتفعيل كود المشتركين")
+def subscriber_management_modal():
+    init_subscribers_db() # التأكد من جاهزية قاعدة البيانات
+    st.write("أدخل بيانات المشترك والمدة لإصدار كود تفعيل جديد:")
     
-    with st.form("owner_subscriber_form"):
+    # نموذج إدخال البيانات
+    with st.form("subscriber_form"):
         subscriber_name = st.text_input("اسم المشترك / الشركة:")
-        subscription_code = st.text_input("كود التفعيل (مثال: ADDOMA-PRO-2026):")
-        plan_choice = st.selectbox("نوع باقة الاشتراك:", ["شهري (Monthly - 30 Days)", "سنوي (Yearly - 365 Days)", "مخصص (Custom Days)"])
-        custom_days = st.number_input("أو عدد الأيام المخصصة:", min_value=1, value=30, step=1)
+        subscription_code = st.text_input("كود التفعيل (مثال: CLIENT-2026):")
+        duration_days = st.number_input("مدة الاشتراك (بالأيام):", min_value=1, value=30, step=1)
         
-        submit_btn = st.form_submit_button("إصدار وحفظ كود التفعيل")
+        submit_btn = st.form_submit_button("إصدار وحفظ الاشتراك")
         
         if submit_btn:
             if subscription_code and subscriber_name:
-                if "شهري" in plan_choice:
-                    days_count = 30
-                elif "سنوي" in plan_choice:
-                    days_count = 365
-                else:
-                    days_count = custom_days
-
-                expiry_date = datetime.now() + timedelta(days=days_count)
+                # حساب تاريخ الانتهاء بناءً على عدد الأيام وتنسيقه ليتطابق مع دالة التحقق
+                expiry_date = datetime.now() + timedelta(days=duration_days)
                 expiry_date_str = expiry_date.strftime('%Y-%m-%d %H:%M:%S.%f')
                 
                 try:
                     conn = sqlite3.connect('subscribers.db')
                     c = conn.cursor()
+                    # إدخال المشترك الجديد، أو تحديث بياناته إذا كان الكود موجوداً مسبقاً
                     c.execute('''INSERT INTO codes (client_name, code, expiry_date, plan) 
                                  VALUES (?, ?, ?, ?)
                                  ON CONFLICT(code) DO UPDATE SET 
                                  client_name=excluded.client_name, 
-                                 expiry_date=excluded.expiry_date,
-                                 plan=excluded.plan''', 
-                              (subscriber_name, subscription_code, expiry_date_str, plan_choice))
+                                 expiry_date=excluded.expiry_date''', 
+                              (subscriber_name, subscription_code, expiry_date_str, "PRO-SQLITE"))
                     conn.commit()
                     conn.close()
                     
-                    st.success(f"✅ تم إصدار الكود ({subscription_code}) بنجاح للمشترك: {subscriber_name}")
-                    st.info(f"⏳ صالح حتى تاريخ: {expiry_date.strftime('%Y-%m-%d')} ({days_count} يوم)")
+                    st.success(f"✅ تم تفعيل الكود ({subscription_code}) بنجاح للمشترك: {subscriber_name}")
+                    st.info(f"⏳ صالح حتى تاريخ: {expiry_date.strftime('%Y-%m-%d')}")
                     
+                    # زر لإغلاق النافذة وتحديث الصفحة
+                    if st.form_submit_button("إغلاق وتحديث"):
+                        st.rerun()
+                        
                 except Exception as e:
                     st.error(f"حدث خطأ أثناء الحفظ في قاعدة البيانات: {e}")
             else:
@@ -434,27 +433,27 @@ def owner_subscriber_management_modal():
 # =========================================================
 CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
-        "name": "عثمان آدم أدومة (Addoma Trading Services - Owner)",
-        "plan": "سنوي (Yearly)",
-        "start_date": "2026-01-01",
-        "duration_days": 365,
-        "is_owner": True  # تحديد مميز لكون هذا الحساب هو حساب المالك
+        "name": "عثمان آدم أدومة (Addoma Trading Services)",
+        "plan": "شهري (Monthly)",
+        "start_date": "2026-09-15",
+        "duration_days": 30,
     },
     "CLIENT-M-881": {
         "name": "شركة النيل للصناعات الهندسية",
         "plan": "شهري (Monthly)",
         "start_date": "2026-09-01",
         "duration_days": 30,
-        "is_owner": False
     },
     "CLIENT-Y-992": {
         "name": "مصانع الحديد والصلب الوطنية",
         "plan": "سنوي (Yearly)",
         "start_date": "2026-03-15",
         "duration_days": 365,
-        "is_owner": False
     },
 }
+
+import extra_streamlit_components as stx
+import streamlit as st
 
 def get_cookie_manager():
     if "cookie_manager" not in st.session_state:
@@ -469,33 +468,7 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if saved_code and not st.session_state.authenticated:
-    # التحقق من قاعدة بيانات الكود الثابت أو قاعدة بيانات السويتش المحلية SQLite للمشتركين الجدد
-    is_valid_code = False
     if saved_code in CLIENTS_DATABASE:
-        is_valid_code = True
-    else:
-        try:
-            init_subscribers_db()
-            conn = sqlite3.connect('subscribers.db')
-            c = conn.cursor()
-            c.execute("SELECT client_name, expiry_date, plan FROM codes WHERE code = ?", (saved_code,))
-            row = c.fetchone()
-            conn.close()
-            if row:
-                exp_dt = datetime.strptime(row[1], '%Y-%m-%d %H:%M:%S.%f')
-                if datetime.now() <= exp_dt:
-                    is_valid_code = True
-                    CLIENTS_DATABASE[saved_code] = {
-                        "name": row[0],
-                        "plan": row[2],
-                        "start_date": datetime.now().strftime('%Y-%m-%d'),
-                        "duration_days": 30,
-                        "is_owner": False
-                    }
-        except Exception:
-            pass
-
-    if is_valid_code:
         st.session_state.authenticated = True
         st.session_state.active_code = saved_code
 
@@ -512,7 +485,7 @@ TXT = {
         "title": "🔐 بوابة تفعيل النظام الموحد",
         "code_input": "كود التفعيل:",
         "btn_activate": "تفعيل",
-        "invalid_code": "❌ كود التفعيل غير صحيح أو منتهي الصلاحية.",
+        "invalid_code": "❌ كود التفعيل غير صحيح.",
         "warning_auth": "🔒 يرجى إدخال كود اشتراك صالح للوصول إلى التطبيقات والمساعد الذكي.",
         "nav_header": "⚙️ نظام الدومة للخدمات التجارية",
         "nav_status": "🟢 النظام متصل ومفعل",
@@ -531,7 +504,7 @@ TXT = {
         "title": "🔐 Unified Activation Portal",
         "code_input": "Activation Code:",
         "btn_activate": "Activate",
-        "invalid_code": "❌ Invalid activation code or expired.",
+        "invalid_code": "❌ Invalid activation code.",
         "warning_auth": "🔒 Please enter a valid activation code to access system applications.",
         "nav_header": "⚙️ Addoma Trading Services System",
         "nav_status": "🟢 System Connected & Active",
@@ -554,35 +527,10 @@ if not st.session_state.authenticated:
     user_code = st.sidebar.text_input(TXT["code_input"], type="password")
     
     if st.sidebar.button(TXT["btn_activate"]):
-        valid_login = False
         if user_code in CLIENTS_DATABASE:
-            valid_login = True
-        else:
-            try:
-                init_subscribers_db()
-                conn = sqlite3.connect('subscribers.db')
-                c = conn.cursor()
-                c.execute("SELECT client_name, expiry_date, plan FROM codes WHERE code = ?", (user_code,))
-                row = c.fetchone()
-                conn.close()
-                if row:
-                    exp_dt = datetime.strptime(row[1], '%Y-%m-%d %H:%M:%S.%f')
-                    if datetime.now() <= exp_dt:
-                        valid_login = True
-                        CLIENTS_DATABASE[user_code] = {
-                            "name": row[0],
-                            "plan": row[2],
-                            "start_date": datetime.now().strftime('%Y-%m-%d'),
-                            "duration_days": 30,
-                            "is_owner": False
-                        }
-            except Exception:
-                pass
-
-        if valid_login:
             st.session_state.authenticated = True
             st.session_state.active_code = user_code
-            expires_at = datetime.now() + timedelta(days=365)
+            expires_at = datetime.now() + timedelta(days=30)
             cookie_manager.set("activation_code", user_code, expires_at=expires_at)
             st.rerun()
         else:
@@ -618,28 +566,32 @@ is_pro = False
 client_name = "Visitor"
 plan_type = "N/A"
 days_left = 0
-is_current_user_owner = False
 
 if input_code in CLIENTS_DATABASE:
     data = CLIENTS_DATABASE[input_code]
     client_name = data["name"]
     plan_type = data["plan"]
-    is_current_user_owner = data.get("is_owner", False)
     
     start_dt = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
     expiry_dt = start_dt + timedelta(days=data["duration_days"])
     today = datetime.now().date()
     
-    if today <= expiry_dt or is_current_user_owner:
+    if today <= expiry_dt:
         is_pro = True
-        days_left = (expiry_dt - today).days if not is_current_user_owner else 365
+        days_left = (expiry_dt - today).days
         st.sidebar.success("✅ Subscription Verified!")
         st.sidebar.markdown(f"**{TXT['client']}** {client_name}")
         st.sidebar.markdown(f"**{TXT['plan']}** {plan_type}")
-        if not is_current_user_owner:
-            st.sidebar.markdown(f"**{TXT['remaining']}** {days_left} {TXT['days']}")
-        else:
-            st.sidebar.markdown("👑 **صلاحيات المالك مفعلة**")
+        st.sidebar.markdown(f"**{TXT['remaining']}** {days_left} {TXT['days']}")
+        
+        # ---------------------------------------------------------
+        # زر لوحة التحكم الخاص بالمالك (لإظهار نافذة إصدار الأكواد)
+        # ---------------------------------------------------------
+        if input_code == "ADDOMA-2026-PRO":
+            st.sidebar.divider()
+            st.sidebar.markdown("👑 **لوحة تحكم المالك الخاصة**")
+            if st.sidebar.button("🔑 إصدار/تحرير كود اشتراك للعملاء", use_container_width=True):
+                subscriber_management_modal()
     else:
         st.sidebar.error(f"❌ License expired on ({expiry_dt}).")
         st.session_state.authenticated = False
@@ -649,15 +601,6 @@ if input_code in CLIENTS_DATABASE:
 if not is_pro:
     st.warning(TXT["warning_auth"])
     st.stop()
-
-# =========================================================
-# نافذة أو زر تحكم المالك الحصري (إصدار الأكواد الشهرية/السنوية)
-# =========================================================
-if is_current_user_owner:
-    st.sidebar.divider()
-    st.sidebar.markdown("👑 **لوحة تحكم المالك (Owner Panel)**")
-    if st.sidebar.button("🛠️ لوحة إصدار وتعديل أكواد التفعيل", use_container_width=True, type="primary"):
-        owner_subscriber_management_modal()
 
 st.sidebar.divider()
 
@@ -852,6 +795,7 @@ else:
 
         st.subheader("📍 Site Management / إدارة المواقع والمولدات")
 
+        # --- بداية التعديل: نموذج الإدخال اليدوي المطور للمواقع والمولدات ---
         with st.expander("➕ إضافة منطقة وموقع ومولدات يدوياً (نموذج متكامل)", expanded=False):
             st.markdown("### بيانات المنطقة والموقع")
             geo_region = st.text_input("عنوان المنطقة الجغرافية (رقمها/اسمها) [مثال: الخرطوم - المنطقة 1]:", key="geo_reg_input")
@@ -882,7 +826,7 @@ else:
                     }
                     
                     for gen in gen_inputs:
-                        if gen["id"]:
+                        if gen["id"]: # التأكد من عدم ترك الرمز فارغاً
                             st.session_state.sites_data[geo_region][site_name]["generators"][gen["id"]] = {
                                 "model": gen["model"],
                                 "run_hours": 0.0,
@@ -914,6 +858,7 @@ else:
             else:
                 selected_sub_site = None
                 current_site_address = ""
+        # --- نهاية التعديل الخاص بنموذج الإدخال ---
 
         if not main_sites or not selected_main_site or not selected_sub_site:
             st.warning("Please add and select a main site and sub-site to manage generators.")
@@ -1270,6 +1215,7 @@ else:
             st.warning("⚠️ **WIC Cold Room Checklist:** Check expansion valves, defrost heaters, and refrigerant flow for WIC 10 and WIC 40 units.")
 
     elif "6." in selected_app:
+        # الميزة الهندسية المستحدثة الجديدة: الحاسبة الذكية للهبوط في الجهد والانبعاثات
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
         
         tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint"])
