@@ -1110,7 +1110,8 @@ else:
 
         st.divider()
 
-        fault_input = st.text_input("Enter Fault Code (e.g., Over Current```python
+        fault_input = st.text_input("Enter Fault Code (e.g., Over Current)")
+
 import os
 import re
 import json
