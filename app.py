@@ -1439,7 +1439,13 @@ if saved_code and not st.session_state.authenticated:
         st.session_state.active_code = saved_code
 
 st.sidebar.subheader("🌐 Language / اللغة")
-selected_lang = st.sidebar.radio("Select Language:", ["العربية (Arabic)", "English"], index=0 if st.session_state.lang == "ar" else 1) selected_lang = st.sidebar.radio(
+selected_lang = st.sidebar.radio(
+    "Select Language:",
+    ["العربية (Arabic)", "English"],
+    index=0 if st.session_state.lang == "ar" else 1,
+    key="main_lang_selector"
+)
+
     "Select Language:", 
     ["العربية (Arabic)", "English"], 
     index=0 if st.session_state.lang == "ar" else 1,
