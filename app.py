@@ -726,72 +726,48 @@ else:
         st.sidebar.subheader("🎨 PDF Branding / الشعار")
         logo_file = st.sidebar.file_uploader("Upload Logo", type=["png", "jpg", "jpeg"], key="logo_up")
 
-        st.subheader("📍 Site Management / إدارة المواقع والمولدات")
-
-        # --- بداية التعديل: نموذج الإدخال اليدوي المطور للمواقع والمولدات ---
-        with st.expander("➕ إضافة منطقة وموقع ومولدات يدوياً (نموذج متكامل)", expanded=False):
-            st.markdown("### بيانات المنطقة والموقع")
-            geo_region = st.text_input("عنوان المنطقة الجغرافية (رقمها/اسمها) [مثال: الخرطوم - المنطقة 1]:", key="geo_reg_input")
-            site_name = st.text_input("اسم الموقع [مثال: مصنع كافوري]:", key="site_name_input")
-            site_address = st.text_input("عنوان الموقع التفصيلي:", key="site_add_input")
-            
-            st.markdown("### بيانات المولدات")
-            num_gens = st.number_input("عدد المولدات في الموقع:", min_value=1, max_value=20, value=1, step=1, key="num_gens_input")
-            
-            st.write("تخصيص بيانات كل مولد:")
-            gen_inputs = []
-            for i in range(int(num_gens)):
-                st.markdown(f"**المولد رقم {i+1}**")
-                col_g1, col_g2, col_g3 = st.columns(3)
-                g_id = col_g1.text_input(f"رمز/رقم المولد", value=f"G{i+1}", key=f"g_id_{i}")
-                g_model = col_g2.text_input(f"موديل المولد", value="Perkins", key=f"g_mod_{i}")
-                g_kw = col_g3.number_input(f"الحجم/السعة (kW)", min_value=0.0, value=100.0, step=10.0, key=f"g_kw_{i}")
-                gen_inputs.append({"id": g_id, "model": g_model, "kw": g_kw})
-                
-            if st.button("💾 حفظ بيانات الموقع والمولدات بالكامل", type="primary"):
-                if geo_region and site_name:
-                    if geo_region not in st.session_state.sites_data:
-                        st.session_state.sites_data[geo_region] = {}
-                    
-                    st.session_state.sites_data[geo_region][site_name] = {
-                        "address": site_address if site_address else "N/A",
-                        "generators": {}
-                    }
-                    
-                    for gen in gen_inputs:
-                        if gen["id"]: # التأكد من عدم ترك الرمز فارغاً
-                            st.session_state.sites_data[geo_region][site_name]["generators"][gen["id"]] = {
-                                "model": gen["model"],
-                                "run_hours": 0.0,
-                                "target": 250.0,
-                                "kw": gen["kw"],
-                                "load": 0.0,
-                                "calib_elec": {"v_nominal": 400.0, "v_measured": 400.0, "freq_nominal": 50.0, "freq_measured": 50.0, "current_max": 200.0, "current_measured": 100.0, "pf": 0.8, "ct_ratio": "200/5"},
-                                "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0, "ambient_temp": 43.0}
-                            }
-                    st.success(f"تم حفظ المنطقة ({geo_region}) والموقع ({site_name}) بعدد {num_gens} مولد بنجاح!")
-                    st.rerun()
-                else:
-                    st.error("يرجى إدخال عنوان المنطقة الجغرافية واسم الموقع كحد أدنى.")
-
-        st.markdown("### 📌 اختيار الموقع الحالي للعمل")
-        main_sites = list(st.session_state.sites_data.keys())
+        st.subheader("📍 Site Management / إدارة المواقع والعناوين")
         col_site1, col_site2 = st.columns(2)
         
+        main_sites = list(st.session_state.sites_data.keys())
+        
         with col_site1:
-            selected_main_site = st.selectbox("🌍 اختر المنطقة الجغرافية:", main_sites) if main_sites else None
+            st.markdown("### 🏢 Main Sites / المواقع الرئيسية")
+            new_main_site = st.text_input("New Main Site Name:")
+            if st.button("➕ Add Main Site"):
+                if new_main_site and new_main_site not in st.session_state.sites_data:
+                    st.session_state.sites_data[new_main_site] = {}
+                    st.success(f"Added: {new_main_site}")
+                    st.rerun()
+                    
+            selected_main_site = st.selectbox("📌 Select Main Site:", main_sites) if main_sites else None
 
         with col_site2:
+            st.markdown("### 🏗️ Sub-Sites / المواقع الفرعية")
             if selected_main_site:
                 sub_sites = list(st.session_state.sites_data[selected_main_site].keys())
-                selected_sub_site = st.selectbox("📍 اختر الموقع:", sub_sites) if sub_sites else None
+                
+                new_sub_site = st.text_input(f"Sub Site Name for ({selected_main_site}):")
+                new_sub_address = st.text_input("Sub Site Address / العنوان:")
+                
+                if st.button("➕ Add Sub Site"):
+                    if new_sub_site and new_sub_site not in st.session_state.sites_data[selected_main_site]:
+                        st.session_state.sites_data[selected_main_site][new_sub_site] = {
+                            "address": new_sub_address if new_sub_address else "N/A",
+                            "generators": {}
+                        }
+                        st.success(f"Added: {new_sub_site}")
+                        st.rerun()
+                        
+                selected_sub_site = st.selectbox("📍 Select Sub Site:", sub_sites) if sub_sites else None
                 
                 if selected_sub_site:
-                    current_site_address = st.session_state.sites_data[selected_main_site][selected_sub_site].get("address", "")
+                    current_site_address = st.text_input("Edit Address:", value=st.session_state.sites_data[selected_main_site][selected_sub_site].get("address", ""))
+                    if st.button("✏️ Update Address"):
+                        st.session_state.sites_data[selected_main_site][selected_sub_site]["address"] = current_site_address
+                        st.success("Updated Address!")
             else:
                 selected_sub_site = None
-                current_site_address = ""
-        # --- نهاية التعديل الخاص بنموذج الإدخال ---
 
         if not main_sites or not selected_main_site or not selected_sub_site:
             st.warning("Please add and select a main site and sub-site to manage generators.")
@@ -802,11 +778,29 @@ else:
         col_gen_m1, col_gen_m2 = st.columns([2, 1])
         with col_gen_m1:
             st.markdown(f"### ⚙️ Generators in [ {selected_main_site} 🔗 {selected_sub_site} ]")
+            new_gen_id = st.text_input("New Genset ID:", placeholder="e.g. G3")
+        with col_gen_m2:
+            st.write("")
+            st.write("")
+            st.write("")
+            if st.button("➕ Create Genset"):
+                if new_gen_id and new_gen_id not in st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"]:
+                    st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][new_gen_id] = {
+                        "model": "Perkins Standard",
+                        "run_hours": 0.0,
+                        "target": 250.0,
+                        "kw": 100.0,
+                        "load": 50.0,
+                        "calib_elec": {"v_nominal": 400.0, "v_measured": 400.0, "freq_nominal": 50.0, "freq_measured": 50.0, "current_max": 200.0, "current_measured": 100.0, "pf": 0.8, "ct_ratio": "200/5"},
+                        "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0, "ambient_temp": 43.0}
+                    }
+                    st.success(f"Created {new_gen_id}")
+                    st.rerun()
 
         gen_list = list(st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"].keys())
 
         if not gen_list:
-            st.info("No generators in this sub-site. Add one from the manual entry form above.")
+            st.info("No generators in this sub-site. Add one above.")
         else:
             col_select_g, col_modal_btn = st.columns([2, 1])
             with col_select_g:
