@@ -219,7 +219,7 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model="gemini-3.6-flash",
+                model="gemini-2.5-flash",
                 contents=prompt,
             )
             return response.text
@@ -364,41 +364,36 @@ def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85)
 
 def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
     """تقدير استهلاك الديزل والانبعاثات المباشرة للمولدات"""
-    # متوسط الاستهلاك = ~0.24 لتر/كيلوواط.ساعة
     liters = kw_load * 0.24 * run_hours
-    co2_kg = liters * 2.68  # 2.68 كجم كربون لكل لتر ديزل
+    co2_kg = liters * 2.68
     return round(liters, 1), round(co2_kg, 1)
 
 # =========================================================
-# 2. نظام الاشتراكات الموحد والباقات (مع إدارة الكوكيز والتحديث الديناميكي)
+# 2. نظام الاشتراكات الموحد والباقات (مع إدارة الكوكيز)
 # =========================================================
-if "clients_db" not in st.session_state:
-    st.session_state.clients_db = {
-        "ADDOMA-2026-PRO": {
-            "name": "عثمان آدم أدومة (Addoma Trading Services)",
-            "plan": "شهري (Monthly)",
-            "start_date": "2026-09-15",
-            "duration_days": 30,
-        },
-        "CLIENT-M-881": {
-            "name": "شركة النيل للصناعات الهندسية",
-            "plan": "شهري (Monthly)",
-            "start_date": "2026-09-01",
-            "duration_days": 30,
-        },
-        "CLIENT-Y-992": {
-            "name": "مصانع الحديد والصلب الوطنية",
-            "plan": "سنوي (Yearly)",
-            "start_date": "2026-03-15",
-            "duration_days": 365,
-        },
-    }
-
-# توجيه المتغير القديم ليقرأ من الـ session_state
-CLIENTS_DATABASE = st.session_state.clients_db
-
-import extra_streamlit_components as stx
-import streamlit as st
+CLIENTS_DATABASE = {
+    "ADDOMA-2026-PRO": {
+        "name": "عثمان آدم أدومة (Addoma Trading Services)",
+        "plan": "شهري (Monthly)",
+        "start_date": "2026-09-15",
+        "duration_days": 30,
+        "is_owner": True,
+    },
+    "CLIENT-M-881": {
+        "name": "شركة النيل للصناعات الهندسية",
+        "plan": "شهري (Monthly)",
+        "start_date": "2026-09-01",
+        "duration_days": 30,
+        "is_owner": False,
+    },
+    "CLIENT-Y-992": {
+        "name": "مصانع الحديد والصلب الوطنية",
+        "plan": "سنوي (Yearly)",
+        "start_date": "2026-03-15",
+        "duration_days": 365,
+        "is_owner": False,
+    },
+}
 
 def get_cookie_manager():
     if "cookie_manager" not in st.session_state:
@@ -417,43 +412,6 @@ if saved_code and not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.session_state.active_code = saved_code
 
-# --- دالة النافذة المنبثقة لإصدار أكواد الاشتراكات ---
-@st.dialog("🔑 إصدار كود اشتراك جديد" if st.session_state.get("lang", "ar") == "ar" else "🔑 Generate New Subscription Code")
-def generate_subscription_modal():
-    st.markdown("### أدخل بيانات المشترك الجديد لإصدار كود التفعيل")
-    
-    client_name = st.text_input("اسم العميل / الشركة:")
-    plan_type = st.selectbox("نوع الباقة / Subscription Plan:", ["شهري (Monthly)", "سنوي (Yearly)", "تجريبي (Trial)"])
-    
-    # تحديد المدة التلقائية بناءً على الباقة
-    default_duration = 30
-    if "سنوي" in plan_type:
-        default_duration = 365
-    elif "تجريبي" in plan_type:
-        default_duration = 7
-        
-    custom_duration = st.number_input("مدة الاشتراك (بالأيام):", value=default_duration, min_value=1)
-    
-    if st.button("🚀 إصدار الكود (Generate)", type="primary", use_container_width=True):
-        if client_name.strip():
-            # توليد كود فريد باستخدام uuid
-            new_code = f"ADDOMA-{uuid.uuid4().hex[:6].upper()}"
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            
-            # إضافة المشترك للقاعدة الديناميكية
-            st.session_state.clients_db[new_code] = {
-                "name": client_name.strip(),
-                "plan": plan_type,
-                "start_date": today_str,
-                "duration_days": custom_duration,
-            }
-            
-            st.success(f"✅ تم إصدار الكود بنجاح!")
-            st.info(f"**كود التفعيل:** `{new_code}`")
-            st.caption("يرجى نسخ الكود وإرساله للعميل.")
-        else:
-            st.error("❌ يرجى إدخال اسم العميل أولاً.")
-
 # --- خيار تحديد اللغة في الشريط الجانبي ---
 st.sidebar.subheader("🌐 Language / اللغة")
 selected_lang = st.sidebar.radio("Select Language:", ["العربية (Arabic)", "English"], index=0 if st.session_state.lang == "ar" else 1)
@@ -461,7 +419,6 @@ st.session_state.lang = "ar" if "العربية" in selected_lang else "en"
 
 L = st.session_state.lang
 
-# نصوص ثنائية اللغة
 TXT = {
     "ar": {
         "title": "🔐 بوابة تفعيل النظام الموحد",
@@ -503,7 +460,6 @@ TXT = {
     }
 }[L]
 
-# --- الواجهة والتأكيد ---
 if not st.session_state.authenticated:
     st.title(TXT["title"])
     user_code = st.sidebar.text_input(TXT["code_input"], type="password")
@@ -543,13 +499,9 @@ else:
                 del st.session_state["active_code"]
             st.rerun()
 
-        # الكود المضاف حديثاً: زر إصدار الاشتراكات (خاص بالمسؤول)
-        st.write("---")
-        if st.button("➕ إصدار اشتراك جديد (Admin)", use_container_width=True):
-            generate_subscription_modal()
-
 input_code = st.session_state.get("active_code", "")
 is_pro = False
+is_app_owner = False
 client_name = "Visitor"
 plan_type = "N/A"
 days_left = 0
@@ -558,6 +510,7 @@ if input_code in CLIENTS_DATABASE:
     data = CLIENTS_DATABASE[input_code]
     client_name = data["name"]
     plan_type = data["plan"]
+    is_app_owner = data.get("is_owner", False)
     
     start_dt = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
     expiry_dt = start_dt + timedelta(days=data["duration_days"])
@@ -616,7 +569,7 @@ selected_app = st.sidebar.radio(
 st.sidebar.divider()
 
 # =========================================================
-# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد مع التحقق الفوري
+# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد مع التحقق الفوري (محجوبة عن العملاء وتظهر لمالك التطبيق فقط)
 # =========================================================
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
@@ -773,51 +726,52 @@ else:
 
         st.subheader("📍 Site Management / إدارة المواقع والمولدات")
 
-        # --- بداية التعديل: نموذج الإدخال اليدوي المطور للمواقع والمولدات ---
-        with st.expander("➕ إضافة منطقة وموقع ومولدات يدوياً (نموذج متكامل)", expanded=False):
-            st.markdown("### بيانات المنطقة والموقع")
-            geo_region = st.text_input("عنوان المنطقة الجغرافية (رقمها/اسمها) [مثال: الخرطوم - المنطقة 1]:", key="geo_reg_input")
-            site_name = st.text_input("اسم الموقع [مثال: مصنع كافوري]:", key="site_name_input")
-            site_address = st.text_input("عنوان الموقع التفصيلي:", key="site_add_input")
-            
-            st.markdown("### بيانات المولدات")
-            num_gens = st.number_input("عدد المولدات في الموقع:", min_value=1, max_value=20, value=1, step=1, key="num_gens_input")
-            
-            st.write("تخصيص بيانات كل مولد:")
-            gen_inputs = []
-            for i in range(int(num_gens)):
-                st.markdown(f"**المولد رقم {i+1}**")
-                col_g1, col_g2, col_g3 = st.columns(3)
-                g_id = col_g1.text_input(f"رمز/رقم المولد", value=f"G{i+1}", key=f"g_id_{i}")
-                g_model = col_g2.text_input(f"موديل المولد", value="Perkins", key=f"g_mod_{i}")
-                g_kw = col_g3.number_input(f"الحجم/السعة (kW)", min_value=0.0, value=100.0, step=10.0, key=f"g_kw_{i}")
-                gen_inputs.append({"id": g_id, "model": g_model, "kw": g_kw})
+        # --- نموذج الإدخال اليدوي للمواقع والمولدات (يظهر لمالك التطبيق فقط) ---
+        if is_app_owner:
+            with st.expander("➕ إضافة منطقة وموقع ومولدات يدوياً (خاص بمالك التطبيق)", expanded=False):
+                st.markdown("### بيانات المنطقة والموقع")
+                geo_region = st.text_input("عنوان المنطقة الجغرافية (رقمها/اسمها) [مثال: الخرطوم - المنطقة 1]:", key="geo_reg_input")
+                site_name = st.text_input("اسم الموقع [مثال: مصنع كافوري]:", key="site_name_input")
+                site_address = st.text_input("عنوان الموقع التفصيلي:", key="site_add_input")
                 
-            if st.button("💾 حفظ بيانات الموقع والمولدات بالكامل", type="primary"):
-                if geo_region and site_name:
-                    if geo_region not in st.session_state.sites_data:
-                        st.session_state.sites_data[geo_region] = {}
+                st.markdown("### بيانات المولدات")
+                num_gens = st.number_input("عدد المولدات في الموقع:", min_value=1, max_value=20, value=1, step=1, key="num_gens_input")
+                
+                st.write("تخصيص بيانات كل مولد:")
+                gen_inputs = []
+                for i in range(int(num_gens)):
+                    st.markdown(f"**المولد رقم {i+1}**")
+                    col_g1, col_g2, col_g3 = st.columns(3)
+                    g_id = col_g1.text_input(f"رمز/رقم المولد", value=f"G{i+1}", key=f"g_id_{i}")
+                    g_model = col_g2.text_input(f"موديل المولد", value="Perkins", key=f"g_mod_{i}")
+                    g_kw = col_g3.number_input(f"الحجم/السعة (kW)", min_value=0.0, value=100.0, step=10.0, key=f"g_kw_{i}")
+                    gen_inputs.append({"id": g_id, "model": g_model, "kw": g_kw})
                     
-                    st.session_state.sites_data[geo_region][site_name] = {
-                        "address": site_address if site_address else "N/A",
-                        "generators": {}
-                    }
-                    
-                    for gen in gen_inputs:
-                        if gen["id"]: # التأكد من عدم ترك الرمز فارغاً
-                            st.session_state.sites_data[geo_region][site_name]["generators"][gen["id"]] = {
-                                "model": gen["model"],
-                                "run_hours": 0.0,
-                                "target": 250.0,
-                                "kw": gen["kw"],
-                                "load": 0.0,
-                                "calib_elec": {"v_nominal": 400.0, "v_measured": 400.0, "freq_nominal": 50.0, "freq_measured": 50.0, "current_max": 200.0, "current_measured": 100.0, "pf": 0.8, "ct_ratio": "200/5"},
-                                "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0, "ambient_temp": 43.0}
-                            }
-                    st.success(f"تم حفظ المنطقة ({geo_region}) والموقع ({site_name}) بعدد {num_gens} مولد بنجاح!")
-                    st.rerun()
-                else:
-                    st.error("يرجى إدخال عنوان المنطقة الجغرافية واسم الموقع كحد أدنى.")
+                if st.button("💾 حفظ بيانات الموقع والمولدات بالكامل", type="primary"):
+                    if geo_region and site_name:
+                        if geo_region not in st.session_state.sites_data:
+                            st.session_state.sites_data[geo_region] = {}
+                        
+                        st.session_state.sites_data[geo_region][site_name] = {
+                            "address": site_address if site_address else "N/A",
+                            "generators": {}
+                        }
+                        
+                        for gen in gen_inputs:
+                            if gen["id"]:
+                                st.session_state.sites_data[geo_region][site_name]["generators"][gen["id"]] = {
+                                    "model": gen["model"],
+                                    "run_hours": 0.0,
+                                    "target": 250.0,
+                                    "kw": gen["kw"],
+                                    "load": 0.0,
+                                    "calib_elec": {"v_nominal": 400.0, "v_measured": 400.0, "freq_nominal": 50.0, "freq_measured": 50.0, "current_max": 200.0, "current_measured": 100.0, "pf": 0.8, "ct_ratio": "200/5"},
+                                    "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0, "ambient_temp": 43.0}
+                                }
+                        st.success(f"تم حفظ المنطقة ({geo_region}) والموقع ({site_name}) بعدد {num_gens} مولد بنجاح!")
+                        st.rerun()
+                    else:
+                        st.error("يرجى إدخال عنوان المنطقة الجغرافية واسم الموقع كحد أدنى.")
 
         st.markdown("### 📌 اختيار الموقع الحالي للعمل")
         main_sites = list(st.session_state.sites_data.keys())
@@ -836,7 +790,6 @@ else:
             else:
                 selected_sub_site = None
                 current_site_address = ""
-        # --- نهاية التعديل الخاص بنموذج الإدخال ---
 
         if not main_sites or not selected_main_site or not selected_sub_site:
             st.warning("Please add and select a main site and sub-site to manage generators.")
@@ -856,11 +809,14 @@ else:
             col_select_g, col_modal_btn = st.columns([2, 1])
             with col_select_g:
                 selected_gen = st.selectbox("Select Generator:", gen_list)
-            with col_modal_btn:
-                st.write("")
-                st.write("")
-                if st.button("📝 Open Calibration Modal"):
-                    edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
+            
+            # --- حجب نافذة ومعايرة المولد عن العملاء وعرضها لمالك التطبيق فقط ---
+            if is_app_owner:
+                with col_modal_btn:
+                    st.write("")
+                    st.write("")
+                    if st.button("📝 Open Calibration Modal"):
+                        edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
 
             gen_info = st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
             calib_e = gen_info.get("calib_elec", {})
@@ -1193,7 +1149,6 @@ else:
             st.warning("⚠️ **WIC Cold Room Checklist:** Check expansion valves, defrost heaters, and refrigerant flow for WIC 10 and WIC 40 units.")
 
     elif "6." in selected_app:
-        # الميزة الهندسية المستحدثة الجديدة: الحاسبة الذكية للهبوط في الجهد والانبعاثات
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
         
         tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint"])
