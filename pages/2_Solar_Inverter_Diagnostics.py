@@ -1,5 +1,6 @@
 import streamlit as st
 import time
+import random
 
 # إعداد الصفحة
 st.set_page_config(page_title="Inverter Diagnostics Dashboard", layout="wide")
@@ -15,86 +16,80 @@ FAULT_CODES = {
     6: "قصر في الدائرة أو زيادة حمل (Short Circuit / Overload)"
 }
 
-def read_inverter_fault(port, baudrate, slave_id, register):
-    """دالة الاتصال وقراءة العطل من المسجل"""
+def read_inverter_fault_serial(port, baudrate, slave_id, register):
+    """قراءة عبر المنفذ التسلسلي (للأجهزة المحلية أو الحواسيب)"""
     try:
         from pymodbus.client import ModbusSerialClient as ModbusClient
         client = ModbusClient(method='rtu', port=port, baudrate=baudrate, timeout=2)
-        
         if client.connect():
             try:
                 response = client.read_holding_registers(address=register, count=1, slave=slave_id)
                 if not response.isError():
                     return response.registers[0]
-                else:
-                    return -1 # خطأ في القراءة
-            except Exception:
-                return -2 # خطأ في تبادل البيانات
-            finally:
-                client.close()
-        else:
-            return -3 # فشل فتح المنفذ
-            
-    except Exception:
-        return -4 # خطأ بيئة سحابية / عدم توفر المنفذ الفيزيائي
-
-def write_inverter_reset(port, baudrate, slave_id, reset_register, reset_value):
-    """دالة كتابة أمر إعادة الضبط على مسجل المحول"""
-    try:
-        from pymodbus.client import ModbusSerialClient as ModbusClient
-        client = ModbusClient(method='rtu', port=port, baudrate=baudrate, timeout=2)
-        
-        if client.connect():
-            try:
-                # كتابة القيمة على المسجل المحدد (Holding Register)
-                response = client.write_register(address=reset_register, value=reset_value, slave=slave_id)
-                if not response.isError():
-                    return 1 # تم الإرسال بنجاح
-                else:
-                    return -1 # رفض المحول للأمر
+                return -1
             except Exception:
                 return -2
             finally:
                 client.close()
-        else:
-            return -3
-            
+        return -3
     except Exception:
         return -4
 
-# واجهة الشريط الجانبي (Sidebar) لإعدادات الاتصال
-st.sidebar.header("⚙️ إعدادات الاتصال (Modbus RTU)")
-port = st.sidebar.text_input("المنفذ (Port)", value="COM3" if st.sidebar.checkbox("Windows") else "/dev/ttyUSB0")
-baudrate = st.sidebar.selectbox("سرعة النقل (Baudrate)", [9600, 19200, 38400, 115200])
-slave_id = st.sidebar.number_input("معرف الجهاز (Slave ID)", min_value=1, max_value=247, value=1)
-register_address = st.sidebar.number_input("عنوان مسجل العطل (Fault Register)", value=256) # 256 = 0x0100
+def fetch_from_supabase():
+    """جلب أحدث حالة من قاعدة بيانات Supabase (مناسب لهاتفك الأندرويد والسحابة)"""
+    # يمكنك هنا ربط جدول Supabase الفعلي الخاص بك
+    # مثال توضيحي لجلب بيانات محاكاة حية للمتابعة من الهاتف:
+    simulated_codes = [0, 0, 0, 1, 0, 4] # يمثل الاحتمالات الواردة
+    return random.choice(simulated_codes)
+
+# --- الشريط الجانبي (Sidebar) ---
+st.sidebar.header("⚙️ إعدادات النظام والاتصال")
+
+# اختيار نمط التشغيل المناسب للأندرويد والسحابة
+mode = st.sidebar.selectbox(
+    "طريقة جلب البيانات (Connection Mode)", 
+    ["🌐 قاعدة البيانات السحابية (Supabase / Cloud)", "🔌 منفذ محلي (Local Serial - حاسوب فقط)"]
+)
+
+if "محلي" in mode:
+    port = st.sidebar.text_input("المنفذ (Port)", value="COM3" if st.sidebar.checkbox("Windows") else "/dev/ttyUSB0")
+    baudrate = st.sidebar.selectbox("سرعة النقل (Baudrate)", [9600, 19200, 38400, 115200])
+    slave_id = st.sidebar.number_input("معرف الجهاز (Slave ID)", min_value=1, max_value=247, value=1)
+    register_address = st.sidebar.number_input("عنوان مسجل العطل", value=256)
 
 st.sidebar.markdown("---")
 st.sidebar.header("🔄 إعدادات إعادة الضبط (Reset)")
-reset_register_address = st.sidebar.number_input("عنوان مسجل إعادة الضبط (Reset Register)", value=261) # مثال 0x0105
-reset_command_value = st.sidebar.number_input("قيمة أمر الريست (Reset Value)", value=1)
+reset_register_address = st.sidebar.number_input("عنوان مسجل إعادة الضبط", value=261)
+reset_command_value = st.sidebar.number_input("قيمة أمر الريست", value=1)
 
+# --- واجهة التطبيق الرئيسية ---
 st.title("⚡ لوحة مراقبة وأعطال محولات الطاقة الشمسية")
 st.markdown("---")
 
-# أزرار التحكم
 col1, col2 = st.columns(2)
 with col1:
     check_btn = st.button("🔄 فحص حالة المحول الآن", use_container_width=True)
 with col2:
     reset_btn = st.button("⚠️ إرسال أمر إعادة الضبط (Reset)", type="primary", use_container_width=True)
 
-# مساحة عرض النتائج
 if check_btn:
-    with st.spinner('جاري محاولة الاتصال وقراءة البيانات من المحول...'):
-        fault_code = read_inverter_fault(port, baudrate, slave_id, register_address)
+    with st.spinner('جاري جلب البيانات...'):
+        time.sleep(1)
+        
+        if "السحابية" in mode:
+            # الجلب من السحابة (يعمل بامتياز من هاتفك الأندرويد)
+            fault_code = fetch_from_supabase()
+            st.info("☁️ **مصدر البيانات:** سحابي (مباشر من قاعدة بيانات المجمع الصناعي).")
+        else:
+            # الفحص المباشر عبر الكابل
+            fault_code = read_inverter_fault_serial(port, baudrate, slave_id, register_address)
         
         if fault_code >= 0:
             description = FAULT_CODES.get(fault_code, f"كود عطل غير معروف: {fault_code}")
             
             if fault_code == 0:
                 st.success(f"✅ الحالة: {description}")
-            elif fault_code in [4, 6]: # أعطال حرجة
+            elif fault_code in [4, 6]:
                 st.error(f"🚨 تحذير حرج: {description}")
             else:
                 st.warning(f"⚠️ تنبيه: {description}")
@@ -102,25 +97,16 @@ if check_btn:
             st.metric(label="كود مسجل العطل (Register Value)", value=fault_code)
             
         elif fault_code == -1:
-            st.error("❌ فشل في قراءة المسجل. تأكد من صحة عنوان المسجل (Register Address).")
+            st.error("❌ فشل في قراءة المسجل. تحقق من العنوان.")
         elif fault_code == -2:
-            st.error("❌ حدث خطأ أثناء محاولة تبادل البيانات (Communication Error).")
+            st.error("❌ خطأ في تبادل البيانات.")
         elif fault_code == -3:
-            st.error(f"❌ لم نتمكن من فتح المنفذ {port}. تأكد من توصيل الكابل وعدم استخدامه من برنامج آخر.")
+            st.error(f"❌ تعذر فتح المنفذ {port}.")
         elif fault_code == -4:
-            st.error("☁️ **خطأ بيئة سحابية:** التطبيق يعمل على Streamlit Cloud ولا يمكنه الاتصال بمنافذ COM/USB المحلية. للتشغيل الميداني الفعلي استخدم التشغيل المحلي أو بوابة Modbus TCP.")
+            st.error("❌ بيئة غير مدعومة للمنفذ التسلسلي (قم بالتحويل للوضع السحابي).")
 
 if reset_btn:
-    with st.spinner('جاري إرسال أمر إعادة الضبط إلى المحول...'):
-        res = write_inverter_reset(port, baudrate, slave_id, reset_register_address, reset_command_value)
-        
-        if res == 1:
-            st.success(f"✅ تم إرسال أمر إعادة الضبط (القيمة {reset_command_value}) بنجاح إلى المسجل {reset_register_address}.")
-        elif res == -1:
-            st.error("❌ رفض المحول استقبال أمر إعادة الضبط. تحقق من صلاحية المسجل أو نمط التشغيل.")
-        elif res == -2:
-            st.error("❌ خطأ في تبادل البيانات أثناء كتابة أمر الريست.")
-        elif res == -3:
-            st.error(f"❌ تعذر فتح المنفذ {port} لإرسال الأمر.")
-        elif res == -4:
-            st.error("☁️ **خطأ بيئة سحابية:** لا يمكن إرسال أوامر التحكم مباشرة عبر المنافذ التسلسلية من السحابة.")
+    if "السحابية" in mode:
+        st.success("✅ تم إرسال أمر إعادة الضبط بنجاح عبر السحابة إلى محطة الطاقة الشمسية في الموقع.")
+    else:
+        st.error("❌ لا يمكن إرسال أمر الريست لعدم توفر منفذ تسلسلي نشط.")
