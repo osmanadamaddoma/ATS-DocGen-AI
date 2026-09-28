@@ -372,62 +372,29 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
 # =========================================================
 # 2. نظام الاشتراكات الموحد والباقات (مع إدارة الكوكيز)
 # =========================================================
-# تهيئة قاعدة بيانات العملاء في session_state لحفظ أي بيانات يدخلها الآدمن
-if "clients_db" not in st.session_state:
-    st.session_state.clients_db = {
-        "ADDOMA-2026-PRO": {
-            "name": "عثمان آدم أدومة (Addoma Trading Services)",
-            "plan": "شهري (Monthly)",
-            "start_date": "2026-09-15",
-            "duration_days": 30,
-        },
-        "CLIENT-M-881": {
-            "name": "شركة النيل للصناعات الهندسية",
-            "plan": "شهري (Monthly)",
-            "start_date": "2026-09-01",
-            "duration_days": 30,
-        },
-        "CLIENT-Y-992": {
-            "name": "مصانع الحديد والصلب الوطنية",
-            "plan": "سنوي (Yearly)",
-            "start_date": "2026-03-15",
-            "duration_days": 365,
-        },
-    }
+CLIENTS_DATABASE = {
+    "ADDOMA-2026-PRO": {
+        "name": "عثمان آدم أدومة (Addoma Trading Services)",
+        "plan": "شهري (Monthly)",
+        "start_date": "2026-09-15",
+        "duration_days": 30,
+    },
+    "CLIENT-M-881": {
+        "name": "شركة النيل للصناعات الهندسية",
+        "plan": "شهري (Monthly)",
+        "start_date": "2026-09-01",
+        "duration_days": 30,
+    },
+    "CLIENT-Y-992": {
+        "name": "مصانع الحديد والصلب الوطنية",
+        "plan": "سنوي (Yearly)",
+        "start_date": "2026-03-15",
+        "duration_days": 365,
+    },
+}
 
-CLIENTS_DATABASE = st.session_state.clients_db
-
-# --- دالة النافذة المنبثقة المخفية لإدارة المشتركين (Admin Panel) ---
-@st.dialog("⚙️ لوحة تحكم الإدارة - إصدار وتعديل باقات المشتركين")
-def admin_subscription_panel():
-    st.info("🔒 هذه النافذة مخفية وتظهر للمسؤولين فقط لإضافة أو تعديل بيانات العملاء.")
-    
-    st.markdown("### 📋 قائمة المشتركين الحالية")
-    df_clients = pd.DataFrame.from_dict(st.session_state.clients_db, orient='index')
-    st.dataframe(df_clients, use_container_width=True)
-        
-    st.divider()
-    st.markdown("### ➕ إضافة / تعديل كود اشتراك")
-    
-    new_code = st.text_input("كود التفعيل (مثال: NEW-CLIENT-2026):")
-    new_name = st.text_input("اسم العميل / الشركة:")
-    new_plan = st.selectbox("الباقة:", ["شهري (Monthly)", "سنوي (Yearly)", "تجريبي (Trial)"])
-    new_start = st.date_input("تاريخ بداية الاشتراك:")
-    new_duration = st.number_input("مدة الباقة (بالأيام):", min_value=1, max_value=3650, value=30)
-    
-    if st.button("💾 حفظ بيانات التفعيل", type="primary", use_container_width=True):
-        if new_code.strip() and new_name.strip():
-            st.session_state.clients_db[new_code.strip()] = {
-                "name": new_name.strip(),
-                "plan": new_plan,
-                "start_date": new_start.strftime("%Y-%m-%d"),
-                "duration_days": new_duration,
-            }
-            st.success(f"✅ تم حفظ وتفعيل الكود '{new_code}' للعميل '{new_name}' بنجاح!")
-            time.sleep(1.5)
-            st.rerun()
-        else:
-            st.error("❌ يرجى تعبئة كود التفعيل واسم العميل كحد أدنى.")
+import extra_streamlit_components as stx
+import streamlit as st
 
 def get_cookie_manager():
     if "cookie_manager" not in st.session_state:
@@ -501,11 +468,7 @@ if not st.session_state.authenticated:
     user_code = st.sidebar.text_input(TXT["code_input"], type="password")
     
     if st.sidebar.button(TXT["btn_activate"]):
-        # الكود السري المخصص لك لفتح لوحة الإدارة المنبثقة المخفية
-        if user_code == "ADMIN-ADDOMA-2026": 
-            admin_subscription_panel()
-            
-        elif user_code in CLIENTS_DATABASE:
+        if user_code in CLIENTS_DATABASE:
             st.session_state.authenticated = True
             st.session_state.active_code = user_code
             expires_at = datetime.now() + timedelta(days=30)
@@ -935,3 +898,283 @@ else:
 
                 if pct < 70.0:
                     color_code = "#28a745"
+                    status_str = "Good (<70%)"
+                elif 70.0 <= pct < 90.0:
+                    color_code = "#ffc107"
+                    status_str = "Warning (70-90%)"
+                else:
+                    color_code = "#dc3545"
+                    status_str = "Critical (>90%)"
+
+                bar_colors.append(color_code)
+
+                processed_rows.append({
+                    "الوحدة": row.get("الوحدة", idx + 1),
+                    "تصنيف القطعة": cat,
+                    "قطع الغيار / الفلاتر": part,
+                    "العمر الافتراضي (ساعة)": life,
+                    "الساعات المنقضية (ساعة)": used,
+                    "المدة المتبقية (ساعة)": max(0.0, rem),
+                    "نسبة الاستهلاك (%)": round(pct, 1),
+                    "حالة التنبيه": status_str,
+                    "الكود الملون": color_code
+                })
+
+            df_result = pd.DataFrame(processed_rows)
+
+            st.divider()
+
+            chart_col1, chart_col2 = st.columns(2)
+            with chart_col1:
+                st.markdown("##### 🟢🟡🔴 Parts Usage Chart")
+                fig_bar = go.Figure()
+                fig_bar.add_trace(go.Bar(
+                    x=df_result["قطع الغيار / الفلاتر"],
+                    y=df_result["نسبة الاستهلاك (%)"],
+                    marker_color=bar_colors,
+                    text=df_result["نسبة الاستهلاك (%)"].astype(str) + "%",
+                    textposition='auto'
+                ))
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+            with chart_col2:
+                st.markdown("##### 🍩 Genset Run Hours Ratio")
+                total_target_h = max(1.0, float(gen_info["target"]))
+                current_h = float(gen_info["run_hours"])
+                rem_h = max(0.0, total_target_h - current_h)
+
+                fig_pie = px.pie(
+                    names=['Elapsed Hours', 'Remaining Target'],
+                    values=[current_h, rem_h],
+                    hole=0.5,
+                    color_discrete_sequence=["#182b49", "#28a745"]
+                )
+                st.plotly_chart(fig_pie, use_container_width=True)
+
+            st.divider()
+            col_up1, col_up2 = st.columns(2)
+            with col_up1:
+                gen_img_file = st.file_uploader("Upload Generator Photo", type=["png", "jpg", "jpeg"])
+            with col_up2:
+                parts_img_file = st.file_uploader("Upload Maintenance Photo", type=["png", "jpg", "jpeg"])
+
+            def generate_full_pdf_bytes():
+                temp_logo_path = None
+                if logo_file:
+                    temp_logo_path = f"temp_logo_{uuid.uuid4().hex}.png"
+                    with open(temp_logo_path, "wb") as f:
+                        f.write(logo_file.getbuffer())
+
+                pdf = ComprehensivePDF("GENERATOR PREDICTIVE MAINTENANCE REPORT", logo_path=temp_logo_path)
+                pdf.add_page()
+
+                pdf.set_fill_color(245, 247, 250)
+                pdf.rect(10, 35, 190, 45, "F")
+                pdf.set_xy(12, 37)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_text_color(24, 43, 73)
+                
+                pdf.cell(0, 5, f"Generator Data Site Address: {sanitize_latin_only(current_site_address)}", ln=True)
+                pdf.set_x(12)
+                pdf.cell(0, 5, f"Main Site: {sanitize_latin_only(selected_main_site)} | Sub Site: {sanitize_latin_only(selected_sub_site)}", ln=True)
+                pdf.set_x(12)
+                pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | Capacity: {gen_info['kw']} kW", ln=True)
+                pdf.set_x(12)
+                pdf.cell(0, 5, f"Current Run Hours: {gen_info['run_hours']} hrs | Target Hours: {gen_info['target']} hrs", ln=True)
+                
+                amb_temp_val = calib_m.get('ambient_temp', 43.0)
+                
+                pdf.ln(2)
+                pdf.set_x(12)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_text_color(200, 30, 30)
+                pdf.cell(0, 5, "Engine Oil Recommendation based on Ambient Temperature:", ln=True)
+                
+                pdf.set_x(12)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_text_color(24, 43, 73)
+                if amb_temp_val >= 45:
+                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 20W50", ln=True)
+                elif amb_temp_val >= 43:
+                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 15W40", ln=True)
+                else:
+                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: USE STANDARD OIL SIZE 15W40", ln=True)
+                
+                pdf.ln(8)
+
+                headers_pdf = ["#", "Part / Service Name", "Lifespan", "Used", "Remain", "Status"]
+                widths = [10, 60, 25, 25, 25, 45]
+                pdf.set_font("Helvetica", "B", 8)
+                pdf.set_fill_color(24, 43, 73)
+                pdf.set_text_color(255, 255, 255)
+                for h, w in zip(headers_pdf, widths):
+                    pdf.cell(w, 6, h, border=1, fill=True, align="C")
+                pdf.ln()
+
+                pdf.set_font("Helvetica", "", 7)
+                pdf.set_text_color(0, 0, 0)
+                for i, row in df_result.iterrows():
+                    fill = (i % 2 == 0)
+                    pdf.set_fill_color(240, 243, 246) if fill else pdf.set_fill_color(255, 255, 255)
+                    pdf.cell(widths[0], 5, str(row["الوحدة"]), border=1, align="C", fill=fill)
+                    pdf.cell(widths[1], 5, sanitize_latin_only(str(row["قطع الغيار / الفلاتر"]))[:32], border=1, fill=fill)
+                    pdf.cell(widths[2], 5, str(row["العمر الافتراضي (ساعة)"]), border=1, align="C", fill=fill)
+                    pdf.cell(widths[3], 5, str(row["الساعات المنقضية (ساعة)"]), border=1, align="C", fill=fill)
+                    pdf.cell(widths[4], 5, str(row["المدة المتبقية (ساعة)"]), border=1, align="C", fill=fill)
+                    pdf.cell(widths[5], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1, fill=fill)
+                    pdf.ln()
+
+                pdf_out = pdf.output(dest="S")
+                return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
+
+            st.download_button(
+                label=f"🖨️ Download Full Report for ({selected_gen})",
+                data=generate_full_pdf_bytes(),
+                file_name=f"Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+
+    elif "2." in selected_app:
+        st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
+        
+        df_iot = fetch_live_iot_data()
+        if not df_iot.empty:
+            latest = df_iot.iloc[-1]
+            col1, col2, col3 = st.columns(3)
+            col1.metric("🌡️ Temp (°C)", f"{latest['temperature']:.1f}")
+            col2.metric("〰️ Vibration (mm/s)", f"{latest['vibration']:.2f}")
+            col3.metric("🗜️ Oil Press (Bar)", f"{latest['pressure']:.1f}")
+
+            fig_temp = px.line(df_iot, x='_time', y='temperature', title="Live Sensor Trend")
+            st.plotly_chart(fig_temp, use_container_width=True)
+
+        st.divider()
+        st.subheader("🕹️ Remote Operations Panel")
+        rc1, rc2, rc3 = st.columns(3)
+        with rc1:
+            if st.button("🟢 Start Generator", use_container_width=True):
+                st.success("Start signal dispatched!")
+        with rc2:
+            if st.button("🔴 Emergency Stop", use_container_width=True):
+                st.error("Emergency Stop dispatched!")
+        with rc3:
+            if st.button("🔄 Reset Alarms", use_container_width=True):
+                st.info("DSE Panel Reset!")
+
+    elif "3." in selected_app:
+        st.title("📊 " + ("المتابعة اليومية وتقارير الإدارة" if L == "ar" else "Daily Monitoring & Tech Reminders"))
+        today_str = datetime.now().strftime("%Y-%m-%d")
+
+        tab_mgr1, tab_mgr2 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders"])
+
+        with tab_mgr1:
+            today_logs = [log for log in st.session_state.daily_logs if log.get("date") == today_str]
+            st.write(f"Date: {today_str}")
+            if today_logs:
+                st.dataframe(pd.DataFrame(today_logs), use_container_width=True)
+            else:
+                st.warning("No logs registered today.")
+
+        with tab_mgr2:
+            tech_phone = st.text_input("Technician Phone Number:", value="249912345678")
+            reminder_msg = f"Addoma Maintenance Reminder: Please register daily genset logs for ({today_str})."
+            encoded_msg = urllib.parse.quote(reminder_msg)
+            whatsapp_url = f"https://wa.me/{tech_phone}?text={encoded_msg}"
+            
+            st.markdown(f'''
+                <a href="{whatsapp_url}" target="_blank">
+                    <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">
+                        💬 Send WhatsApp Reminder
+                    </button>
+                </a>
+            ''', unsafe_allow_html=True)
+
+    elif "4." in selected_app:
+        st.title("🤖 " + ("المساعد الذكي والكتالوجات وقراءة الأكواد" if L == "ar" else "AI Diagnostics & Fault Code Reader"))
+
+        col_files1, col_files2 = st.columns(2)
+        with col_files1:
+            st.subheader("📚 Catalog Upload (PDF)")
+            manual_file = st.file_uploader("Upload Equipment Catalog", type=["pdf"])
+            if manual_file:
+                if "loaded_manual_name" not in st.session_state or st.session_state.loaded_manual_name != manual_file.name:
+                    with st.spinner("Extracting text..."):
+                        catalog_pages = []
+                        with pdfplumber.open(manual_file) as pdf:
+                            for i, page in enumerate(pdf.pages):
+                                catalog_pages.append({"page_num": i + 1, "content": page.extract_text() or ""})
+                        st.session_state.catalog_pages = catalog_pages
+                        st.session_state.loaded_manual_name = manual_file.name
+                        st.success(f"Parsed {len(catalog_pages)} pages.")
+
+        with col_files2:
+            st.subheader("📷 Screen & Barcode Reader")
+            fault_image = st.file_uploader("Upload Alarm Screenshot", type=["png", "jpg", "jpeg"])
+            fault_cam = st.camera_input("📸 Capture Screen")
+
+        st.divider()
+
+        fault_input = st.text_input("Enter Fault Code (e.g., Over Current / DSE 8610 Error / Oil Low):", value="Over Current")
+
+        if st.button("🔍 Analyze Fault", use_container_width=True):
+            clean_fault = fault_input.strip()
+            st.markdown(f"### Diagnostic Report: `{clean_fault}`")
+            
+            ai_res = analyze_fault_with_gemini(clean_fault, language=L)
+            st.markdown(ai_res)
+
+    elif "5." in selected_app:
+        st.title("🔍 " + ("نظام فحص المعدات مقارنة بصرية" if L == "ar" else "Equipment Visual Inspection (WIC & Gensets)"))
+
+        eq_type = st.selectbox("Equipment Type:", [
+            "Industrial Diesel Generator",
+            "WIC 10 & WIC 40 Cold Rooms / غرف تبريد",
+            "3-Phase Electric Motor"
+        ])
+
+        c_img1, c_img2 = st.columns(2)
+        with c_img1:
+            st.write("🟢 Reference (Normal)")
+            good_img = st.file_uploader("Good Part Photo", type=["png", "jpg"], key="gi")
+            if good_img: st.image(Image.open(good_img), use_container_width=True)
+        with c_img2:
+            st.write("🔴 Inspection Item (Defective)")
+            bad_img = st.file_uploader("Inspected Part Photo", type=["png", "jpg"], key="bi")
+            if bad_img: st.image(Image.open(bad_img), use_container_width=True)
+
+        if "WIC" in eq_type:
+            st.warning("⚠️ **WIC Cold Room Checklist:** Check expansion valves, defrost heaters, and refrigerant flow for WIC 10 and WIC 40 units.")
+
+    elif "6." in selected_app:
+        # الميزة الهندسية المستحدثة الجديدة: الحاسبة الذكية للهبوط في الجهد والانبعاثات
+        st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
+        
+        tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint"])
+        
+        with tab_calc1:
+            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
+            c1, c2, c3 = st.columns(3)
+            i_amp = c1.number_input("Current (Amperes / أمبير):", value=250.0)
+            dist_m = c2.number_input("Cable Length (Meters / متر):", value=120.0)
+            c_size = c3.selectbox("Cable Size (mm² / مقطع الكابل):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4)
+            
+            v_drop, v_drop_pct = calculate_cable_voltage_drop(i_amp, dist_m, c_size)
+            
+            st.metric("Voltage Drop (فقد الجهد)", f"{v_drop} V", f"{v_drop_pct}%")
+            if v_drop_pct > 4.0:
+                st.error("⚠️ Warning: Voltage drop exceeds standard 4% limit! Consider using a larger cable size.")
+            else:
+                st.success("✅ Cable size is acceptable under IEC standards.")
+
+        with tab_calc2:
+            st.subheader("🌱 Fuel Consumption & CO2 Emission Estimator")
+            ec1, ec2 = st.columns(2)
+            load_kw = ec1.number_input("Running Load (kW):", value=200.0)
+            hours_run = ec2.number_input("Operating Hours:", value=24.0)
+            
+            est_liters, est_co2 = calculate_fuel_consumption_and_emissions(load_kw, hours_run)
+            
+            mc1, mc2 = st.columns(2)
+            mc1.metric("Estimated Diesel Used", f"{est_liters} Liters")
+            mc2.metric("Estimated CO2 Output", f"{est_co2} kg")
