@@ -52,6 +52,298 @@ st.set_page_config(
     layout="wide",
 )
 
+# التحقق من أن المستخدم أدخل الكود الصحيح المطابق لما في ملف الأسرار
+if st.text_input("أدخل كود التفعيل:", type="password") == st.secrets["admin_code"]:
+    st.success("تم تسجيل الدخول كمسؤول بنجاح!")
+else:
+    st.warning("الرجاء إدخال الكود الصحيح للمتابعة.")
+    st.stop()  # إيقاف تنفيذ باقي الكود حتى يتم إدخال الكود الصحيح
+
+if "audio_muted" not in st.session_state:
+    st.session_state.audio_muted = False
+
+if "lang" not in st.session_state:
+    st.session_state.lang = "ar"
+
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "chat"
+
+if "sites_data" not in st.session_state:
+    st.session_state.sites_data = {
+        "الخرطوم (القائمة الرئيسية)": {
+            "الموقع الرئيسي - كافوري (موقع فرعي)": {
+                "address": "الخرطوم - المنطقة الصناعية - كافوري",
+                "generators": {
+                    "G1": {
+                        "model": "Perkins 410 kVA",
+                        "run_hours": 700.0,
+                        "target": 940.0,
+                        "kw": 410.0,
+                        "load": 250.0,
+                        "calib_elec": {
+                            "v_nominal": 400.0, "v_measured": 398.0,
+                            "freq_nominal": 50.0, "freq_measured": 50.1,
+                            "current_max": 600.0, "current_measured": 360.0,
+                            "pf": 0.85, "ct_ratio": "600/5"
+                        },
+                        "calib_engine": {
+                            "oil_press_bar": 4.5, "coolant_temp_c": 85.0,
+                            "rpm": 1500.0, "battery_v": 26.5,
+                            "ambient_temp": 43.0
+                        }
+                    },
+                    "G2": {
+                        "model": "Cummins 250 kVA",
+                        "run_hours": 1200.0,
+                        "target": 1500.0,
+                        "kw": 250.0,
+                        "load": 180.0,
+                        "calib_elec": {
+                            "v_nominal": 400.0, "v_measured": 402.0,
+                            "freq_nominal": 50.0, "freq_measured": 49.9,
+                            "current_max": 360.0, "current_measured": 260.0,
+                            "pf": 0.82, "ct_ratio": "400/5"
+                        },
+                        "calib_engine": {
+                            "oil_press_bar": 4.2, "coolant_temp_c": 88.0,
+                            "rpm": 1500.0, "battery_v": 25.8,
+                            "ambient_temp": 45.0
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+if "daily_logs" not in st.session_state:
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    st.session_state.daily_logs = [
+        {
+            "timestamp": f"{today_str} 08:30:00",
+            "date": today_str,
+            "site": "الخرطوم (القائمة الرئيسية) - الموقع الرئيسي - كافوري (موقع فرعي)",
+            "generator": "G1",
+            "technician": "أحمد فني الصيانة",
+            "run_hours": 700.0,
+            "v_measured": 398.0,
+            "oil_press": 4.5,
+            "coolant_temp": 85.0,
+            "status": "طبيعي"
+        }
+    ]
+
+gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+
+if not gemini_key and "supabase" in st.secrets:
+    gemini_key = st.secrets["supabase"].get("GEMINI_API_KEY")
+
+if not gemini_key:
+    st.warning("⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY. يرجى إضافته في st.secrets.")
+
+client = genai.Client(api_key=gemini_key) if gemini_key else None
+
+supabase = None
+if create_client:
+    supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+    supabase_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
+    
+    if not supabase_url and "supabase" in st.secrets:
+        supabase_url = st.secrets["supabase"].get("SUPABASE_URL")
+        supabase_key = st.secrets["supabase"].get("SUPABASE_KEY")
+
+    if supabase_url and supabase_key:
+        try:
+            supabase = create_client(supabase_url, supabase_key)
+            response = supabase.table("subscriptions").select("*").limit(1).execute()
+            st.success("✅ التطبيق متصل ومُفعل بنجاح مع قاعدة بيانات Supabase!")
+        except Exception as e:
+            st.error(f"❌ فشل الاتصال بقاعدة البيانات: {e}")
+    else:
+        st.info("💡 لم يتم العثور على مفاتيح Supabase. يرجى إضافتها (SUPABASE_URL و SUPABASE_KEY) في ملف st.secrets.")
+else:
+    st.warning("⚠️ مكتبة supabase غير مثبتة. يرجى تثبيتها باستخدام pip install supabase")
+
+def play_audio(text, lang='ar', loop=False):
+    if st.session_state.get("audio_muted", False):
+        return
+    try:
+        tts_lang = 'en' if st.session_state.lang == 'en' or lang == 'en' else 'ar'
+        tts = gTTS(text=text, lang=tts_lang)
+        audio_data = io.BytesIO()
+        tts.write_to_fp(audio_data)
+        audio_bytes = audio_data.getvalue()
+        
+        if loop:
+            b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+            audio_html = f"""
+                <audio autoplay loop controls style="width: 100%;">
+                    <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
+                    Your browser does not support audio playback.
+                </audio>
+            """
+            st.components.v1.html(audio_html, height=60)
+        else:
+            audio_data.seek(0)
+            st.audio(audio_data, format='audio/mp3', autoplay=True)
+    except Exception as e:
+        st.error(f"حدث خطأ في تشغيل الصوت: {e}")
+
+@st.cache_data(ttl=3600)
+def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
+    if not client:
+        return "⚠️ GEMINI_API_KEY not found." if language == "en" else "⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY."
+
+    lang_instr = "Respond in English." if language == "en" else "اكتب الإجابة بلغة عربية تقنية واضحة ومباشرة."
+
+    prompt = f"""
+    You are an expert industrial consulting engineer specializing in generators, DSE control panels (DSE 7320, DSE 8610 MKII), Perkins & Cummins engines, and cooling systems.
+    
+    Fault Code / Alarm: "{fault_code}"
+    
+    Catalog Context:
+    \"\"\"
+    {context_text if context_text else "No specific catalog excerpt."}
+    \"\"\"
+
+    Provide a professional diagnostic report with:
+    1. Technical Explanation / Fault Nature.
+    2. Top 3 Probable Causes.
+    3. Sequential Field Corrective Actions.
+    
+    {lang_instr}
+    """
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt,
+            )
+            return response.text
+        except Exception as e:
+            err_msg = str(e)
+            if "503" in err_msg or "UNAVAILABLE" in err_msg:
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                    continue
+                else:
+                    return "⚠️ High server load (503). Please retry in a few seconds." if language == "en" else "⚠️ الخادم يمر بضغط عالٍ حالياً (503). يرجى المحاولة مرة أخرى."
+            return f"❌ Error: {err_msg}"
+
+def sanitize_latin_only(text):
+    if not isinstance(text, str):
+        text = str(text)
+    clean_text = re.sub(r"[^\x00-\x7F]+", "", text).strip()
+    return clean_text if clean_text else "N/A"
+
+class ComprehensivePDF(FPDF):
+    def __init__(self, title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT", logo_path=None):
+        super().__init__()
+        self.report_title = title_text
+        self.logo_path = logo_path
+
+    def header(self):
+        self.set_fill_color(24, 43, 73)
+        self.rect(0, 0, 210, 8, "F")
+        if self.logo_path and os.path.exists(self.logo_path):
+            self.image(self.logo_path, x=10, y=12, w=25)
+            text_x = 40
+        else:
+            text_x = 10
+        self.set_xy(text_x, 12)
+        self.set_font("Helvetica", "B", 13)
+        self.set_text_color(24, 43, 73)
+        self.cell(0, 5, self.report_title, ln=True)
+
+        self.set_x(text_x)
+        self.set_font("Helvetica", "B", 8)
+        self.set_text_color(100, 100, 100)
+        self.cell(0, 4, "ADDOMA TRADING SERVICES - ENGINEERING CONSULTANCY", ln=True)
+
+        self.set_x(text_x)
+        self.set_font("Helvetica", "", 8)
+        self.cell(0, 4, "Power Systems & Electro-Mechanical Maintenance Division", ln=True)
+
+        self.set_draw_color(24, 43, 73)
+        self.set_line_width(0.5)
+        self.line(10, 30, 200, 30)
+        self.ln(10)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_draw_color(200, 200, 200)
+        self.set_line_width(0.2)
+        self.line(10, 282, 200, 282)
+        self.set_font("Helvetica", "I", 8)
+        self.set_text_color(120, 120, 120)
+        self.cell(0```python
+import os
+import re
+import json
+import uuid
+import time
+import urllib.parse
+from datetime import datetime, timedelta
+import threading
+import io
+import base64
+import math
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
+from PIL import Image
+from bs4 import BeautifulSoup
+import requests
+from fpdf import FPDF
+import pdfplumber
+import streamlit as st
+import extra_streamlit_components as stx
+
+from google import genai
+from gtts import gTTS
+
+# محاولة استيراد مكتبة Supabase
+try:
+    from supabase import create_client, Client
+except ImportError:
+    create_client = None
+
+# استيراد مكتبة قاعدة بيانات إنترنت الأشياء الحية (IoT Database)
+try:
+    from influxdb_client import InfluxDBClient
+except ImportError:
+    InfluxDBClient = None
+
+# محاولة استيراد مكتبة قراءة الباركود
+try:
+    from pyzbar.pyzbar import decode as decode_qr
+except ImportError:
+    decode_qr = None
+
+# =========================================================
+# 0. إعدادات الصفحة الرئيسية وتهيئة الذكاء الاصطناعي والصوت واللغة
+# =========================================================
+st.set_page_config(
+    page_title="المجمع الصناعي الشامل - Addoma Trading Services",
+    page_icon="🔐",
+    layout="wide",
+)
+
+# =========================================================
+# التحقق من أن المستخدم أدخل الكود الصحيح المطابق لما في ملف الأسرار
+# =========================================================
+if "admin_code" in st.secrets and st.text_input("أدخل كود التفعيل:", type="password", key="master_gate") == st.secrets["admin_code"]:
+    st.success("تم تسجيل الدخول كمسؤول بنجاح!")
+    # ضع باقي كود التطبيق هنا
+else:
+    st.warning("الرجاء إدخال الكود الصحيح للمتابعة.")
+    st.stop()  # إيقاف تنفيذ باقي الكود حتى يتم إدخال الكود الصحيح
+# =========================================================
+
+
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
 
