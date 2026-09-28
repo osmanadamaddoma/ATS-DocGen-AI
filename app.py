@@ -1173,3 +1173,111 @@ else:
             mc1, mc2 = st.columns(2)
             mc1.metric("Estimated Diesel Used", f"{est_liters} Liters")
             mc2.metric("Estimated CO2 Output", f"{est_co2} kg")
+import streamlit as st
+import pandas as pd
+import uuid
+from datetime import datetime, timedelta
+
+# 1. تهيئة الجلسة وقاعدة البيانات (في أعلى الملف)
+if "CLIENTS_DATABASE" not in st.session_state:
+    st.session_state.CLIENTS_DATABASE = {
+        "ADDOMA-2026-A101": {
+            "name": "شركة النيل للطاقة",
+            "plan": "سنوي (Yearly) - 365 يوم",
+            "start_date": "2026-01-15",
+            "duration_days": 365
+        }
+    }
+
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = True
+
+# 2. القائمة الجانبية للتنقل
+st.sidebar.title("إدارة Addoma Trading")
+app_mode = st.sidebar.selectbox("اختر القسم:", ["الرئيسية", "إدارة وتصدير الأكواد (ATS)"])
+
+# 3. التوجيه وعرض الصفحة المطلوبة
+if app_mode == "إدارة وتصدير الأكواد (ATS)":
+    render_activation_export_window()  # <--- هذا هو سطر الاستدعاء في مكانه الصحيح
+elif app_mode == "الرئيسية":
+    st.title("لوحة التحكم الرئيسية")
+    st.write("أهلاً بك في النظام.")
+
+
+# =========================================================
+# 4. ضع كود الدالة بالكامل هنا (في نهاية الملف الرئيسي)
+# =========================================================
+def render_activation_export_window():
+    st.title("🔐 نافذة استصدار وتحرير بيانات الأكواد المفعلة للمشتركين")
+    st.caption("Addoma Trading Services - Subscription & License Generation Portal")
+
+    if not st.session_state.get("authenticated", False):
+        st.warning("🔒 يرجى تسجيل الدخول أولاً للوصول إلى نظام إدارة الأكواد المفعلة.")
+        return
+
+    tab_gen, tab_export, tab_db = st.tabs([
+        "🔑 استصدار كود جديد", 
+        "📤 استخراج وتحرير بيانات المشتركين", 
+        "📊 سجل الأكواد النشطة"
+    ])
+
+    with tab_gen:
+        st.subheader("إصدار كود تفعيل واشتراك جديد")
+        with st.form("new_activation_form"):
+            new_client_name = st.text_input("اسم المشترك / الجهة المستفيدة:")
+            plan_option = st.selectbox("نوع الباقة:", ["شهري (Monthly) - 30 يوم", "سنوي (Yearly) - 365 يوم", "تجريبي (Trial) - 7 أيام"])
+            custom_code_input = st.text_input("كود التفعيل المقترح (اختياري):", placeholder="ADDOMA-2026-XXXX")
+            
+            if st.form_submit_button("⚙️ إصدار وتوثيق الكود الجديد"):
+                if not new_client_name:
+                    st.error("❌ يرجى إدخال اسم المشترك على الأقل.")
+                else:
+                    if not custom_code_input:
+                        generated_code = f"ADDOMA-2026-{str(uuid.uuid4())[:6].upper()}"
+                    else:
+                        generated_code = custom_code_input.strip().upper()
+
+                    duration_map = {"شهري (Monthly) - 30 يوم": 30, "سنوي (Yearly) - 365 يوم": 365, "تجريبي (Trial) - 7 أيام": 7}
+                    
+                    if "custom_generated_codes" not in st.session_state:
+                        st.session_state.custom_generated_codes = {}
+
+                    st.session_state.custom_generated_codes[generated_code] = {
+                        "name": new_client_name,
+                        "plan": plan_option,
+                        "start_date": datetime.now().strftime("%Y-%m-%d"),
+                        "duration_days": duration_map[plan_option]
+                    }
+                    st.success(f"✅ تم بنجاح استصدار الكود للمشترك: **{new_client_name}**")
+                    st.code(f"Activation Code: {generated_code}", language="text")
+
+    with tab_export:
+        st.subheader("استخراج تقارير وجداول بيانات الأكواد المفعلة")
+        export_data = []
+        combined_db = st.session_state.get("CLIENTS_DATABASE", {}).copy()
+        if "custom_generated_codes" in st.session_state:
+            combined_db.update(st.session_state.custom_generated_codes)
+
+        for code, info in combined_db.items():
+            start_dt = datetime.strptime(info["start_date"], "%Y-%m-%d").date()
+            expiry_dt = start_dt + timedelta(days=info["duration_days"])
+            today = datetime.now().date()
+            export_data.append({
+                "رمز التفعيل": code,
+                "اسم المشترك": info["name"],
+                "نوع الباقة": info["plan"],
+                "تاريخ البدء": info["start_date"],
+                "تاريخ الانتهاء": expiry_dt.strftime("%Y-%m-%d"),
+                "الأيام المتبقية": max(0, (expiry_dt - today).days),
+                "حالة الاشتراك": "نشط (Active)" if today <= expiry_dt else "منتهي (Expired)"
+            })
+
+        df_subscribers = pd.DataFrame(export_data)
+        edited_subscribers_df = st.data_editor(df_subscribers, num_rows="dynamic", use_container_width=True)
+        
+        csv_bytes = edited_subscribers_df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("📥 تحميل البيانات بصيغة CSV", data=csv_bytes, file_name="Addoma_Subscribers_Report.csv", mime="text/csv", use_container_width=True)
+
+    with tab_db:
+        st.subheader("📊 نظرة عامة على حالة التفعيل")
+        st.dataframe(pd.DataFrame(export_data), use_container_width=True)
