@@ -370,28 +370,32 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
     return round(liters, 1), round(co2_kg, 1)
 
 # =========================================================
-# 2. نظام الاشتراكات الموحد والباقات (مع إدارة الكوكيز)
+# 2. نظام الاشتراكات الموحد والباقات (مع إدارة الكوكيز والتحديث الديناميكي)
 # =========================================================
-CLIENTS_DATABASE = {
-    "ADDOMA-2026-PRO": {
-        "name": "عثمان آدم أدومة (Addoma Trading Services)",
-        "plan": "شهري (Monthly)",
-        "start_date": "2026-09-15",
-        "duration_days": 30,
-    },
-    "CLIENT-M-881": {
-        "name": "شركة النيل للصناعات الهندسية",
-        "plan": "شهري (Monthly)",
-        "start_date": "2026-09-01",
-        "duration_days": 30,
-    },
-    "CLIENT-Y-992": {
-        "name": "مصانع الحديد والصلب الوطنية",
-        "plan": "سنوي (Yearly)",
-        "start_date": "2026-03-15",
-        "duration_days": 365,
-    },
-}
+if "clients_db" not in st.session_state:
+    st.session_state.clients_db = {
+        "ADDOMA-2026-PRO": {
+            "name": "عثمان آدم أدومة (Addoma Trading Services)",
+            "plan": "شهري (Monthly)",
+            "start_date": "2026-09-15",
+            "duration_days": 30,
+        },
+        "CLIENT-M-881": {
+            "name": "شركة النيل للصناعات الهندسية",
+            "plan": "شهري (Monthly)",
+            "start_date": "2026-09-01",
+            "duration_days": 30,
+        },
+        "CLIENT-Y-992": {
+            "name": "مصانع الحديد والصلب الوطنية",
+            "plan": "سنوي (Yearly)",
+            "start_date": "2026-03-15",
+            "duration_days": 365,
+        },
+    }
+
+# توجيه المتغير القديم ليقرأ من الـ session_state
+CLIENTS_DATABASE = st.session_state.clients_db
 
 import extra_streamlit_components as stx
 import streamlit as st
@@ -412,6 +416,43 @@ if saved_code and not st.session_state.authenticated:
     if saved_code in CLIENTS_DATABASE:
         st.session_state.authenticated = True
         st.session_state.active_code = saved_code
+
+# --- دالة النافذة المنبثقة لإصدار أكواد الاشتراكات ---
+@st.dialog("🔑 إصدار كود اشتراك جديد" if st.session_state.get("lang", "ar") == "ar" else "🔑 Generate New Subscription Code")
+def generate_subscription_modal():
+    st.markdown("### أدخل بيانات المشترك الجديد لإصدار كود التفعيل")
+    
+    client_name = st.text_input("اسم العميل / الشركة:")
+    plan_type = st.selectbox("نوع الباقة / Subscription Plan:", ["شهري (Monthly)", "سنوي (Yearly)", "تجريبي (Trial)"])
+    
+    # تحديد المدة التلقائية بناءً على الباقة
+    default_duration = 30
+    if "سنوي" in plan_type:
+        default_duration = 365
+    elif "تجريبي" in plan_type:
+        default_duration = 7
+        
+    custom_duration = st.number_input("مدة الاشتراك (بالأيام):", value=default_duration, min_value=1)
+    
+    if st.button("🚀 إصدار الكود (Generate)", type="primary", use_container_width=True):
+        if client_name.strip():
+            # توليد كود فريد باستخدام uuid
+            new_code = f"ADDOMA-{uuid.uuid4().hex[:6].upper()}"
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            
+            # إضافة المشترك للقاعدة الديناميكية
+            st.session_state.clients_db[new_code] = {
+                "name": client_name.strip(),
+                "plan": plan_type,
+                "start_date": today_str,
+                "duration_days": custom_duration,
+            }
+            
+            st.success(f"✅ تم إصدار الكود بنجاح!")
+            st.info(f"**كود التفعيل:** `{new_code}`")
+            st.caption("يرجى نسخ الكود وإرساله للعميل.")
+        else:
+            st.error("❌ يرجى إدخال اسم العميل أولاً.")
 
 # --- خيار تحديد اللغة في الشريط الجانبي ---
 st.sidebar.subheader("🌐 Language / اللغة")
@@ -501,6 +542,11 @@ else:
             if "active_code" in st.session_state:
                 del st.session_state["active_code"]
             st.rerun()
+
+        # الكود المضاف حديثاً: زر إصدار الاشتراكات (خاص بالمسؤول)
+        st.write("---")
+        if st.button("➕ إصدار اشتراك جديد (Admin)", use_container_width=True):
+            generate_subscription_modal()
 
 input_code = st.session_state.get("active_code", "")
 is_pro = False
