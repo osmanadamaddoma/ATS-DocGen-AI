@@ -1,6 +1,5 @@
 import streamlit as st
 import time
-from pymodbus.client import ModbusSerialClient as ModbusClient
 
 # إعداد الصفحة
 st.set_page_config(page_title="Inverter Diagnostics Dashboard", layout="wide")
@@ -17,20 +16,28 @@ FAULT_CODES = {
 }
 
 def read_inverter_fault(port, baudrate, slave_id, register):
-    """دالة للاتصال وقراءة العطل وإرجاع النتيجة"""
-    client = ModbusClient(method='rtu', port=port, baudrate=baudrate, timeout=2)
-    if client.connect():
-        try:
-            response = client.read_holding_registers(address=register, count=1, slave=slave_id)
-            if not response.isError():
-                return response.registers[0]
-            else:
-                return -1 # خطأ في القراءة
-        except Exception as e:
-            return -2 # خطأ في الاتصال
-        finally:
-            client.close()
-    return -3 # فشل فتح المنفذ
+    """دالة للاتصال وقراءة العطل مع معالجة استثناءات بيئة السحابة"""
+    try:
+        from pymodbus.client import ModbusSerialClient as ModbusClient
+        client = ModbusClient(method='rtu', port=port, baudrate=baudrate, timeout=2)
+        
+        if client.connect():
+            try:
+                response = client.read_holding_registers(address=register, count=1, slave=slave_id)
+                if not response.isError():
+                    return response.registers[0]
+                else:
+                    return -1 # خطأ في القراءة
+            except Exception as e:
+                return -2 # خطأ في تبادل البيانات
+            finally:
+                client.close()
+        else:
+            return -3 # فشل فتح المنفذ
+            
+    except Exception as e:
+        # التقاط أخطاء عدم توفر مكتبة pyserial أو غياب منافذ COM في السحابة
+        return -4 
 
 # واجهة الشريط الجانبي (Sidebar) لإعدادات الاتصال
 st.sidebar.header("⚙️ إعدادات الاتصال (Modbus RTU)")
@@ -53,7 +60,7 @@ with col2:
 status_placeholder = st.empty()
 
 if check_btn:
-    with st.spinner('جاري قراءة البيانات من المحول...'):
+    with st.spinner('جاري محاولة الاتصال وقراءة البيانات من المحول...'):
         fault_code = read_inverter_fault(port, baudrate, slave_id, register_address)
         
         if fault_code >= 0:
@@ -75,6 +82,8 @@ if check_btn:
             st.error("❌ حدث خطأ أثناء محاولة تبادل البيانات (Communication Error).")
         elif fault_code == -3:
             st.error(f"❌ لم نتمكن من فتح المنفذ {port}. تأكد من توصيل الكابل وعدم استخدامه من برنامج آخر.")
+        elif fault_code == -4:
+            st.error("☁️ **خطأ بيئة سحابية:** التطبيق يعمل الآن على خوادم Streamlit السحابية ولا يمكنه الوصول إلى منافذ (COM/USB) المحلية الخاصة بك. للقراءة الفعلية، يجب تشغيل الكود محلياً أو استخدام بوابة IoT (Modbus TCP).")
 
 if reset_btn:
     st.warning("هذه الخاصية تتطلب كتابة قيمة على مسجل إعادة الضبط (أضف دالة Write Register هنا وفقاً لكتيب المحول).")
