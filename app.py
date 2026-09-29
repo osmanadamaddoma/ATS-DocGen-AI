@@ -577,7 +577,7 @@ apps_list_ar = [
 ]
 
 apps_list_en = [
-    "⚙️ 1. Predictive Maintenance & Gensets",
+    "⚙️️ 1. Predictive Maintenance & Gensets",
     "🎛️ 2. Remote Operations & Control Center",
     "📊 3. Daily Monitoring & Reminders",
     "🤖 4. AI Diagnostics & Catalog Reader",
@@ -694,25 +694,29 @@ if st.session_state.current_page == "admin_panel" and is_admin:
     
     with tab_gen:
         st.subheader("إصدار كود اشتراك جديد (Trial / Monthly / Yearly)")
-        with st.form("generate_code_form"):
+        
+        # التعديل الهام: تم فصل الزر عن الفورم لتحديث الواجهة وعرض الكود بوضوح وحفظه بشكل مستمر
+        with st.form("generate_code_form", clear_on_submit=True):
             client_name_input = st.text_input("اسم العميل / الشركة:")
             plan_type_input = st.selectbox("نوع الباقة:", ["تجريبي (Trial)", "شهري (Monthly)", "سنوي (Yearly)"])
             custom_dur = st.number_input("مدة الاشتراك (بالأيام):", value=30, min_value=1)
             
-            if st.form_submit_button("🚀 إصدار وحفظ الكود", use_container_width=True):
-                if client_name_input.strip():
-                    new_code = f"ADDOMA-{uuid.uuid4().hex[:6].upper()}"
-                    st.session_state.clients_db[new_code] = {
-                        "name": client_name_input.strip(),
-                        "plan": plan_type_input,
-                        "start_date": datetime.now().strftime("%Y-%m-%d"),
-                        "duration_days": custom_dur,
-                        "role": "client"
-                    }
-                    st.success(f"✅ تم إنشاء كود الاشتراك للعميل {client_name_input} بنجاح!")
-                    st.info(f"**الكود الجديد:** `{new_code}`")
-                else:
-                    st.error("يرجى إدخال اسم العميل.")
+            submitted = st.form_submit_button("🚀 إصدار وحفظ الكود", use_container_width=True)
+            
+        if submitted:
+            if client_name_input.strip():
+                new_code = f"ADDOMA-{uuid.uuid4().hex[:6].upper()}"
+                st.session_state.clients_db[new_code] = {
+                    "name": client_name_input.strip(),
+                    "plan": plan_type_input,
+                    "start_date": datetime.now().strftime("%Y-%m-%d"),
+                    "duration_days": custom_dur,
+                    "role": "client"
+                }
+                st.success(f"✅ تم إنشاء كود الاشتراك للعميل {client_name_input} بنجاح ومزامنته في الجلسة!")
+                st.info(f"**يرجى نسخ الكود الجديد وإرساله للعميل:** `{new_code}`")
+            else:
+                st.error("يرجى إدخال اسم العميل.")
 
     with tab_view:
         st.subheader("قائمة الأكواد الفعالة")
