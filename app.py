@@ -83,7 +83,7 @@ if "clients_db" not in st.session_state:
             "plan": "شهري (Monthly) | احترافي",
             "start_date": "2026-09-15",
             "duration_days": 30,
-            "role": "admin"  # صلاحية كاملة للإدارة والتحكم
+            "role": "admin"
         }
     }
 
@@ -179,7 +179,7 @@ if st.session_state.current_page == "main_apps":
             
             if selected_sub:
                 gens = st.session_state.sites_data[selected_main][selected_sub]["generators"]
-                gen_selected = st.selectbox("⚙️️ اختر المولد:", list(gens.keys()))
+                gen_selected = st.selectbox("⚙ اختر المولد:", list(gens.keys()))
                 
                 with st.expander("📝 فتح لوحة تعديل وتحديث قراءات المولد ومعايراته", expanded=True):
                     g_data = gens[gen_selected]
@@ -206,7 +206,7 @@ if st.session_state.current_page == "main_apps":
                             st.success("✅ تم تحديث بيانات ومعايرات المولد بنجاح!")
                             st.rerun()
 
-                st.subheader(فشح `بيانات ومعايرات المولد النشط: {gen_selected}`)
+                st.subheader(f"بيانات ومعايرات المولد النشط: {gen_selected}")
                 st.json(gens[gen_selected])
 
     elif "2." in selected_app:
@@ -223,7 +223,7 @@ if st.session_state.current_page == "main_apps":
         with col_c2:
             st.info("🚨 لوحة الإنذارات والحماية الطارئة")
             if st.button("🔴 إيقاف طوارئ (Emergency Stop)", use_container_width=True):
-                st.error("⚠️️ تم تفعيل مفتاح الطوارئ وفصل قاطع الدائرة الرئيسي (GCB).")
+                st.error("⚠ تم تفعيل مفتاح الطوارئ وفصل قاطع الدائرة الرئيسي (GCB).")
 
     elif "3." in selected_app:
         st.title("📊 المتابعة اليومية وتقارير الإدارة الهندسية")
@@ -348,5 +348,5 @@ elif st.session_state.current_page == "admin_panel" and is_admin:
 # =========================================================
 elif st.session_state.current_page == "chat":
     st.title("🤖 المساعد الهندسي الذكي - Addoma ATS")
-    st.info("مرحباً بك يا باشمهندس عثمان. اسألني عن أي استفسار يتعلق بالمولدات، المخططات، لوحات التحكم Deep Sea، أو غرف التبريد.")
+    st.info("مرحباً بك. اسألني عن أي استفسار يتعلق بالمولدات، المخططات، لوحات التحكم Deep Sea، أو غرف التبريد.")
     st.chat_input("اكتب استفسارك الهندسي هنا...")
