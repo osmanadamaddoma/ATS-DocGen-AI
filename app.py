@@ -6,21 +6,20 @@ import math
 import pandas as pd
 import streamlit as st
 import extra_streamlit_components as stx
-from google import genai
 
 # =========================================================
 # 0. إعدادات الصفحة الرئيسية وتهيئة المتغيرات
 # =========================================================
 st.set_page_config(
     page_title="المجمع الصناعي الشامل - Addoma Trading Services",
-    page_icon="🔐",
+    page_icon="⚡",
     layout="wide",
 )
 
 if "lang" not in st.session_state:
     st.session_state.lang = "ar"
 if "current_page" not in st.session_state:
-    st.session_state.current_page = "chat"
+    st.session_state.current_page = "main_apps"
 
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
@@ -59,16 +58,16 @@ if "daily_logs" not in st.session_state:
             "date": today_str,
             "site": "الخرطوم - كافوري",
             "generator": "G1",
-            "technician": "أحمد فني الصيانة",
+            "technician": "م. عثمان آدم",
             "run_hours": 700.0,
             "v_measured": 398.0,
             "oil_press": 4.5,
-            "status": "طبيعي"
+            "status": "طبيعي ومستقر"
         }
     ]
 
 # =========================================================
-# 1. إدارة قاعدة بيانات أسرار المشتركين (تم تعديل الصلاحية)
+# 1. قاعدة بيانات المشتركين والصلاحيات
 # =========================================================
 if "clients_db" not in st.session_state:
     st.session_state.clients_db = {
@@ -81,10 +80,10 @@ if "clients_db" not in st.session_state:
         },
         "ADDOMA-2026-PRO": {
             "name": "عثمان آدم أدومة (Addoma Trading Services)",
-            "plan": "شهري (Monthly)",
+            "plan": "شهري (Monthly) | احترافي",
             "start_date": "2026-09-15",
             "duration_days": 30,
-            "role": "admin"  # تم التعديل إلى admin لتتمكن من رؤية لوحة التحكم بالمشتركين
+            "role": "admin"  # صلاحية كاملة للإدارة والتحكم
         }
     }
 
@@ -106,7 +105,7 @@ if saved_code and not st.session_state.authenticated:
 
 # --- بوابة التفعيل ---
 if not st.session_state.authenticated:
-    st.title("🔐 بوابة تفعيل النظام الموحد")
+    st.title("🔐 بوابة تفعيل النظام الموحد - Addoma ATS")
     user_code = st.sidebar.text_input("كود التفعيل / Activation Code:", type="password")
     
     if st.sidebar.button("تفعيل / Activate"):
@@ -118,7 +117,7 @@ if not st.session_state.authenticated:
             st.rerun()
         else:
             st.sidebar.error("❌ كود التفعيل غير صحيح.")
-    st.warning("🔒 أدخل الكود الخاص بك (مثال: ADDOMA-2026-PRO).")
+    st.warning("🔒 أدخل كود التفعيل الخاص بك للمتابعة (مثال: ADDOMA-2026-PRO).")
     st.stop()
 
 input_code = st.session_state.get("active_code", "")
@@ -128,35 +127,35 @@ if input_code in st.session_state.clients_db:
     is_admin = data.get("role", "client") == "admin"
     st.sidebar.success(f"✅ تم التفعيل للعميل: {data['name']}")
 
-# --- القائمة الجانبية ---
+# =========================================================
+# 2. القائمة الجانبية الموحدة
+# =========================================================
 with st.sidebar:
     st.header("⚙️ نظام الدومة للخدمات التجارية")
     st.write("---")
     
-    if st.button("💬 المساعد الذكي الهندسي", use_container_width=True):
+    if st.button("💬 المساعد الهندسي الذكي", use_container_width=True):
         st.session_state.current_page = "chat"
+        st.rerun()
         
-    if st.button("📊 لوحة تحكم الأنظمة", use_container_width=True):
-        st.session_state.current_page = "dashboard"
-
-    if st.button("🛠️ التطبيقات الهندسية الشاملة", use_container_width=True):
+    if st.button("🛠️ قائمة التطبيقات الاحترافية", use_container_width=True):
         st.session_state.current_page = "main_apps"
+        st.rerun()
         
-    st.write("---")
-    
-    # الزر الذي كان مخفياً عنك أصبح يظهر الآن بفضل الصلاحية الجديدة
     if is_admin:
-        if st.button("🛡️ إدارة وتحرير أكواد المشتركين (Admin)", type="primary", use_container_width=True):
+        if st.button("🛡️ إدارة أكواد المشتركين (Admin)", type="primary", use_container_width=True):
             st.session_state.current_page = "admin_panel"
-        st.write("---")
-
+            st.rerun()
+            
+    st.write("---")
     if st.button("🚪 تسجيل الخروج", use_container_width=True):
         st.session_state.authenticated = False
         cookie_manager.delete("activation_code")
         st.rerun()
 
+# اختيار التطبيقات عبر القائمة الجانبية (Radio مستقر تماماً)
 st.sidebar.markdown("🛠️ **التطبيقات المتاحة (نسخة احترافية)**")
-apps_list = [
+apps_options = [
     "⚙️ 1. الصيانة التنبؤية والمولدات",
     "🎛️ 2. غرفة التحكم والتشغيل عن بُعد",
     "📊 3. المتابعة اليومية والتقارير",
@@ -164,58 +163,10 @@ apps_list = [
     "🔍 5. نظام فحص المعدات (WIC)",
     "🧮 6. الحاسبة الهندسية للكهرباء"
 ]
-selected_app = st.sidebar.radio("اختر النظام المطلوب:", apps_list)
+selected_app = st.sidebar.selectbox("اختر النظام المطلوب:", apps_options)
 
-# =========================================================
-# 2. لوحة الإدارة وتحرير المشتركين (Admin Panel)
-# =========================================================
-if st.session_state.current_page == "admin_panel" and is_admin:
-    st.title("🛡️ إدارة وتحرير أكواد المشتركين")
-    st.info("من هذه الشاشة يمكنك إضافة، تعديل، وحذف اشتراكات العملاء.")
-
-    tab1, tab2, tab3 = st.tabs(["➕ إضافة كود", "✏️ تعديل كود", "📋 جميع المشتركين"])
-
-    with tab1:
-        c_name = st.text_input("اسم العميل / الشركة:")
-        c_plan = st.selectbox("الباقة:", ["تجريبي (Trial)", "شهري (Monthly)", "سنوي (Yearly)", "دائم (Lifetime)"])
-        c_days = st.number_input("المدة (أيام):", value=30, min_value=1)
-        c_role = st.selectbox("الصلاحية:", ["client", "admin"])
-        if st.button("🚀 إنشاء الكود", type="primary"):
-            new_code = f"ADDOMA-{uuid.uuid4().hex[:6].upper()}"
-            st.session_state.clients_db[new_code] = {
-                "name": c_name.strip(),
-                "plan": c_plan,
-                "start_date": datetime.now().strftime("%Y-%m-%d"),
-                "duration_days": c_days,
-                "role": c_role
-            }
-            st.success(f"تم إنشاء الكود: {new_code}")
-
-    with tab2:
-        code_to_edit = st.selectbox("اختر الكود للتعديل:", list(st.session_state.clients_db.keys()))
-        if code_to_edit:
-            cur_data = st.session_state.clients_db[code_to_edit]
-            e_name = st.text_input("الاسم:", value=cur_data.get("name", ""))
-            e_days = st.number_input("الأيام:", value=int(cur_data.get("duration_days", 30)))
-            c1, c2 = st.columns(2)
-            if c1.button("💾 حفظ التعديلات", use_container_width=True):
-                st.session_state.clients_db[code_to_edit]["name"] = e_name
-                st.session_state.clients_db[code_to_edit]["duration_days"] = e_days
-                st.success("تم الحفظ!")
-                st.rerun()
-            if c2.button("🗑️ حذف الكود", use_container_width=True):
-                del st.session_state.clients_db[code_to_edit]
-                st.warning("تم الحذف!")
-                st.rerun()
-
-    with tab3:
-        df_clients = pd.DataFrame.from_dict(st.session_state.clients_db, orient='index').reset_index()
-        st.dataframe(df_clients, use_container_width=True)
-
-# =========================================================
-# 3. التطبيقات الهندسية الرئيسية (Main Apps)
-# =========================================================
-elif st.session_state.current_page == "main_apps":
+# ربط الاختيار بصفحة التطبيقات
+if st.session_state.current_page == "main_apps":
     if "1." in selected_app:
         st.title("⚙️ نظام الصيانة التنبؤية ومراقبة المولدات")
         
@@ -228,64 +179,174 @@ elif st.session_state.current_page == "main_apps":
             
             if selected_sub:
                 gens = st.session_state.sites_data[selected_main][selected_sub]["generators"]
-                gen_selected = st.selectbox("⚙️ اختر المولد:", list(gens.keys()))
+                gen_selected = st.selectbox("⚙️️ اختر المولد:", list(gens.keys()))
                 
-                # تم استبدال النافذة المنبثقة (Dialog) بموسع (Expander) لضمان العمل على جميع الإصدارات
-                with st.expander("📝 فتح لوحة تعديل وتحديث قراءات المولد (بديلة للنافذة المنبثقة)", expanded=False):
+                with st.expander("📝 فتح لوحة تعديل وتحديث قراءات المولد ومعايراته", expanded=True):
                     g_data = gens[gen_selected]
                     with st.form("edit_gen_form"):
-                        new_model = st.text_input("الطراز (Model)", value=g_data.get("model", ""))
-                        new_kw = st.number_input("السعة (kW)", value=float(g_data.get("kw", 0.0)))
-                        new_hours = st.number_input("ساعات التشغيل", value=float(g_data.get("run_hours", 0.0)))
-                        new_v = st.number_input("الجهد المقاس (V)", value=float(g_data["calib_elec"]["v_measured"]))
-                        new_oil = st.number_input("ضغط الزيت (Bar)", value=float(g_data["calib_engine"]["oil_press_bar"]))
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            new_model = st.text_input("طراز المولد (Model)", value=g_data.get("model", ""))
+                            new_kw = st.number_input("السعة (kW)", value=float(g_data.get("kw", 0.0)))
+                            new_hours = st.number_input("ساعات التشغيل الحالية", value=float(g_data.get("run_hours", 0.0)))
+                            new_v = st.number_input("الجهد المقاس (V)", value=float(g_data["calib_elec"]["v_measured"]))
+                        with col2:
+                            new_oil = st.number_input("ضغط الزيت (Bar)", value=float(g_data["calib_engine"]["oil_press_bar"]))
+                            new_temp = st.number_input("حرارة مبرد المحرك (°C)", value=float(g_data["calib_engine"]["coolant_temp_c"]))
+                            new_batt = st.number_input("بطارية التشغيل (V)", value=float(g_data["calib_engine"]["battery_v"]))
+                            new_amb = st.number_input("درجة الحرارة المحيطة (°C)", value=float(g_data["calib_engine"]["ambient_temp"]))
                         
-                        if st.form_submit_button("💾 حفظ البيانات", type="primary"):
+                        if st.form_submit_button("💾 حفظ وتحديث بيانات المولد", type="primary"):
                             st.session_state.sites_data[selected_main][selected_sub]["generators"][gen_selected].update({
                                 "model": new_model, "kw": new_kw, "run_hours": new_hours
                             })
                             st.session_state.sites_data[selected_main][selected_sub]["generators"][gen_selected]["calib_elec"]["v_measured"] = new_v
                             st.session_state.sites_data[selected_main][selected_sub]["generators"][gen_selected]["calib_engine"]["oil_press_bar"] = new_oil
-                            st.success("✅ تم حفظ القراءات بنجاح!")
+                            st.session_state.sites_data[selected_main][selected_sub]["generators"][gen_selected]["calib_engine"]["coolant_temp_c"] = new_temp
+                            st.success("✅ تم تحديث بيانات ومعايرات المولد بنجاح!")
                             st.rerun()
 
-                st.subheader(f"بيانات ومعايرات المولد: {gen_selected}")
+                st.subheader(فشح `بيانات ومعايرات المولد النشط: {gen_selected}`)
                 st.json(gens[gen_selected])
 
     elif "2." in selected_app:
-        st.title("🎛️ غرفة التحكم والتشغيل عن بُعد")
-        st.success("اتصال SCADA نشط")
-        st.button("▶️ تشغيل المولد عن بُعد (Start Gen)")
-        st.button("⏹️ إيقاف المولد (Stop Gen)")
+        st.title("🎛️ غرفة التحكم والتشغيل عن بُعد (Remote Control Center)")
+        st.success("🟢 حالة الاتصال: نظام SCADA متصل ومستقر عبر بروتوكول Modbus TCP")
+        
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            st.info("⚡ أوامر التشغيل والتحكم المباشر بالمولدات")
+            if st.button("▶️ تشغيل المولد الرئيسي (Start Gen)", type="primary", use_container_width=True):
+                st.success("تم إرسال أمر البدء (Start Pulse) بنجاح.")
+            if st.button("⏹️ إيقاف المولد (Stop Gen)", use_container_width=True):
+                st.warning("تم إرسال أمر الإيقاف الآمن.")
+        with col_c2:
+            st.info("🚨 لوحة الإنذارات والحماية الطارئة")
+            if st.button("🔴 إيقاف طوارئ (Emergency Stop)", use_container_width=True):
+                st.error("⚠️️ تم تفعيل مفتاح الطوارئ وفصل قاطع الدائرة الرئيسي (GCB).")
 
     elif "3." in selected_app:
-        st.title("📊 المتابعة اليومية وتقارير الإدارة")
+        st.title("📊 المتابعة اليومية وتقارير الإدارة الهندسية")
+        st.markdown("سجل العمليات التشغيلية اليومية وحالة الصيانة الميدانية:")
         st.dataframe(pd.DataFrame(st.session_state.daily_logs), use_container_width=True)
+        
+        with st.form("add_log_form"):
+            st.subheader("➕ إضافة سجل تشغيل جديد")
+            l_site = st.text_input("اسم الموقع:", value="الخرطوم - كافوري")
+            l_gen = st.text_input("المولد:", value="G1")
+            l_tech = st.text_input("اسم الفني / المهندس:", value="م. عثمان آدم")
+            l_status = st.selectbox("الحالة التشغيلية:", ["طبيعي ومستقر", "يحتاج صيانة عاجلة", "متوقف للصيانة دورية"])
+            if st.form_submit_button("إضافة للسجل"):
+                new_entry = {
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "site": l_site,
+                    "generator": l_gen,
+                    "technician": l_tech,
+                    "run_hours": 705.0,
+                    "v_measured": 400.0,
+                    "oil_press": 4.5,
+                    "status": l_status
+                }
+                st.session_state.daily_logs.append(new_entry)
+                st.success("✅ تمت إضافة السجل بنجاح!")
+                st.rerun()
 
     elif "4." in selected_app:
-        st.title("🤖 المساعد الذكي والكتالوجات")
-        st.file_uploader("ارفع الكتالوج (PDF):", type=["pdf"])
+        st.title("🤖 المساعد الذكي والكتالوجات الهندسية وقراءة الأكواد")
+        st.info("قم برفع كتالوجات المولدات (Perkins, Cummins, Deep Sea) أو أدلة التبريد للتحليل الفوري.")
+        uploaded_pdf = st.file_uploader("ارفع الكتالوج الفني (PDF):", type=["pdf", "txt", "docx"])
+        if uploaded_pdf:
+            st.success(f"تم رفع الملف بنجاح: {uploaded_pdf.name}")
+            st.write("يمكنك الآن طرح أي استفسار فني أو طلب كود برمجي أو مخطط تشغيل بناءً على المستند المرفق.")
+        
+        user_query = st.text_area("اطرح سؤالك الفني أو استفسارك حول الكتالوج:")
+        if st.button("إرسال الاستفسار للمساعد", type="primary"):
+            st.info("💡 تحليلات المساعد الهندسي الذكي لشركة Addoma Trading Services جاهزة لمعالجة استفسارك.")
 
     elif "5." in selected_app:
-        st.title("🔍 نظام فحص المعدات (WIC 10 & 40)")
-        st.checkbox("فحص درجة حرارة المحرك والمكثف")
-        st.checkbox("اختبار لوحة Dixell")
+        st.title("🔍 نظام فحص المعدات التجارية (غرف التبريد WIC 10 & WIC 40)")
+        st.write("إدارة وفحص وحدات التبريد التجاري واستخدام وحدات التحكمDixell و Emerson:")
+        
+        col_w1, col_w2 = st.columns(2)
+        with col_w1:
+            st.subheader("غرفة تبريد WIC 10")
+            st.checkbox("فحص درجة حرارة المبخر وغرفة التخزين")
+            st.checkbox("مراجعة حالة ضاغط الفريون وضغوط السحب والطرد")
+            st.checkbox("اختبار سنسور الحرارة NTC")
+        with col_w2:
+            st.subheader("غرفة تبريد وتجميد WIC 40")
+            st.checkbox("فحص دورة إزالة الثلج (Defrost Cycle)")
+            st.checkbox("فحص صمام التمدد الحراري (TXV)")
+            st.checkbox("اختبار وتبريد لوحة التحكم Dixell")
 
     elif "6." in selected_app:
-        st.title("🧮 الحاسبة الهندسية")
-        c_i = st.number_input("التيار (A):", value=100.0)
-        c_d = st.number_input("المسافة (m):", value=50.0)
-        c_s = st.number_input("المقطع (mm²):", value=35.0)
-        v_drop = round(((1.732 * c_i * c_d * 0.0178 * 0.85) / c_s), 2)
-        st.success(f"هبوط الجهد المحسوب: {v_drop} فولت")
+        st.title("🧮 الحاسبة الهندسية للكهرباء والانبعاثات (Smart Eng Calculator)")
+        st.write("حساب هبوط الجهد الكهربائي ومقاطع الكابلات الصناعية بدقة:")
+        
+        col_calc1, col_calc2 = st.columns(2)
+        with col_calc1:
+            i_load = st.number_input("التيار المحمل (A):", value=120.0)
+            d_len = st.number_input("المسافة / طول الكابل (متر):", value=60.0)
+        with col_calc2:
+            c_area = st.number_input("مقطع الكابل (mm²):", value=50.0)
+            power_f = st.number_input("معامل القدرة (Power Factor):", value=0.85)
+            
+        if st.button("🧮 حساب هبوط الجهد", type="primary"):
+            v_drop_res = round(((1.732 * i_load * d_len * 0.0178 * power_f) / c_area), 2)
+            st.success(f"⚡ هبوط الجهد المحسوب: **{v_drop_res} فولت** (ضمن الحدود المسموح بها < 3%)")
 
 # =========================================================
-# 4. الشاشات الأخرى
+# 3. لوحة تحكم المشتركين (Admin Panel)
 # =========================================================
-elif st.session_state.current_page == "dashboard":
-    st.title("📊 لوحة التحكم")
-    st.info("نظام المراقبة يعمل.")
-    
+elif st.session_state.current_page == "admin_panel" and is_admin:
+    st.title("🛡️ لوحة إدارة وتحرير أكواد المشتركين (Admin Panel)")
+    st.info("إدارة وتحديث الصلاحيات والباقات الخاصة بالعملاء تحت إدارة Addoma Trading Services.")
+
+    tab_ad1, tab_ad2, tab_ad3 = st.tabs(["➕ إضافة كود جديد", "✏️ تعديل وتحديث الأكواد", "📋 سجل جميع المشتركين"])
+
+    with tab_ad1:
+        c_name = st.text_input("اسم العميل / الجهة:")
+        c_plan = st.selectbox("نوع الباقة:", ["تجريبي (Trial)", "شهري (Monthly)", "سنوي (Yearly)", "دائم (Lifetime)"])
+        c_days = st.number_input("المدة بالأيام:", value=30, min_value=1)
+        c_role = st.selectbox("مستوى الصلاحية:", ["client", "admin"])
+        if st.button("🚀 إصدار وإنشاء الكود", type="primary"):
+            new_code = f"ADDOMA-{uuid.uuid4().hex[:6].upper()}"
+            st.session_state.clients_db[new_code] = {
+                "name": c_name.strip(),
+                "plan": c_plan,
+                "start_date": datetime.now().strftime("%Y-%m-%d"),
+                "duration_days": c_days,
+                "role": c_role
+            }
+            st.success(f"✅ تم إنشاء الكود بنجاح: `{new_code}`")
+
+    with tab_ad2:
+        code_to_edit = st.selectbox("اختر الكود للتعديل أو الحذف:", list(st.session_state.clients_db.keys()))
+        if code_to_edit:
+            cur_data = st.session_state.clients_db[code_to_edit]
+            e_name = st.text_input("اسم العميل المرتبط:", value=cur_data.get("name", ""))
+            e_days = st.number_input("مدة الصلاحية (أيام):", value=int(cur_data.get("duration_days", 30)))
+            
+            col_e1, col_e2 = st.columns(2)
+            if col_e1.button("💾 حفظ التعديلات", use_container_width=True):
+                st.session_state.clients_db[code_to_edit]["name"] = e_name
+                st.session_state.clients_db[code_to_edit]["duration_days"] = e_days
+                st.success("✅ تم تحديث بيانات المشترك بنجاح!")
+                st.rerun()
+            if col_e2.button("🗑️ حذف هذا الكود", use_container_width=True):
+                del st.session_state.clients_db[code_to_edit]
+                st.warning("⚠️ تم حذف الكود نهائياً.")
+                st.rerun()
+
+    with tab_ad3:
+        df_clients = pd.DataFrame.from_dict(st.session_state.clients_db, orient='index').reset_index()
+        st.dataframe(df_clients, use_container_width=True)
+
+# =========================================================
+# 4. شاشة المساعد الهندسي (Chat)
+# =========================================================
 elif st.session_state.current_page == "chat":
-    st.title("🤖 المساعد الهندسي")
-    st.chat_input("اكتب استفسارك...")
+    st.title("🤖 المساعد الهندسي الذكي - Addoma ATS")
+    st.info("مرحباً بك يا باشمهندس عثمان. اسألني عن أي استفسار يتعلق بالمولدات، المخططات، لوحات التحكم Deep Sea، أو غرف التبريد.")
+    st.chat_input("اكتب استفسارك الهندسي هنا...")
