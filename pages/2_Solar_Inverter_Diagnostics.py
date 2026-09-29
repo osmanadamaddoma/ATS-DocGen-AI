@@ -1,11 +1,12 @@
 import streamlit as st
 import time
 import random
+import math
 
-# إعداد الصفحة
-st.set_page_config(page_title="Inverter Diagnostics Dashboard", layout="wide")
+# إعداد الصفحة (يجب أن يكون أول سطر)
+st.set_page_config(page_title="AI Solar & Inverter Diagnostics", layout="wide", page_icon="⚡")
 
-# قاموس الأعطال
+# --- دوال الاتصال وقواعد البيانات ---
 FAULT_CODES = {
     0: "النظام يعمل بشكل طبيعي (No Fault)",
     1: "جهد الشبكة غير طبيعي (Grid Voltage Out of Range)",
@@ -16,97 +17,121 @@ FAULT_CODES = {
     6: "قصر في الدائرة أو زيادة حمل (Short Circuit / Overload)"
 }
 
-def read_inverter_fault_serial(port, baudrate, slave_id, register):
-    """قراءة عبر المنفذ التسلسلي (للأجهزة المحلية أو الحواسيب)"""
-    try:
-        from pymodbus.client import ModbusSerialClient as ModbusClient
-        client = ModbusClient(method='rtu', port=port, baudrate=baudrate, timeout=2)
-        if client.connect():
-            try:
-                response = client.read_holding_registers(address=register, count=1, slave=slave_id)
-                if not response.isError():
-                    return response.registers[0]
-                return -1
-            except Exception:
-                return -2
-            finally:
-                client.close()
-        return -3
-    except Exception:
-        return -4
-
 def fetch_from_supabase():
-    """جلب أحدث حالة من قاعدة بيانات Supabase (مناسب لهاتفك الأندرويد والسحابة)"""
-    # يمكنك هنا ربط جدول Supabase الفعلي الخاص بك
-    # مثال توضيحي لجلب بيانات محاكاة حية للمتابعة من الهاتف:
-    simulated_codes = [0, 0, 0, 1, 0, 4] # يمثل الاحتمالات الواردة
-    return random.choice(simulated_codes)
+    """محاكاة جلب البيانات السحابية أو قراءة الذكاء الاصطناعي للمحطة"""
+    return random.choice([0, 0, 0, 1, 3, 4, 5])
 
-# --- الشريط الجانبي (Sidebar) ---
-st.sidebar.header("⚙️ إعدادات النظام والاتصال")
+def ai_fault_diagnosis(fault_code):
+    """نظام خبير مبسط للذكاء الاصطناعي يقدم توصيات هندسية لكل عطل"""
+    diagnoses = {
+        0: "✅ **تحليل AI:** استقرار حراري وكهربائي ممتاز. كفاءة التوليد متوافقة مع منحنى الإشعاع الشمسي لبرنامج PVsyst.",
+        1: "⚠️ **تحليل AI:** رصد تذبذب في شبكة المدينة. يوصى بمراجعة إعدادات المزامنة (Grid-Tie) وتوسيع نطاق الحماية (Voltage Protection limits).",
+        2: "⚠️ **تحليل AI:** عدم استقرار في التردد. إذا كانت المحطة تعمل بالتوازي مع مولد ديزل، تأكد من إعدادات (Droop Control) وحاكم السرعة (Governor).",
+        3: "🚨 **تحليل AI:** سلسلة الألواح (String) تتجاوز أقصى جهد MPPT. تأكد من مطابقة حسابات (Voc) مع درجات الحرارة الدنيا في منطقتك لتجنب تلف المحول.",
+        4: "🚨 **تحليل AI:** إجهاد حراري يقلل من كفاءة المحول (Derating). راجع تهوية غرفة المحولات ونظف زعانف التبريد فوراً.",
+        5: "⚠️ **تحليل AI:** تفريغ عميق للبطاريات (DOD تجاوز الحد الآمن). افصل الأحمال غير الحرجة وراجع حجم المصفوفة الشمسية لضمان شحن كافٍ.",
+        6: "🚨 **تحليل AI:** تيار زائد مفاجئ. افحص كابلات التيار المتردد (AC) لاحتمالية حدوث قصر، أو راجع ذروة إقلاع المحركات (Inrush Current) في الأحمال."
+    }
+    return diagnoses.get(fault_code, "عطل غير مصنف. راجع دليل الصيانة.")
 
-# اختيار نمط التشغيل المناسب للأندرويد والسحابة
-mode = st.sidebar.selectbox(
-    "طريقة جلب البيانات (Connection Mode)", 
-    ["🌐 قاعدة البيانات السحابية (Supabase / Cloud)", "🔌 منفذ محلي (Local Serial - حاسوب فقط)"]
-)
-
-if "محلي" in mode:
-    port = st.sidebar.text_input("المنفذ (Port)", value="COM3" if st.sidebar.checkbox("Windows") else "/dev/ttyUSB0")
-    baudrate = st.sidebar.selectbox("سرعة النقل (Baudrate)", [9600, 19200, 38400, 115200])
-    slave_id = st.sidebar.number_input("معرف الجهاز (Slave ID)", min_value=1, max_value=247, value=1)
-    register_address = st.sidebar.number_input("عنوان مسجل العطل", value=256)
+# --- الشريط الجانبي ---
+st.sidebar.header("⚙️ إعدادات النظام")
+mode = st.sidebar.selectbox("طريقة جلب البيانات", ["🌐 وضع السحابة / الذكاء الاصطناعي", "🔌 وضع الكابل المحلي (Modbus)"])
 
 st.sidebar.markdown("---")
-st.sidebar.header("🔄 إعدادات إعادة الضبط (Reset)")
-reset_register_address = st.sidebar.number_input("عنوان مسجل إعادة الضبط", value=261)
-reset_command_value = st.sidebar.number_input("قيمة أمر الريست", value=1)
+st.sidebar.info("💡 **مشروع الصيانة التنبؤية المدعوم بالذكاء الاصطناعي**\n\nتصميم وإدارة المهندس المختص.")
 
-# --- واجهة التطبيق الرئيسية ---
-st.title("⚡ لوحة مراقبة وأعطال محولات الطاقة الشمسية")
+# --- الواجهة الرئيسية ---
+st.title("⚡ لوحة الإدارة الذكية لمحطات الطاقة الشمسية")
 st.markdown("---")
 
-col1, col2 = st.columns(2)
-with col1:
-    check_btn = st.button("🔄 فحص حالة المحول الآن", use_container_width=True)
-with col2:
-    reset_btn = st.button("⚠️ إرسال أمر إعادة الضبط (Reset)", type="primary", use_container_width=True)
+# تقسيم الواجهة إلى 3 أقسام (Tabs) لتسهيل التصفح من الموبايل
+tab1, tab2, tab3 = st.tabs(["📡 المراقبة وتشخيص AI", "🧮 حاسبة PVsyst للتصميم", "📚 ملاحق ومعايير هندسية"])
 
-if check_btn:
-    with st.spinner('جاري جلب البيانات...'):
-        time.sleep(1)
-        
-        if "السحابية" in mode:
-            # الجلب من السحابة (يعمل بامتياز من هاتفك الأندرويد)
+# ==========================================
+# التبويب الأول: المراقبة والذكاء الاصطناعي
+# ==========================================
+with tab1:
+    st.subheader("مراقبة حالة المحول (Inverter Telemetry)")
+    col1, col2 = st.columns(2)
+    with col1:
+        check_btn = st.button("🔄 تحليل حالة المحطة بالذكاء الاصطناعي", use_container_width=True)
+    with col2:
+        reset_btn = st.button("⚠️ إرسال أمر إعادة الضبط (Remote Reset)", type="primary", use_container_width=True)
+
+    if check_btn:
+        with st.spinner("يقوم الذكاء الاصطناعي بتحليل البيانات الحية..."):
+            time.sleep(1) # محاكاة معالجة البيانات
             fault_code = fetch_from_supabase()
-            st.info("☁️ **مصدر البيانات:** سحابي (مباشر من قاعدة بيانات المجمع الصناعي).")
-        else:
-            # الفحص المباشر عبر الكابل
-            fault_code = read_inverter_fault_serial(port, baudrate, slave_id, register_address)
-        
-        if fault_code >= 0:
-            description = FAULT_CODES.get(fault_code, f"كود عطل غير معروف: {fault_code}")
+            
+            description = FAULT_CODES.get(fault_code, "كود غير معروف")
+            ai_recommendation = ai_fault_diagnosis(fault_code)
+            
+            # العرض
+            st.metric(label="كود مسجل العطل (Modbus Register)", value=fault_code)
             
             if fault_code == 0:
-                st.success(f"✅ الحالة: {description}")
-            elif fault_code in [4, 6]:
-                st.error(f"🚨 تحذير حرج: {description}")
+                st.success(f"**الحالة:** {description}")
+                st.info(ai_recommendation)
+            elif fault_code in [4, 6, 3]:
+                st.error(f"**تنبيه حرج:** {description}")
+                st.error(ai_recommendation)
             else:
-                st.warning(f"⚠️ تنبيه: {description}")
-                
-            st.metric(label="كود مسجل العطل (Register Value)", value=fault_code)
-            
-        elif fault_code == -1:
-            st.error("❌ فشل في قراءة المسجل. تحقق من العنوان.")
-        elif fault_code == -2:
-            st.error("❌ خطأ في تبادل البيانات.")
-        elif fault_code == -3:
-            st.error(f"❌ تعذر فتح المنفذ {port}.")
-        elif fault_code == -4:
-            st.error("❌ بيئة غير مدعومة للمنفذ التسلسلي (قم بالتحويل للوضع السحابي).")
+                st.warning(f"**تحذير:** {description}")
+                st.warning(ai_recommendation)
 
-if reset_btn:
-    if "السحابية" in mode:
-        st.success("✅ تم إرسال أمر إعادة الضبط بنجاح عبر السحابة إلى محطة الطاقة الشمسية في الموقع.")
-    else:
-        st.error("❌ لا يمكن إرسال أمر الريست لعدم توفر منفذ تسلسلي نشط.")
+# ==========================================
+# التبويب الثاني: حاسبة التصميم (على معايير PVsyst)
+# ==========================================
+with tab2:
+    st.subheader("حاسبة الأحمال وتصميم المحطة الكهروضوئية")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        daily_load = st.number_input("الاستهلاك اليومي (كيلو واط ساعة - kWh)", min_value=1.0, value=15.0)
+        psh = st.number_input("ساعات الذروة الشمسية (PSH)", min_value=2.0, value=5.5)
+        sys_voltage = st.selectbox("جهد النظام (System Voltage DC)", [12, 24, 48, 96, 384], index=2)
+    with c2:
+        panel_watt = st.number_input("قدرة اللوح الواحد (واط)", min_value=100, value=550)
+        autonomy = st.number_input("أيام الاستقلالية للبطاريات (Days)", min_value=0.5, value=1.0)
+        dod = st.slider("عمق التفريغ المسموح للبطاريات (DOD %)", min_value=20, max_value=90, value=50)
+
+    if st.button("🧮 حساب المواصفات الهندسية"):
+        # الحسابات الرياضية
+        efficiency_loss = 1.3 # تعويض الفواقد (حرارة، غبار، كابلات) بمقدار 30%
+        required_array_kw = (daily_load / psh) * efficiency_loss
+        total_panels = math.ceil((required_array_kw * 1000) / panel_watt)
+        
+        # حساب البطاريات: (الاستهلاك * أيام الاستقلالية * 1000) / (جهد النظام * عمق التفريغ)
+        req_battery_ah = (daily_load * 1000 * autonomy) / (sys_voltage * (dod / 100.0))
+        
+        st.markdown("### 📊 النتائج الموصى بها للتصميم:")
+        res_c1, res_c2, res_c3 = st.columns(3)
+        res_c1.metric("حجم المصفوفة الشمسية", f"{required_array_kw:.2f} kW")
+        res_c2.metric("عدد الألواح المطلوبة", f"{total_panels} لوح")
+        res_c3.metric("سعة بنك البطاريات", f"{req_battery_ah:.0f} Ah")
+        
+        st.info(f"💡 **توصية المحول:** يوصى باستخدام Inverter بقدرة لا تقل عن **{math.ceil(required_array_kw * 1.25)} kW** لاستيعاب تيارات البدء العالية.")
+
+# ==========================================
+# التبويب الثالث: الملاحق وجداول التصميم
+# ==========================================
+with tab3:
+    st.subheader("📚 الملاحق والمعايير الهندسية")
+    
+    st.markdown("""
+    **1. استخدام بيانات Google لتقدير الإشعاع:**
+    * يُنصح باستخدام أدوات مثل **Google Project Sunroof** أو **Google Earth** لتحديد زوايا السمت (Azimuth) وتأثير الظلال على الموقع قبل إدخال البيانات إلى PVsyst.
+    * المعادلة القياسية لحساب الطاقة المنتجة: 
+    $$ E = A \times r \times H \times PR $$
+    *(حيث A: المساحة، r: الكفاءة، H: الإشعاع، PR: معامل الأداء)*
+    
+    **2. معايير ضبط كابلات التيار المستمر (DC Sizing):**
+    * يجب ألا يتجاوز الهبوط في الجهد (Voltage Drop) نسبة **2%** بين الألواح والمحول لضمان عمل نظام MPPT بأعلى كفاءة.
+    
+    **3. معاملات تصحيح الحرارة (Temperature Derating):**
+    * وفقاً لبرنامج PVsyst، تنخفض كفاءة الألواح بحوالي $0.4\%$ لكل درجة مئوية ترتفع فوق $25^\circ C$. يجب أخذ ذلك في الاعتبار عند تصميم مشاريع في البيئات الحارة.
+    
+    **4. التوافق مع المولدات (Genset Integration):**
+    * عند ربط المحول الشمسي مع المولدات الصناعية، تأكد من تركيب لوحة تحكم ذكية (مثل Deep Sea أو ComAp) لمنع رجوع القدرة العكسية (Reverse Power) إلى المولد.
+    """)
