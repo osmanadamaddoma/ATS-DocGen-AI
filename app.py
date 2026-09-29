@@ -20,7 +20,7 @@ import requests
 from fpdf import FPDF
 import pdfplumber
 import streamlit as st
-import extra_streamlit_components as stx  # مكتبة إدارة الكوكيز
+import extra_streamlit_components as stx  # مكتبة إدارة الكوكيز المضافة
 from google import genai
 from gtts import gTTS
 
@@ -51,9 +51,6 @@ st.set_page_config(
     layout="wide",
 )
 
-# كلمة المرور الخاصة بإدارة الدومة للخدمات التجارية لإنشاء الأكواد
-ADMIN_PASSWORD = st.secrets.get("ADMIN_PASSWORD", "Addoma@2026#Admin")
-
 # التهيئة المبدئية لمتغيرات الجلسة (Session State)
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
@@ -61,11 +58,9 @@ if "audio_muted" not in st.session_state:
 if "lang" not in st.session_state:
     st.session_state.lang = "ar"  # 'ar' or 'en'
 
+# تحديد الصفحة الافتراضية عند الدخول
 if "current_page" not in st.session_state:
     st.session_state.current_page = "chat"
-
-if "admin_authenticated" not in st.session_state:
-    st.session_state.admin_authenticated = False
 
 # تحديث هيكل قاعدة البيانات المصغرة ليدعم القوائم الرئيسية والفرعية
 if "sites_data" not in st.session_state:
@@ -115,6 +110,7 @@ if "sites_data" not in st.session_state:
         }
     }
 
+# سجل الإدخالات اليومية وتتبع القراءات
 if "daily_logs" not in st.session_state:
     today_str = datetime.now().strftime("%Y-%m-%d")
     st.session_state.daily_logs = [
@@ -132,17 +128,19 @@ if "daily_logs" not in st.session_state:
         }
     ]
 
-# جلب مفتاح Gemini
+# جلب مفتاح Gemini بأمان من الإعدادات
 gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+
 if not gemini_key and "supabase" in st.secrets:
     gemini_key = st.secrets["supabase"].get("GEMINI_API_KEY")
 
 if not gemini_key:
     st.warning("⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY. يرجى إضافته في st.secrets.")
 
+# تهيئة عميل Gemini API
 client = genai.Client(api_key=gemini_key) if gemini_key else None
 
-# إعدادات قاعدة بيانات Supabase
+# إعدادات قاعدة بيانات Supabase للاتصال بتطبيقاتي
 supabase = None
 if create_client:
     supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
@@ -164,7 +162,10 @@ if create_client:
 else:
     st.warning("⚠️ مكتبة supabase غير مثبتة. يرجى تثبيتها باستخدام pip install supabase")
 
+
+# دالة تشغيل الصوت المحدثة مع دعم اللغتين خيار الكتم والتكرار المستمر للانذارات
 def play_audio(text, lang='ar', loop=False):
+    """تحويل النص إلى صوت باستخدام gTTS وتشغيله إن لم يتم تفعيل Mute مع دعم التكرار"""
     if st.session_state.get("audio_muted", False):
         return
     try:
@@ -191,6 +192,7 @@ def play_audio(text, lang='ar', loop=False):
 
 @st.cache_data(ttl=3600)
 def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
+    """دالة استدعاء الذكاء الاصطناعي مع معالجة حزمة الضغط العالي (503) وإعادة المحاولة ودعم ثنائية اللغة"""
     if not client:
         return "⚠️ GEMINI_API_KEY not found." if language == "en" else "⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY."
 
@@ -242,7 +244,11 @@ def sanitize_latin_only(text):
     return clean_text if clean_text else "N/A"
 
 class ComprehensivePDF(FPDF):
-    def __init__(self, title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT", logo_path=None):
+    def __init__(
+        self,
+        title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT",
+        logo_path=None,
+    ):
         super().__init__()
         self.report_title = title_text
         self.logo_path = logo_path
@@ -265,11 +271,21 @@ class ComprehensivePDF(FPDF):
         self.set_x(text_x)
         self.set_font("Helvetica", "B", 8)
         self.set_text_color(100, 100, 100)
-        self.cell(0, 4, "ADDOMA TRADING SERVICES - ENGINEERING CONSULTANCY", ln=True)
+        self.cell(
+            0,
+            4,
+            "ADDOMA TRADING SERVICES - ENGINEERING CONSULTANCY",
+            ln=True,
+        )
 
         self.set_x(text_x)
         self.set_font("Helvetica", "", 8)
-        self.cell(0, 4, "Power Systems & Electro-Mechanical Maintenance Division", ln=True)
+        self.cell(
+            0,
+            4,
+            "Power Systems & Electro-Mechanical Maintenance Division",
+            ln=True,
+        )
 
         self.set_draw_color(24, 43, 73)
         self.set_line_width(0.5)
@@ -284,13 +300,25 @@ class ComprehensivePDF(FPDF):
 
         self.set_font("Helvetica", "I", 8)
         self.set_text_color(120, 120, 120)
-        self.cell(0, 4, "Prepared by: Osman Adam Addoma | Power Systems Engineer", ln=True, align="C")
-        self.cell(0, 4, f"Page {self.page_no()} | Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
+        self.cell(
+            0,
+            4,
+            "Prepared by: Osman Adam Addoma | Power Systems Engineer",
+            ln=True,
+            align="C",
+        )
+        self.cell(
+            0,
+            4,
+            f"Page {self.page_no()} | Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            align="C",
+        )
 
 # =========================================================
 # 1.5 دوال الربط بقاعدة البيانات الحية وإنترنت الأشياء (IoT)
 # =========================================================
 def fetch_live_iot_data():
+    """جلب القراءات اللحظية من قاعدة بيانات السلاسل الزمنية الحية إن وجدت"""
     if not InfluxDBClient or "influxdb" not in st.secrets:
         import random
         today = datetime.now()
@@ -328,41 +356,55 @@ def fetch_live_iot_data():
 # 1.8 أدوات وحاسبات هندسية مستحدثة (Engineering Smart Tools)
 # =========================================================
 def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85):
-    rho_copper = 0.0178
+    """حساب هبوط الجهد ثلاثي الأوجه للكهرباء (3-Phase Voltage Drop)"""
+    rho_copper = 0.0178  # المقاومة النوعية للنحاس
     v_drop = (math.sqrt(3) * current_a * distance_m * rho_copper * cos_phi) / cable_mm2
     v_drop_pct = (v_drop / 400.0) * 100
     return round(v_drop, 2), round(v_drop_pct, 2)
 
 def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
+    """تقدير استهلاك الديزل والانبعاثات المباشرة للمولدات"""
+    # متوسط الاستهلاك = ~0.24 لتر/كيلوواط.ساعة
     liters = kw_load * 0.24 * run_hours
-    co2_kg = liters * 2.68
+    co2_kg = liters * 2.68  # 2.68 كجم كربون لكل لتر ديزل
     return round(liters, 1), round(co2_kg, 1)
 
 # =========================================================
-# 2. نظام الاشتراكات الموحد والباقات وحاسبة الأكواد (إدارة الدومة للخدمات التجارية)
+# 2. نظام الاشتراكات الموحد والباقات (مع إدارة الكوكيز والتحديث الديناميكي)
 # =========================================================
 if "clients_db" not in st.session_state:
     st.session_state.clients_db = {
+        "ADDOMA-MASTER-2026": {
+            "name": "إدارة الدومة للخدمات التجارية",
+            "plan": "التحكم الشامل (Admin)",
+            "start_date": "2026-01-01",
+            "duration_days": 36500,
+            "role": "admin"
+        },
         "ADDOMA-2026-PRO": {
             "name": "عثمان آدم أدومة (Addoma Trading Services)",
             "plan": "شهري (Monthly)",
             "start_date": "2026-09-15",
             "duration_days": 30,
+            "role": "client"
         },
         "CLIENT-M-881": {
             "name": "شركة النيل للصناعات الهندسية",
             "plan": "شهري (Monthly)",
             "start_date": "2026-09-01",
             "duration_days": 30,
+            "role": "client"
         },
         "CLIENT-Y-992": {
             "name": "مصانع الحديد والصلب الوطنية",
             "plan": "سنوي (Yearly)",
             "start_date": "2026-03-15",
             "duration_days": 365,
+            "role": "client"
         },
     }
 
+# توجيه المتغير القديم ليقرأ من الـ session_state
 CLIENTS_DATABASE = st.session_state.clients_db
 
 def get_cookie_manager():
@@ -381,94 +423,6 @@ if saved_code and not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.session_state.active_code = saved_code
 
-# --- نافذة منبثقة مغلقة ومحمية لإدارة الدومة لإنشاء وإدارة أكواد الاشتراكات ---
-@st.dialog("🔒 بوابـة إدارة الدومـة - تحرير وإصدار أكواد التفعيل")
-def admin_management_modal():
-    st.markdown("### 🏢 Addoma Trading Services - System Management")
-    st.caption("الوصول مصرح به فقط لمهندسي وإدارة الشركة المصدرة للنظام.")
-
-    if not st.session_state.admin_authenticated:
-        pwd_input = st.text_input("أدخل كلمة مرور الإدارة لتأكيد صلاحية الوصول:", type="password")
-        if st.button("🔑 تسجيل الدخول للإدارة", type="primary", use_container_width=True):
-            if pwd_input == ADMIN_PASSWORD:
-                st.session_state.admin_authenticated = True
-                st.success("✅ تم التحقق من هوية المسؤول بنجاح!")
-                st.rerun()
-            else:
-                st.error("❌ كلمة المرور غير صحيحة. الوصول مرفوض!")
-        return
-
-    st.success("🟢 أهلاً بك! تم التوثيق كمسؤول نظام الدومة للخدمات التجارية.")
-    
-    admin_tab1, admin_tab2 = st.tabs(["🚀 إصدار كود جديد", "📋 قائمة ومتابعة المشتركين"])
-
-    with admin_tab1:
-        st.markdown("#### إصدار كود تفعيل لعميل جديد")
-        client_name = st.text_input("اسم العميل / الشركة المشتركة:", key="adm_client_name")
-        plan_type = st.selectbox(
-            "نوع الباقة المتاحة:", 
-            ["تجريبي (Trial - 7 أيام)", "شهري (Monthly - 30 يوم)", "سنوي (Yearly - 365 يوم)", "تخصيص مدة أخرى (Custom)"],
-            key="adm_plan_type"
-        )
-        
-        default_days = 30
-        if "تجريبي" in plan_type:
-            default_days = 7
-        elif "سنوي" in plan_type:
-            default_days = 365
-            
-        custom_duration = st.number_input("مدة الصلاحية الفعالة (بالأيام):", value=default_days, min_value=1, key="adm_days")
-
-        if st.button("✨ تحرير وإصدار الكود الآن", type="primary", use_container_width=True):
-            if client_name.strip():
-                prefix = "TRY" if "تجريبي" in plan_type else ("MTH" if "شهري" in plan_type else "YRL")
-                new_code = f"ADDOMA-{prefix}-{uuid.uuid4().hex[:6].upper()}"
-                today_str = datetime.now().strftime("%Y-%m-%d")
-                
-                st.session_state.clients_db[new_code] = {
-                    "name": client_name.strip(),
-                    "plan": plan_type,
-                    "start_date": today_str,
-                    "duration_days": int(custom_duration),
-                }
-                
-                st.success("✅ تم إصدار كود الاشتراك وتفعيله في قاعدة البيانات!")
-                st.code(new_code, language="text")
-                st.info("قم بنسخ هذا الكود وتسليمه للعميل لإدخاله عبر بوابة التفعيل الخاصة به.")
-            else:
-                st.error("❌ يرجى كتابة اسم العميل أولاً.")
-
-    with admin_tab2:
-        st.markdown("#### المشتركون المفعلون في النظام")
-        db_records = []
-        for code, details in st.session_state.clients_db.items():
-            st_date = datetime.strptime(details["start_date"], "%Y-%m-%d").date()
-            exp_date = st_date + timedelta(days=details["duration_days"])
-            rem_days = (exp_date - datetime.now().date()).days
-            
-            db_records.append({
-                "الكود": code,
-                "العميل": details["name"],
-                "الباقة": details["plan"],
-                "تاريخ البدء": details["start_date"],
-                "الأيام المتبقية": max(0, rem_days),
-                "الحالة": "🟢 نشط" if rem_days >= 0 else "🔴 منتهي"
-            })
-        
-        st.dataframe(pd.DataFrame(db_records), use_container_width=True)
-        
-        st.divider()
-        st.markdown("##### 🗑️ إلغاء / حذف اشتراك عميل")
-        code_to_delete = st.selectbox("اختر الكود المراد إيقافه:", list(st.session_state.clients_db.keys()))
-        if st.button("حذف الكود المختار", type="secondary"):
-            del st.session_state.clients_db[code_to_delete]
-            st.warning(f"تم حذف الكود `{code_to_delete}` بنجاح.")
-            st.rerun()
-
-    if st.button("🚪 إغلاق جلسة الإدارة"):
-        st.session_state.admin_authenticated = False
-        st.rerun()
-
 # --- خيار تحديد اللغة في الشريط الجانبي ---
 st.sidebar.subheader("🌐 Language / اللغة")
 selected_lang = st.sidebar.radio("Select Language:", ["العربية (Arabic)", "English"], index=0 if st.session_state.lang == "ar" else 1)
@@ -479,11 +433,11 @@ L = st.session_state.lang
 # نصوص ثنائية اللغة
 TXT = {
     "ar": {
-        "title": "🔐 بوابة تفعيل النظام الموحد للمجمع الصناعي",
-        "code_input": "أدخل كود تفعيل الخدمة الخاص بك:",
-        "btn_activate": "تفعيل الاشتراك",
-        "invalid_code": "❌ كود التفعيل غير صحيح أو منتهي الصلاحية.",
-        "warning_auth": "🔒 يرجى إدخال كود اشتراك صالح مسبق الدفع للوصول للتطبيقات المتقدمة والمساعد الذكي.",
+        "title": "🔐 بوابة تفعيل النظام الموحد",
+        "code_input": "كود التفعيل:",
+        "btn_activate": "تفعيل",
+        "invalid_code": "❌ كود التفعيل غير صحيح.",
+        "warning_auth": "🔒 يرجى إدخال كود اشتراك صالح للوصول إلى التطبيقات والمساعد الذكي.",
         "nav_header": "⚙️ نظام الدومة للخدمات التجارية",
         "nav_status": "🟢 النظام متصل ومفعل",
         "btn_chat": "💬 المساعد الذكي الهندسي",
@@ -498,10 +452,10 @@ TXT = {
         "choose_app": "اختر النظام المطلوب:"
     },
     "en": {
-        "title": "🔐 Unified Industrial Portal Activation",
-        "code_input": "Enter your service activation code:",
-        "btn_activate": "Activate License",
-        "invalid_code": "❌ Invalid or expired activation code.",
+        "title": "🔐 Unified Activation Portal",
+        "code_input": "Activation Code:",
+        "btn_activate": "Activate",
+        "invalid_code": "❌ Invalid activation code.",
         "warning_auth": "🔒 Please enter a valid activation code to access system applications.",
         "nav_header": "⚙️ Addoma Trading Services System",
         "nav_status": "🟢 System Connected & Active",
@@ -517,6 +471,7 @@ TXT = {
         "choose_app": "Select System Module:"
     }
 }[L]
+
 
 # --- الواجهة والتأكيد ---
 if not st.session_state.authenticated:
@@ -534,43 +489,12 @@ if not st.session_state.authenticated:
             st.sidebar.error(TXT["invalid_code"])
             
     st.warning(TXT["warning_auth"])
-    
-    # رابط مخفي لمهندسي الدومة فقط لإدارة النظام وإصدار الأكواد
-    st.write("---")
-    if st.button("🏢 بوابة إدارة الدومة للخدمات التجارية (الوصول المصرح به)"):
-        admin_management_modal()
-        
     st.stop()
-else:
-    with st.sidebar:
-        st.header(TXT["nav_header"])
-        st.success(TXT["nav_status"])
-        st.write("---")
-        
-        if st.button(TXT["btn_chat"], use_container_width=True):
-            st.session_state.current_page = "chat"
-            
-        if st.button(TXT["btn_dashboard"], use_container_width=True):
-            st.session_state.current_page = "dashboard"
 
-        if st.button(TXT["btn_apps"], use_container_width=True):
-            st.session_state.current_page = "main_apps"
-            
-        st.write("---")
-        if st.button(TXT["btn_logout"], type="primary", use_container_width=True):
-            st.session_state.authenticated = False
-            cookie_manager.delete("activation_code")
-            if "active_code" in st.session_state:
-                del st.session_state["active_code"]
-            st.rerun()
-
-        # زر إدارة الدومة للخدمات التجارية لإصدار الأكواد للمشتركين
-        st.write("---")
-        if st.button("🏢 لوحة إدارة الدومة (إصدار الأكواد)", use_container_width=True):
-            admin_management_modal()
 
 input_code = st.session_state.get("active_code", "")
 is_pro = False
+is_admin = False
 client_name = "Visitor"
 plan_type = "N/A"
 days_left = 0
@@ -579,6 +503,7 @@ if input_code in CLIENTS_DATABASE:
     data = CLIENTS_DATABASE[input_code]
     client_name = data["name"]
     plan_type = data["plan"]
+    is_admin = data.get("role", "client") == "admin"
     
     start_dt = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
     expiry_dt = start_dt + timedelta(days=data["duration_days"])
@@ -601,15 +526,46 @@ if not is_pro:
     st.warning(TXT["warning_auth"])
     st.stop()
 
+# إعداد القائمة الجانبية بعد المصادقة
+with st.sidebar:
+    st.header(TXT["nav_header"])
+    st.success(TXT["nav_status"])
+    st.write("---")
+    
+    if st.button(TXT["btn_chat"], use_container_width=True):
+        st.session_state.current_page = "chat"
+        
+    if st.button(TXT["btn_dashboard"], use_container_width=True):
+        st.session_state.current_page = "dashboard"
+
+    if st.button(TXT["btn_apps"], use_container_width=True):
+        st.session_state.current_page = "main_apps"
+        
+    st.write("---")
+    
+    if is_admin:
+        if st.button("🛡️ إدارة الدومة للخدمات التجارية (Admin)", type="primary", use_container_width=True):
+            st.session_state.current_page = "admin_panel"
+        st.write("---")
+
+    if st.button(TXT["btn_logout"], use_container_width=True):
+        st.session_state.authenticated = False
+        cookie_manager.delete("activation_code")
+        if "active_code" in st.session_state:
+            del st.session_state["active_code"]
+        st.rerun()
+
+
 st.sidebar.divider()
 
 # =========================================================
-# 3. قائمة اختيار التطبيق المركزي
+# 3. قائمة اختيار التطبيق المركزي (ربط مع التنقل الجديد)
 # =========================================================
 st.sidebar.markdown(TXT["app_selection"])
 
 def on_app_change():
-    st.session_state.current_page = "main_apps"
+    if st.session_state.current_page != "admin_panel":
+        st.session_state.current_page = "main_apps"
 
 apps_list_ar = [
     "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
@@ -637,7 +593,7 @@ selected_app = st.sidebar.radio(
 st.sidebar.divider()
 
 # =========================================================
-# النافذة المنبثقة لإدخال/تحديث بيانات المولد
+# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد مع التحقق الفوري
 # =========================================================
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
@@ -729,8 +685,43 @@ def edit_generator_modal(main_site, sub_site, gen_key):
 # --- عرض الواجهات الرئيسية (المدمجة) ---
 # =========================================================
 
+# --- نافذة الإدارة الخاصة (التي لا يراها العملاء) ---
+if st.session_state.current_page == "admin_panel" and is_admin:
+    st.title("🛡️ إدارة الدومة للخدمات التجارية")
+    st.warning("هذه النافذة مخصصة لإدارة العمليات ولا يمكن للعملاء المشتركين الوصول إليها.")
+    
+    tab_gen, tab_view = st.tabs(["🔑 إصدار وتوليد أكواد الاشتراك", "📋 سجل المشتركين الحاليين"])
+    
+    with tab_gen:
+        st.subheader("إصدار كود اشتراك جديد (Trial / Monthly / Yearly)")
+        with st.form("generate_code_form"):
+            client_name_input = st.text_input("اسم العميل / الشركة:")
+            plan_type_input = st.selectbox("نوع الباقة:", ["تجريبي (Trial)", "شهري (Monthly)", "سنوي (Yearly)"])
+            custom_dur = st.number_input("مدة الاشتراك (بالأيام):", value=30, min_value=1)
+            
+            if st.form_submit_button("🚀 إصدار وحفظ الكود", use_container_width=True):
+                if client_name_input.strip():
+                    new_code = f"ADDOMA-{uuid.uuid4().hex[:6].upper()}"
+                    st.session_state.clients_db[new_code] = {
+                        "name": client_name_input.strip(),
+                        "plan": plan_type_input,
+                        "start_date": datetime.now().strftime("%Y-%m-%d"),
+                        "duration_days": custom_dur,
+                        "role": "client"
+                    }
+                    st.success(f"✅ تم إنشاء كود الاشتراك للعميل {client_name_input} بنجاح!")
+                    st.info(f"**الكود الجديد:** `{new_code}`")
+                else:
+                    st.error("يرجى إدخال اسم العميل.")
+
+    with tab_view:
+        st.subheader("قائمة الأكواد الفعالة")
+        df_clients = pd.DataFrame.from_dict(st.session_state.clients_db, orient='index').reset_index()
+        df_clients.rename(columns={'index': 'كود التفعيل'}, inplace=True)
+        st.dataframe(df_clients, use_container_width=True)
+
 # --- 2. واجهة المساعد الذكي (Chat UI) ---
-if st.session_state.current_page == "chat":
+elif st.session_state.current_page == "chat":
     st.title("🤖 " + ("المساعد الذكي الهندسي" if L == "ar" else "Smart AI Assistant"))
     st.caption("Addoma Trading Services - Industrial AI Engine")
 
@@ -794,6 +785,7 @@ else:
 
         st.subheader("📍 Site Management / إدارة المواقع والمولدات")
 
+        # --- بداية التعديل: نموذج الإدخال اليدوي المطور للمواقع والمولدات ---
         with st.expander("➕ إضافة منطقة وموقع ومولدات يدوياً (نموذج متكامل)", expanded=False):
             st.markdown("### بيانات المنطقة والموقع")
             geo_region = st.text_input("عنوان المنطقة الجغرافية (رقمها/اسمها) [مثال: الخرطوم - المنطقة 1]:", key="geo_reg_input")
@@ -824,7 +816,7 @@ else:
                     }
                     
                     for gen in gen_inputs:
-                        if gen["id"]:
+                        if gen["id"]: # التأكد من عدم ترك الرمز فارغاً
                             st.session_state.sites_data[geo_region][site_name]["generators"][gen["id"]] = {
                                 "model": gen["model"],
                                 "run_hours": 0.0,
@@ -856,6 +848,7 @@ else:
             else:
                 selected_sub_site = None
                 current_site_address = ""
+        # --- نهاية التعديل الخاص بنموذج الإدخال ---
 
         if not main_sites or not selected_main_site or not selected_sub_site:
             st.warning("Please add and select a main site and sub-site to manage generators.")
@@ -979,99 +972,9 @@ else:
                     "قطع الغيار / الفلاتر": part,
                     "العمر الافتراضي (ساعة)": life,
                     "الساعات المنقضية (ساعة)": used,
-                    "المدة المتبقية (ساعة)": max(0.0, rem),
-                    "نسبة الاستهلاك (%)": round(pct, 1),
-                    "حالة التنبيه": status_str,
-                    "الكود الملون": color_code
+                    "المتبقي (ساعة)": rem,
+                    "الحالة": status_str
                 })
 
-            df_result = pd.DataFrame(processed_rows)
-
-            st.divider()
-
-            chart_col1, chart_col2 = st.columns(2)
-            with chart_col1:
-                st.markdown("##### 🟢🟡🔴 Parts Usage Chart")
-                fig_bar = go.Figure()
-                fig_bar.add_trace(go.Bar(
-                    x=df_result["قطع الغيار / الفلاتر"],
-                    y=df_result["نسبة الاستهلاك (%)"],
-                    marker_color=bar_colors,
-                    text=df_result["نسبة الاستهلاك (%)"].astype(str) + "%",
-                    textposition='auto'
-                ))
-                st.plotly_chart(fig_bar, use_container_width=True)
-
-            with chart_col2:
-                st.markdown("##### 🍩 Genset Run Hours Ratio")
-                total_target_h = max(1.0, float(gen_info["target"]))
-                current_h = float(gen_info["run_hours"])
-                rem_h = max(0.0, total_target_h - current_h)
-
-                fig_pie = px.pie(
-                    names=['Elapsed Hours', 'Remaining Target'],
-                    values=[current_h, rem_h],
-                    hole=0.5,
-                    color_discrete_sequence=["#182b49", "#28a745"]
-                )
-                st.plotly_chart(fig_pie, use_container_width=True)
-
-            st.divider()
-            col_up1, col_up2 = st.columns(2)
-            with col_up1:
-                gen_img_file = st.file_uploader("Upload Generator Photo", type=["png", "jpg", "jpeg"])
-            with col_up2:
-                parts_img_file = st.file_uploader("Upload Maintenance Photo", type=["png", "jpg", "jpeg"])
-
-            def generate_full_pdf_bytes():
-                temp_logo_path = None
-                if logo_file:
-                    temp_logo_path = f"temp_logo_{uuid.uuid4().hex}.png"
-                    with open(temp_logo_path, "wb") as f:
-                        f.write(logo_file.getbuffer())
-
-                pdf = ComprehensivePDF("GENERATOR PREDICTIVE MAINTENANCE REPORT", logo_path=temp_logo_path)
-                pdf.add_page()
-
-                pdf.set_fill_color(245, 247, 250)
-                pdf.rect(10, 35, 190, 45, "F")
-                pdf.set_xy(12, 37)
-                pdf.set_font("Helvetica", "B", 9)
-                pdf.set_text_color(24, 43, 73)
-                
-                pdf.cell(0, 5, f"Generator Data Site Address: {sanitize_latin_only(current_site_address)}", ln=True)
-                pdf.set_x(12)
-                pdf.cell(0, 5, f"Main Site: {sanitize_latin_only(selected_main_site)} | Sub Site: {sanitize_latin_only(selected_sub_site)}", ln=True)
-                pdf.set_x(12)
-                pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | Capacity: {gen_info['kw']} kW", ln=True)
-                pdf.set_x(12)
-                pdf.cell(0, 5, f"Current Run Hours: {gen_info['run_hours']} hrs | Target Hours: {gen_info['target']} hrs", ln=True)
-                
-                amb_temp_val = calib_m.get('ambient_temp', 43.0)
-                
-                pdf.ln(2)
-                pdf.set_x(12)
-                pdf.set_font("Helvetica", "B", 9)
-                pdf.set_text_color(200, 30, 30)
-                pdf.cell(0, 5, "Engine Oil Recommendation based on Ambient Temperature:", ln=True)
-                
-                pdf.set_x(12)
-                pdf.set_font("Helvetica", "B", 9)
-                pdf.set_text_color(24, 43, 73)
-                if amb_temp_val >= 45:
-                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 20W50", ln=True)
-                elif amb_temp_val >= 43:
-                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 15W40", ln=True)
-                else:
-                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: USE STANDARD OIL SIZE 15W40", ln=True)
-
-                return pdf.output(dest='S').encode('latin-1')
-
-            if st.button("📄 Generate Maintenance PDF Report", type="primary"):
-                pdf_bytes = generate_full_pdf_bytes()
-                st.download_button(
-                    label="📥 Download PDF Report",
-                    data=pdf_bytes,
-                    file_name=f"Genset_Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
-                    mime="application/pdf"
-                )
+            df_processed = pd.DataFrame(processed_rows)
+            st.dataframe(df_processed, use_container_width=True)
