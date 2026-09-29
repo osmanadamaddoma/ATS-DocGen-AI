@@ -51,16 +51,17 @@ st.set_page_config(
     layout="wide",
 )
 
+# التهيئة المبدئية لمتغيرات الجلسة (Session State)
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
 
 if "lang" not in st.session_state:
-    st.session_state.lang = "ar"
+    st.session_state.lang = "ar"  # 'ar' or 'en'
 
 if "current_page" not in st.session_state:
     st.session_state.current_page = "chat"
 
-# تهيئة قاعدة بيانات المواقع
+# تحديث هيكل قاعدة البيانات المصغرة
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
         "الخرطوم (القائمة الرئيسية)": {
@@ -125,8 +126,26 @@ if "daily_logs" not in st.session_state:
         }
     ]
 
+# جلب مفتاح Gemini
 gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+if not gemini_key and "supabase" in st.secrets:
+    gemini_key = st.secrets["supabase"].get("GEMINI_API_KEY")
+
 client = genai.Client(api_key=gemini_key) if gemini_key else None
+
+# إعدادات Supabase
+supabase = None
+if create_client:
+    supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+    supabase_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
+    if not supabase_url and "supabase" in st.secrets:
+        supabase_url = st.secrets["supabase"].get("SUPABASE_URL")
+        supabase_key = st.secrets["supabase"].get("SUPABASE_KEY")
+    if supabase_url and supabase_key:
+        try:
+            supabase = create_client(supabase_url, supabase_key)
+        except Exception:
+            pass
 
 def play_audio(text, lang='ar', loop=False):
     if st.session_state.get("audio_muted", False):
@@ -149,14 +168,15 @@ def play_audio(text, lang='ar', loop=False):
         else:
             audio_data.seek(0)
             st.audio(audio_data, format='audio/mp3', autoplay=True)
-    except Exception as e:
-        st.error(f"خطأ في تشغيل الصوت: {e}")
+    except Exception:
+        pass
 
 @st.cache_data(ttl=3600)
 def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
     if not client:
         return "⚠️ GEMINI_API_KEY غير متوفر."
-    prompt = f"Fault Diagnostic: {fault_code}. Context: {context_text}"
+    lang_instr = "Respond in English." if language == "en" else "اكتب الإجابة بلغة عربية تقنية واضحة ومباشرة."
+    prompt = f"Fault Code: {fault_code}\nContext: {context_text}\n{lang_instr}"
     try:
         response = client.models.generate_content(model="gemini-3.6-flash", contents=prompt)
         return response.text
@@ -164,7 +184,21 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
         return f"❌ خطأ: {e}"
 
 # =========================================================
-# 1. قاعدة بيانات المشتركين مع إمكانية التعديل
+# 1. دوال النظام المساعدة وتصميم PDF والحاسبات
+# =========================================================
+def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85):
+    rho_copper = 0.0178
+    v_drop = (math.sqrt(3) * current_a * distance_m * rho_copper * cos_phi) / cable_mm2
+    v_drop_pct = (v_drop / 400.0) * 100
+    return round(v_drop, 2), round(v_drop_pct, 2)
+
+def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
+    liters = kw_load * 0.24 * run_hours
+    co2_kg = liters * 2.68
+    return round(liters, 1), round(co2_kg, 1)
+
+# =========================================================
+# 2. إدارة قاعدة بيانات أسرار الاشتراكات
 # =========================================================
 if "clients_db" not in st.session_state:
     st.session_state.clients_db = {
@@ -202,18 +236,18 @@ if saved_code and not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.session_state.active_code = saved_code
 
-# --- خيار تحديد اللغة ---
+# --- تحديد اللغة ---
 st.sidebar.subheader("🌐 Language / اللغة")
 selected_lang = st.sidebar.radio("Select Language:", ["العربية (Arabic)", "English"], index=0 if st.session_state.lang == "ar" else 1)
 st.session_state.lang = "ar" if "العربية" in selected_lang else "en"
 L = st.session_state.lang
 
-# --- التحقق من المصادقة ---
+# --- بوابة التفعيل والتحقق ---
 if not st.session_state.authenticated:
-    st.title("🔐 بوابة تفعيل النظام الموحد")
-    user_code = st.sidebar.text_input("كود التفعيل:", type="password")
+    st.title("🔐 بوابة تفعيل النظام الموحد - Addoma Trading Services")
+    user_code = st.sidebar.text_input("كود التفعيل / Activation Code:", type="password")
     
-    if st.sidebar.button("تفعيل"):
+    if st.sidebar.button("تفعيل / Activate"):
         if user_code in CLIENTS_DATABASE:
             st.session_state.authenticated = True
             st.session_state.active_code = user_code
@@ -222,19 +256,37 @@ if not st.session_state.authenticated:
             st.rerun()
         else:
             st.sidebar.error("❌ كود التفعيل غير صحيح.")
-    st.warning("🔒 يرجى إدخال كود اشتراك صالح للوصول إلى التطبيقات.")
+    st.warning("🔒 يرجى إدخال كود اشتراك صالح للوصول إلى التطبيقات والمساعد الذكي.")
     st.stop()
 
 input_code = st.session_state.get("active_code", "")
 is_admin = False
+client_name = "Visitor"
+plan_type = "N/A"
+days_left = 0
+
 if input_code in CLIENTS_DATABASE:
     data = CLIENTS_DATABASE[input_code]
+    client_name = data["name"]
+    plan_type = data["plan"]
     is_admin = data.get("role", "client") == "admin"
+    start_dt = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
+    expiry_dt = start_dt + timedelta(days=data["duration_days"])
+    today = datetime.now().date()
+    
+    if today <= expiry_dt:
+        days_left = (expiry_dt - today).days
+        st.sidebar.success(f"✅ تم التفعيل للعميل: {client_name}")
+        st.sidebar.caption(f"الباقة: {plan_type} | المتبقي: {days_left} يوم")
+    else:
+        st.sidebar.error("❌ انتهت صلاحية الاشتراك.")
+        st.session_state.authenticated = False
+        cookie_manager.delete("activation_code")
+        st.stop()
 
-# القائمة الجانبية للتنقل الرئيسي
+# --- القائمة الجانبية وتوجيه النوافذ الرئيسي ---
 with st.sidebar:
     st.header("⚙️ نظام الدومة للخدمات التجارية")
-    st.success("🟢 النظام متصل ومفعل")
     st.write("---")
     
     if st.button("💬 المساعد الذكي الهندسي", use_container_width=True):
@@ -249,7 +301,7 @@ with st.sidebar:
     st.write("---")
     
     if is_admin:
-        if st.button("🛡️ لوحة إدارة وتحرير المشتركين (Admin)", type="primary", use_container_width=True):
+        if st.button("🛡️ إدارة وتحرير أكواد المشتركين (Admin)", type="primary", use_container_width=True):
             st.session_state.current_page = "admin_panel"
         st.write("---")
 
@@ -260,7 +312,7 @@ with st.sidebar:
             del st.session_state["active_code"]
         st.rerun()
 
-# اختيار التطبيق الفرعي من القائمة الجانبية
+# القائمة الفرعية للتطبيقات الهندسية الـ 6
 st.sidebar.markdown("🛠️ **التطبيقات المتاحة (نسخة احترافية)**")
 apps_list = [
     "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
@@ -307,27 +359,27 @@ def edit_generator_modal(main_site, sub_site, gen_key):
         st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]["calib_elec"]["v_measured"] = v_meas
         st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]["calib_engine"]["oil_press_bar"] = o_press
         st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]["calib_engine"]["coolant_temp_c"] = c_temp
-        st.success("✅ تم حفظ البيانات بنجاح!")
+        st.success("✅ تم حفظ البيانات وتعيينها بنجاح!")
         st.rerun()
 
 # =========================================================
-# نافذة تحرير وإدارة أكواد المشتركين بالكامل (ADMIN PANEL)
+# 1. لوحة تحرير وإدارة أكواد المشتركين بالكامل (ADMIN PANEL)
 # =========================================================
 if st.session_state.current_page == "admin_panel" and is_admin:
-    st.title("🛡️ إدارة وتحرير أكواد المشتركين")
-    st.info("مرحباً بك في لوحة تحكم الإدارة. يمكنك هنا إنشاء، تعديل، تجديد، أو حذف أكواد المشتركين.")
+    st.title("🛡️ إدارة وتحرير أكواد المشتركين (Admin Dashboard)")
+    st.info("مرحباً بك في لوحة الإدارة. يمكنك من هنا توليد أكواد جديدة، تعديل مدد باقات المشتركين، أو الغاؤها.")
 
-    tab_create, tab_edit, tab_view = st.tabs(["➕ إصدار كود جديد", "✏️ تحرير وتعديل كود موجود", "📋 كافة المشتركين"])
+    tab_create, tab_edit, tab_view = st.tabs(["➕ إصدار كود جديد", "✏️ تحرير وتعديل كود مشترك", "📋 قائمة المشتركين"])
 
     with tab_create:
-        st.subheader("إصدار كود اشتراك جديد")
+        st.subheader("إصدار كود اشتراك مفعل جديد")
         with st.form("create_code_form", clear_on_submit=True):
             c_name = st.text_input("اسم العميل / الشركة:")
             c_plan = st.selectbox("نوع الباقة:", ["تجريبي (Trial)", "شهري (Monthly)", "سنوي (Yearly)", "دائم (Lifetime)"])
             c_days = st.number_input("مدة الاشتراك (بالأيام):", value=30, min_value=1)
-            c_role = st.selectbox("الصلاحية:", ["client", "admin"])
+            c_role = st.selectbox("نوع الصلاحية:", ["client", "admin"])
             
-            btn_create = st.form_submit_button("🚀 توليد وحفظ الكود", use_container_width=True)
+            btn_create = st.form_submit_button("🚀 توليد وحفظ الكود فوراً", use_container_width=True)
             
             if btn_create:
                 if c_name.strip():
@@ -339,28 +391,28 @@ if st.session_state.current_page == "admin_panel" and is_admin:
                         "duration_days": c_days,
                         "role": c_role
                     }
-                    st.success(f"✅ تم إنشاء كود الاشتراك للعميل ({c_name}) بنجاح!")
+                    st.success(f"✅ تم إنشاء وتفعيل كود العميل ({c_name}) بنجاح!")
                     st.code(new_code, language="text")
                 else:
                     st.error("يرجى إدخال اسم العميل.")
 
     with tab_edit:
-        st.subheader("تعديل بيانات كود اشتراك قائم")
-        selected_code_to_edit = st.selectbox("اختر الكود المراد تحريره:", list(st.session_state.clients_db.keys()))
+        st.subheader("تحرير وتعديل أكواد المشتركين الحالية")
+        selected_code_to_edit = st.selectbox("اختر الكود المراد تعديله:", list(st.session_state.clients_db.keys()))
         
         if selected_code_to_edit:
             cur_data = st.session_state.clients_db[selected_code_to_edit]
             
             with st.form("edit_code_form"):
-                st.write(f"**الكود الحالي:** `{selected_code_to_edit}`")
+                st.write(f"**الكود المحدد:** `{selected_code_to_edit}`")
                 e_name = st.text_input("اسم العميل:", value=cur_data.get("name", ""))
-                e_plan = st.selectbox("الباقة:", ["تجريبي (Trial)", "شهري (Monthly)", "سنوي (Yearly)", "دائم (Lifetime)"], index=0)
-                e_days = st.number_input("أيام الاشتراك الإضافية / المتبقية:", value=int(cur_data.get("duration_days", 30)))
+                e_plan = st.selectbox("نوع الباقة:", ["تجريبي (Trial)", "شهري (Monthly)", "سنوي (Yearly)", "دائم (Lifetime)"])
+                e_days = st.number_input("الأيام المتاحة للذين يستخدمون الكود:", value=int(cur_data.get("duration_days", 30)))
                 e_role = st.selectbox("الصلاحية:", ["client", "admin"], index=0 if cur_data.get("role") == "client" else 1)
                 
                 col_save, col_del = st.columns(2)
                 btn_save = col_save.form_submit_button("💾 حفظ التعديلات", use_container_width=True)
-                btn_delete = col_del.form_submit_button("🗑️ حذف الكود بالكامل", type="primary", use_container_width=True)
+                btn_delete = col_del.form_submit_button("🗑️ حذف الكود نهائياً", type="primary", use_container_width=True)
                 
                 if btn_save:
                     st.session_state.clients_db[selected_code_to_edit] = {
@@ -370,16 +422,16 @@ if st.session_state.current_page == "admin_panel" and is_admin:
                         "duration_days": e_days,
                         "role": e_role
                     }
-                    st.success("✅ تم تحديث بيانات الاشتراك بنجاح!")
+                    st.success("✅ تم حفظ وتحديث بيانات الكود والمشترك!")
                     st.rerun()
                     
                 if btn_delete:
                     del st.session_state.clients_db[selected_code_to_edit]
-                    st.warning("🗑️ تم حذف الكود بنجاح من النظام!")
+                    st.warning("🗑️ تم حذف الكود من قاعدة البيانات!")
                     st.rerun()
 
     with tab_view:
-        st.subheader("جدول بيانات كافة المشتركين والأكواد")
+        st.subheader("جدول كافة أسرار وأكواد المشتركين")
         df_clients = pd.DataFrame.from_dict(st.session_state.clients_db, orient='index').reset_index()
         df_clients.rename(columns={'index': 'كود التفعيل'}, inplace=True)
         st.dataframe(df_clients, use_container_width=True)
@@ -413,20 +465,59 @@ elif st.session_state.current_page == "chat":
 elif st.session_state.current_page == "dashboard":
     st.title("📊 لوحة تحكم الأنظمة والمتابعة")
     col1, col2, col3 = st.columns(3)
-    col1.metric(label="حالة المولدات", value="مستقرة (Stable)", delta="جاهزية التزامن")
+    col1.metric(label="حالة المولدات", value="مستقرة (Stable)", delta="تزامن جاهز")
     col2.metric(label="غرف التبريد WIC", value="2 وحدات (WIC10 & 40)", delta="-1°C")
     col3.metric(label="قاعدة البيانات", value="Supabase Online", delta="12ms")
     st.divider()
-    st.info("نظام التشغيل والمراقبة اللحظي يعمل بدون مشاكل.")
+    st.info("نظام التشغيل والمراقبة اللحظي يعمل بانتظام بدون مشاكل.")
 
 # =========================================================
-# 4. التوجيه الديناميكي للنوافذ والتطبيقات الـ 6 المكتملة
+# 4. عرض الشاشات للتطبيقات الهندسية الـ 6 المكتملة
 # =========================================================
 else:
     # --- التطبيق 1: الصيانة التنبؤية والمولدات ---
     if "1." in selected_app:
         st.title("⚙️ نظام الصيانة التنبؤية ومراقبة المولدات")
         
+        # نموذج الإدخال اليدوي للمواقع والمولدات
+        with st.expander("➕ إضافة منطقة وموقع ومولدات يدوياً (نموذج متكامل)", expanded=False):
+            geo_region = st.text_input("عنوان المنطقة الجغرافية [مثال: الخرطوم - المنطقة 1]:", key="geo_reg_input")
+            site_name = st.text_input("اسم الموقع [مثال: مصنع كافوري]:", key="site_name_input")
+            site_address = st.text_input("عنوان الموقع التفصيلي:", key="site_add_input")
+            num_gens = st.number_input("عدد المولدات في الموقع:", min_value=1, max_value=20, value=1, step=1, key="num_gens_input")
+            
+            gen_inputs = []
+            for i in range(int(num_gens)):
+                col_g1, col_g2, col_g3 = st.columns(3)
+                g_id = col_g1.text_input(f"رمز/رقم المولد {i+1}", value=f"G{i+1}", key=f"g_id_{i}")
+                g_model = col_g2.text_input(f"موديل المولد {i+1}", value="Perkins", key=f"g_mod_{i}")
+                g_kw = col_g3.number_input(f"الحجم/السعة kW {i+1}", min_value=0.0, value=100.0, step=10.0, key=f"g_kw_{i}")
+                gen_inputs.append({"id": g_id, "model": g_model, "kw": g_kw})
+                
+            if st.button("💾 حفظ بيانات الموقع والمولدات بالكامل", type="primary"):
+                if geo_region and site_name:
+                    if geo_region not in st.session_state.sites_data:
+                        st.session_state.sites_data[geo_region] = {}
+                    
+                    st.session_state.sites_data[geo_region][site_name] = {
+                        "address": site_address if site_address else "N/A",
+                        "generators": {}
+                    }
+                    
+                    for gen in gen_inputs:
+                        if gen["id"]:
+                            st.session_state.sites_data[geo_region][site_name]["generators"][gen["id"]] = {
+                                "model": gen["model"],
+                                "run_hours": 0.0,
+                                "target": 250.0,
+                                "kw": gen["kw"],
+                                "load": 0.0,
+                                "calib_elec": {"v_nominal": 400.0, "v_measured": 400.0, "freq_nominal": 50.0, "freq_measured": 50.0, "current_max": 200.0, "current_measured": 100.0, "pf": 0.8, "ct_ratio": "200/5"},
+                                "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0, "ambient_temp": 43.0}
+                            }
+                    st.success(f"تم حفظ المنطقة ({geo_region}) والموقع ({site_name}) بنجاح!")
+                    st.rerun()
+
         main_sites = list(st.session_state.sites_data.keys())
         col_s1, col_s2 = st.columns(2)
         selected_main = col_s1.selectbox("🌍 المنطقة الرئيسية:", main_sites) if main_sites else None
@@ -442,13 +533,13 @@ else:
                 if st.button("📝 فتح نافذة المعايرة والتحرير المنبثقة (Modal)"):
                     edit_generator_modal(selected_main, selected_sub, gen_selected)
                 
-                st.subheader(f"بيانات المولد: {gen_selected}")
+                st.subheader(f"بيانات ومعايرات المولد: {gen_selected}")
                 st.json(gens[gen_selected])
 
     # --- التطبيق 2: غرفة التحكم والتشغيل عن بُعد ---
     elif "2." in selected_app:
         st.title("🎛️ غرفة التحكم والتشغيل عن بُعد (Remote Control)")
-        st.success("اتصال SCADA / DSE Control Panel نشط")
+        st.success("اتصال SCADA / DSE Control Panel نشط عبر البروتوكول المباشر")
         c1, c2, c3 = st.columns(3)
         c1.button("▶️ تشغيل المولد عن بُعد (Start Gen)")
         c2.button("⏹️ إيقاف المولد (Stop Gen)")
@@ -456,22 +547,22 @@ else:
 
     # --- التطبيق 3: المتابعة اليومية وتقارير الإدارة ---
     elif "3." in selected_app:
-        st.title("📊 المتابعة اليومية وتقارير الإدارة")
-        st.subheader("سجل القراءات اليومية")
+        st.title("📊 المتابعة اليومية وتقارير الإدارة والتذكيرات")
+        st.subheader("سجل القراءات الميدانية اليومية")
         df_logs = pd.DataFrame(st.session_state.daily_logs)
         st.dataframe(df_logs, use_container_width=True)
 
     # --- التطبيق 4: المساعد الذكي والكتالوجات ---
     elif "4." in selected_app:
         st.title("🤖 المساعد الذكي والكتالوجات وقراءة الأكواد")
-        uploaded_catalog = st.file_uploader("قم برفع ملف الكتالوج (PDF) هنا:", type=["pdf"])
+        uploaded_catalog = st.file_uploader("قم برفع ملف الكتالوج (PDF) هنا للتحليل والبحث:", type=["pdf"])
         if uploaded_catalog:
-            st.success("تم رفع الكتالوج بنجاح وتجهيزه للتحليل.")
+            st.success("تم رفع الملف وتجهيزه للذكاء الاصطناعي بنجاح.")
 
-    # --- التطبيق 5: نظام فحص المعدات (WIC وغيرها) ---
+    # --- التطبيق 5: نظام فحص المعدات ---
     elif "5." in selected_app:
         st.title("🔍 نظام فحص المعدات (WIC 10 & WIC 40)")
-        st.info("فحص غرف التبريد وتجميد اللقاحات")
+        st.info("قائمة فحص واختبار غرف التبريد وتجميد اللقاحات")
         st.checkbox("فحص درجة حرارة المحرك والمكثف")
         st.checkbox("فحص ضغوط الفريون والغاز")
         st.checkbox("اختبار لوحة Dixell / Emerson")
@@ -479,7 +570,6 @@ else:
     # --- التطبيق 6: الحاسبة الهندسية للكهرباء والانبعاثات ---
     elif "6." in selected_app:
         st.title("🧮 الحاسبة الهندسية للكهرباء والانبعاثات")
-        
         c_i = st.number_input("التيار (Ampere):", value=100.0)
         c_d = st.number_input("المسافة (متر):", value=50.0)
         c_s = st.number_input("مساحة مقطع الكابل (mm²):", value=35.0)
