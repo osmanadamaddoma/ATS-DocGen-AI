@@ -440,10 +440,26 @@ if saved_code and not st.session_state.authenticated:
         st.session_state.authenticated = True
         st.session_state.active_code = saved_code
 
-# --- دالة النافذة المنبثقة لإصدار أكواد الاشتراكات ---
-@st.dialog("🔑 إصدار كود اشتراك جديد" if st.session_state.get("lang", "ar") == "ar" else "🔑 Generate New Subscription Code")
-def generate_subscription_modal():
-    st.markdown("### أدخل بيانات المشترك الجديد لإصدار كود التفعيل")
+# --- دالة النافذة المنبثقة لإصدار أكواد الاشتراكات ---       # ===== فقط الأدمن يرى زر إصدار الأكواد =====
+        ADMIN_CODES = ["ADDOMA-2026-PRO"]  # ضع هنا أكوادك أنت فقط
+        current_active_code = st.session_state.get("active_code", "")
+        
+        # تحقق هل المستخدم الحالي هو الأدمن
+        is_admin_user = current_active_code in ADMIN_CODES
+        
+        if is_admin_user:
+            st.write("---")
+            st.markdown("👑 **لوحة تحكم الأدمن**")
+            if st.button("➕ إصدار اشتراك جديد (Admin)", use_container_width=True, type="primary"):
+                generate_subscription_modal()
+            
+            # عرض عدد المشتركين فقط للأدمن
+            if supabase:
+                try:
+                    count_res = supabase.table("subscriptions").select("code", count="exact").execute()
+                    st.caption(f"إجمالي المشتركين: {count_res.count if hasattr(count_res, 'count') else len(count_res.data)}")
+                except:
+                    pass
 
     client_name = st.text_input("اسم العميل / الشركة:")
     plan_type = st.selectbox("نوع الباقة / Subscription Plan:", ["شهري (Monthly)", "سنوي (Yearly)", "تجريبي (Trial)"])
