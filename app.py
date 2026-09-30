@@ -29,7 +29,7 @@ try:
 except ImportError:
     InfluxDBClient = None
 
-st.set_page_config(page_title="المجمع الصناعي الشامل V4.1 - Addoma FIXED", page_icon="🔐", layout="wide")
+st.set_page_config(page_title="المجمع الصناعي V4.2 - Full Report + WhatsApp", page_icon="🔐", layout="wide")
 
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
@@ -60,7 +60,6 @@ if "daily_logs" not in st.session_state:
     today_str = datetime.now().strftime("%Y-%m-%d")
     st.session_state.daily_logs = [{"timestamp": f"{today_str} 08:30:00", "date": today_str, "site": "الخرطوم - كافوري", "generator": "G1", "technician": "أحمد فني", "run_hours": 700.0, "v_measured": 398.0, "oil_press": 4.5, "coolant_temp": 85.0, "status": "طبيعي"}]
 
-# ===== NEW: دفتر أرقام الفنيين والمهندسين - يدوي =====
 if "technicians_db" not in st.session_state:
     st.session_state.technicians_db = {
         "الخرطوم (القائمة الرئيسية) / الموقع الرئيسي - كافوري (موقع فرعي)": [
@@ -126,11 +125,6 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
                 continue
             return f"Error: {e}"
 
-def sanitize_latin_only(text):
-    if not isinstance(text, str):
-        text = str(text)
-    return re.sub(r"[^\x00-\x7F]+", "", text).strip() or "N/A"
-
 class ComprehensivePDF(FPDF):
     def __init__(self, title_text="INDUSTRIAL REPORT", logo_path=None):
         super().__init__()
@@ -148,14 +142,34 @@ class ComprehensivePDF(FPDF):
         self.cell(0, 5, self.report_title, ln=True)
         self.set_x(x)
         self.set_font("Helvetica", "B", 8)
-        self.cell(0, 4, "ADDOMA TRADING SERVICES", ln=True)
+        self.cell(0, 4, "ADDOMA TRADING SERVICES - Generator Performance & Maintenance Report V4.2", ln=True)
         self.line(10, 30, 200, 30)
         self.ln(10)
     def footer(self):
         self.set_y(-15)
         self.set_font("Helvetica", "I", 8)
         self.set_text_color(120, 120, 120)
-        self.cell(0, 4, f"Page {self.page_no()} | {datetime.now().strftime('%Y-%m-%d %H:%M')} | Osman Adam Addoma", align="C")
+        self.cell(0, 4, f"Page {self.page_no()} | {datetime.now().strftime('%Y-%m-%d %H:%M')} | Osman Adam Addoma | V4.2 FULL", align="C")
+
+def create_performance_chart_image(df_res, gen_id):
+    try:
+        import matplotlib.pyplot as plt
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+        colors = ['red' if p>=90 else 'orange' if p>=70 else 'green' for p in df_res['نسبة الاستهلاك (%)']]
+        ax1.barh(df_res['قطع الغيار / الفلاتر'], df_res['نسبة الاستهلاك (%)'], color=colors)
+        ax1.set_title(f'Generator {gen_id} - Consumption %', fontsize=10)
+        ax1.set_xlabel('Consumption %')
+        ax2.barh(df_res['قطع الغيار / الفلاتر'], df_res['المدة المتبقية (ساعة)'], color='skyblue')
+        ax2.set_title('Remaining Hours - Performance', fontsize=10)
+        ax2.set_xlabel('Hours')
+        plt.tight_layout()
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=150)
+        buf.seek(0)
+        plt.close()
+        return buf
+    except Exception:
+        return None
 
 def fetch_live_iot_data():
     import random
@@ -184,50 +198,39 @@ def detect_carrier(phone):
     else:
         return "SUDAN 📱"
 
-@st.dialog("🔔 إنذار صيانة - إرسال واتساب للفني المحفوظ")
+@st.dialog("🔔 إنذار صيانة - واتساب")
 def whatsapp_alert_modal(alert_data):
     st.error(f"🚨 {alert_data['gen']} - {alert_data['part']}")
     st.write(f"📍 {alert_data['site']} | ⏱️ باقي {alert_data['remain']:.0f} ساعة | {alert_data.get('level','')}")
-
-    # جلب أرقام الموقع أو الافتراضي
     site_key = alert_data['site']
     techs = st.session_state.technicians_db.get(site_key, [])
     if not techs:
-        # حاول بالمفتاح الرئيسي
         for k in st.session_state.technicians_db.keys():
-            if k!= "DEFAULT" and k in site_key or site_key in k:
+            if k!= "DEFAULT" and (k in site_key or site_key in k):
                 techs = st.session_state.technicians_db[k]
                 break
     if not techs:
         techs = st.session_state.technicians_db.get("DEFAULT", [])
-
     options = [f"{t['name']} - {t['phone']} ({t['role']}) | {detect_carrier(t['phone'])}" for t in techs]
     options.append("➕ رقم جديد غير محفوظ")
-
-    sel = st.selectbox("📱 اختر الفني/المهندس المحفوظ:", options, key=f"sel_tech_{alert_data['gen']}_{alert_data['part']}")
-
+    sel = st.selectbox("📱 اختر الفني/المهندس:", options, key=f"sel_tech_{alert_data['gen']}_{alert_data['part']}")
     if "رقم جديد" in sel:
-        phone = st.text_input("اكتب الرقم الجديد (يبدأ بـ 09):", value="09", key=f"new_phone_{alert_data['gen']}_{alert_data['part']}")
+        phone = st.text_input("اكتب الرقم الجديد (09):", value="09", key=f"new_phone_{alert_data['gen']}_{alert_data['part']}")
         tech_name = "فني"
     else:
         idx = options.index(sel)
         phone = techs[idx]['phone']
         tech_name = techs[idx]['name']
-
-    st.caption(f"الشبكة: {detect_carrier(phone)} | سيتم الإرسال إلى: {tech_name}")
-
+    st.caption(f"الشبكة: {detect_carrier(phone)} | إلى: {tech_name}")
     default_msg = f"""*ADDOMA - تنبيه صيانة حرج* 🚨
-
 *المولد:* {alert_data['gen']}
 *القطعة:* {alert_data['part']}
 *الموقع:* {alert_data['site']}
 *الحالة:* {alert_data.get('level','تنبيه')}
-*متبقي:* {alert_data['remain']:.0f} ساعة فقط
-*الفني المسؤول:* {tech_name}
+*متبقي:* {alert_data['remain']:.0f} ساعة
+*الفني:* {tech_name}
 *المطلوب:* تغيير القطعة فوراً
-
-- نظام V4.1
-"""
+- V4.2"""
     msg = st.text_area("✏️ نص الرسالة:", value=default_msg, height=200, key=f"msg_{alert_data['gen']}_{alert_data['part']}")
     if st.button("📤 إرسال واتساب الآن", type="primary", use_container_width=True):
         clean = phone.strip().replace(" ","")
@@ -262,7 +265,6 @@ def save_to_supabase_auto():
         except Exception:
             pass
 
-# ===== CLIENTS DB =====
 if "clients_db" not in st.session_state:
     st.session_state.clients_db = {
         "ADDOMA-2026-PRO": {"name": "عثمان آدم أدومة - Admin", "plan": "Admin Super", "start_date": "2026-09-15", "duration_days": 3650},
@@ -305,7 +307,7 @@ def generate_subscription_modal():
         else:
             st.error("ادخل اسم العميل")
 
-@st.dialog("👷 إضافة فني / مهندس جديد")
+@st.dialog("👷 إضافة فني / مهندس جديد - للجميع")
 def add_technician_modal():
     st.markdown("### إضافة رقم جديد لدفتر الفنيين")
     all_sites = []
@@ -314,7 +316,7 @@ def add_technician_modal():
             all_sites.append(f"{ms} / {ss}")
     site_sel = st.selectbox("اختر الموقع:", all_sites)
     t_name = st.text_input("اسم الفني/المهندس:", placeholder="م. أحمد")
-    t_phone = st.text_input("رقم الهاتف (يبدأ بـ 09):", placeholder="0912345678")
+    t_phone = st.text_input("رقم الهاتف (09):", placeholder="0912345678")
     t_role = st.selectbox("الدور:", ["مهندس", "فني", "مسؤول صيانة", "طوارئ"])
     if st.button("💾 حفظ في الدفتر", type="primary", use_container_width=True):
         if t_name and t_phone:
@@ -332,10 +334,9 @@ st.sidebar.subheader("🌐 Language / اللغة")
 selected_lang = st.sidebar.radio("Select Language", ["Arabic", "English"], index=0 if st.session_state.lang == "ar" else 1, label_visibility="collapsed")
 st.session_state.lang = "ar" if selected_lang == "Arabic" else "en"
 L = st.session_state.lang
-TXT = {"ar": {"title": "🔐 بوابة التفعيل", "code_input": "كود التفعيل:", "btn_activate": "تفعيل", "invalid": "كود غير صحيح", "auth": "ادخل كود صالح", "nav_header": "⚙️ نظام الدومة V4.1", "nav_status": "🟢 مفعل", "btn_chat": "💬 المساعد الذكي", "btn_dashboard": "📊 لوحة التحكم", "btn_apps": "🛠️ التطبيقات", "btn_logout": "🚪 خروج", "choose_app": "اختر النظام:"},
-       "en": {"title": "🔐 Activation Portal", "code_input": "Code:", "btn_activate": "Activate", "invalid": "Invalid", "auth": "Enter valid code", "nav_header": "⚙️ Addoma V4.1", "nav_status": "🟢 Active", "btn_chat": "💬 AI Assistant", "btn_dashboard": "📊 Dashboard", "btn_apps": "🛠️ Apps", "btn_logout": "🚪 Logout", "choose_app": "Select System:"}}[L]
+TXT = {"ar": {"title": "🔐 بوابة التفعيل", "code_input": "كود التفعيل:", "btn_activate": "تفعيل", "invalid": "كود غير صحيح", "auth": "ادخل كود صالح", "nav_header": "⚙️ نظام الدومة V4.2", "nav_status": "🟢 مفعل", "btn_chat": "💬 المساعد الذكي", "btn_dashboard": "📊 لوحة التحكم", "btn_apps": "🛠️ التطبيقات", "btn_logout": "🚪 خروج", "choose_app": "اختر النظام:"},
+       "en": {"title": "🔐 Activation Portal", "code_input": "Code:", "btn_activate": "Activate", "invalid": "Invalid", "auth": "Enter valid code", "nav_header": "⚙️ Addoma V4.2", "nav_status": "🟢 Active", "btn_chat": "💬 AI Assistant", "btn_dashboard": "📊 Dashboard", "btn_apps": "🛠️ Apps", "btn_logout": "🚪 Logout", "choose_app": "Select System:"}}[L]
 
-# ===== AUTH =====
 if not st.session_state.authenticated:
     st.title(TXT["title"])
     user_code = st.sidebar.text_input(TXT["code_input"], type="password")
@@ -365,29 +366,28 @@ else:
         if st.button(TXT["btn_apps"], use_container_width=True):
             st.session_state.current_page = "main_apps"
         st.write("---")
+        # ===== للجميع: العملاء والـ Admin =====
+        st.markdown("### 👷 دفتر الفنيين (للجميع)")
+        if st.button("➕ إضافة فني/مهندس", use_container_width=True, type="primary"):
+            add_technician_modal()
+        if st.button("📋 عرض الدفتر", use_container_width=True):
+            for site_k, tech_list in st.session_state.technicians_db.items():
+                if site_k!= "DEFAULT":
+                    with st.expander(f"📍 {site_k[:25]} ({len(tech_list)})"):
+                        for t in tech_list:
+                            st.write(f"{t['name']} | {t['phone']} | {detect_carrier(t['phone'])} | {t['role']}")
+        st.divider()
         if IS_ADMIN:
-            st.divider()
             st.markdown("### 🔐 Admin Panel")
-            if st.button("➕ إصدار اشتراك جديد", use_container_width=True, type="primary"):
+            if st.button("➕ إصدار اشتراك جديد", use_container_width=True):
                 generate_subscription_modal()
             if st.button("📋 عرض كل الأكواد", use_container_width=True):
                 st.dataframe(pd.DataFrame.from_dict(st.session_state.clients_db, orient='index'), use_container_width=True)
-            st.divider()
-            st.markdown("### 👷 دفتر الفنيين")
-            if st.button("➕ إضافة فني/مهندس", use_container_width=True):
-                add_technician_modal()
-            # عرض الدفتر
-            for site_k, tech_list in st.session_state.technicians_db.items():
-                if site_k!= "DEFAULT":
-                    with st.expander(f"📍 {site_k[:20]}.. ({len(tech_list)})"):
-                        for t in tech_list:
-                            st.write(f"{t['name']} | {t['phone']} | {detect_carrier(t['phone'])}")
         st.write("---")
         if st.button(TXT["btn_logout"], use_container_width=True):
             st.session_state.authenticated = False
             cookie_manager.delete("activation_code")
             st.rerun()
-
     data = CLIENTS_DATABASE.get(active_code, {})
     start_dt = datetime.strptime(data.get("start_date","2026-09-15"), "%Y-%m-%d").date()
     expiry_dt = start_dt + timedelta(days=data.get("duration_days",30))
@@ -459,10 +459,10 @@ if st.session_state.current_page == "chat":
         st.session_state.messages.append({"role":"assistant","content":ans})
 
 elif st.session_state.current_page == "dashboard":
-    st.title("📊 CEO Dashboard + Alerts + دفتر الفنيين")
+    st.title("📊 CEO Dashboard + Alerts + دفتر الفنيين - V4.2")
     alerts = check_critical_parts()
     if alerts:
-        st.error(f"🚨 يوجد {len(alerts)} تنبيه حرج! - مربوط بالدفتر")
+        st.error(f"🚨 يوجد {len(alerts)} تنبيه حرج! - يظهر للجميع")
         for al in alerts:
             c1,c2 = st.columns([4,1])
             with c1:
@@ -484,7 +484,7 @@ elif st.session_state.current_page == "dashboard":
 
 else:
     if "1." in selected_app:
-        st.title("⚙️ Predictive Maintenance + QR + Invoice")
+        st.title("⚙️ Predictive Maintenance + QR + Invoice + تقرير شامل")
         main_sites = list(st.session_state.sites_data.keys())
         sel_main = st.selectbox("Area:", main_sites) if main_sites else None
         sel_sub = None
@@ -529,9 +529,13 @@ else:
                 processed.append({**row, "المدة المتبقية (ساعة)": remain, "نسبة الاستهلاك (%)": pct, "حالة": "🔴 حرج" if pct>=90 else "🟡 تحذير" if pct>=70 else "🟢 جيد"})
             df_res=pd.DataFrame(processed)
             st.dataframe(df_res, use_container_width=True)
-            st.plotly_chart(px.bar(df_res, x="قطع الغيار / الفلاتر", y="نسبة الاستهلاك (%)", color="حالة"), use_container_width=True)
+            c_chart1, c_chart2 = st.columns(2)
+            with c_chart1:
+                st.plotly_chart(px.bar(df_res, x="قطع الغيار / الفلاتر", y="نسبة الاستهلاك (%)", color="حالة", title="Consumption %"), use_container_width=True)
+            with c_chart2:
+                st.plotly_chart(px.bar(df_res, x="قطع الغيار / الفلاتر", y="المدة المتبقية (ساعة)", color="حالة", title="Remaining Hours - Performance"), use_container_width=True)
             st.divider()
-            st.subheader("🧾 فاتورة قطع الغيار المطلوبة")
+            st.subheader("🧾 فاتورة + 📊 تقرير أداء شامل PDF (للعملاء والـ Admin)")
             invoice=[]
             total=0
             for r in processed:
@@ -539,21 +543,65 @@ else:
                     price=PARTS_PRICES.get(r["قطع الغيار / الفلاتر"],500)
                     invoice.append({"Part": r["قطع الغيار / الفلاتر"], "Price USD": price, "Remain hrs": r["المدة المتبقية (ساعة)"]})
                     total+=price
-            if invoice:
-                st.dataframe(pd.DataFrame(invoice), use_container_width=True)
-                st.metric("إجمالي الفاتورة", f"${total} USD")
-                pdf = ComprehensivePDF(f"INVOICE {sel_gen}")
+            c_rep1, c_rep2 = st.columns(2)
+            with c_rep1:
+                if invoice:
+                    st.dataframe(pd.DataFrame(invoice), use_container_width=True)
+                    st.metric("إجمالي الفاتورة", f"${total} USD")
+                else:
+                    st.success("لا فاتورة - لا قطع حرجة")
+            with c_rep2:
+                st.markdown("#### 📈 أداء المولد")
+                st.metric("متوسط الاستهلاك", f"{df_res['نسبة الاستهلاك (%)'].mean():.1f}%")
+                st.metric("أقل قطعة متبقية", f"{df_res['المدة المتبقية (ساعة)'].min():.0f}h")
+            if st.button("📄 إنشاء تقرير شامل PDF (صيانة + أداء + رسوم بيانية)", type="primary", use_container_width=True):
+                pdf = ComprehensivePDF(f"MAINTENANCE & PERFORMANCE REPORT - {sel_gen}")
                 pdf.add_page()
+                pdf.set_font("Helvetica","B",11)
+                pdf.cell(0,8,f"Generator: {sel_gen} | Model: {gen_info['model']} | kW: {gen_info['kw']}", ln=True)
+                pdf.set_font("Helvetica","",9)
+                pdf.cell(0,6,f"Site: {sel_main} / {sel_sub} | Run Hours: {gen_info['run_hours']} | Target: {gen_info['target']}", ln=True)
+                pdf.cell(0,6,f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Client: {data.get('name','')} | Days Left: {days_left}", ln=True)
+                pdf.ln(4)
                 pdf.set_font("Helvetica","B",10)
-                pdf.cell(0,10,f"Generator: {sel_gen} | Total: ${total}", ln=True)
-                for inv in invoice:
-                    pdf.set_font("Helvetica","",9)
-                    pdf.cell(0,6,f"{inv['Part']} - ${inv['Price USD']} - Remain {inv['Remain hrs']} hrs", ln=True)
+                pdf.set_fill_color(200,200,200)
+                pdf.cell(60,7,"Part", border=1, fill=True)
+                pdf.cell(25,7,"Life", border=1, fill=True)
+                pdf.cell(25,7,"Used", border=1, fill=True)
+                pdf.cell(25,7,"Remain", border=1, fill=True)
+                pdf.cell(30,7,"Status", border=1, fill=True)
+                pdf.ln()
+                pdf.set_font("Helvetica","",8)
+                for r in processed:
+                    pdf.cell(60,6, r["قطع الغيار / الفلاتر"][:25], border=1)
+                    pdf.cell(25,6, str(r["العمر الافتراضي (ساعة)"]), border=1)
+                    pdf.cell(25,6, str(r["الساعات المنقضية (ساعة)"]), border=1)
+                    pdf.cell(25,6, str(r["المدة المتبقية (ساعة)"]), border=1)
+                    pdf.cell(30,6, r["حالة"], border=1)
+                    pdf.ln()
+                pdf.ln(5)
+                if invoice:
+                    pdf.set_font("Helvetica","B",10)
+                    pdf.cell(0,7,f"INVOICE TOTAL: ${total} USD - Critical Parts: {len(invoice)}", ln=True)
+                    for inv in invoice:
+                        pdf.set_font("Helvetica","",8)
+                        pdf.cell(0,5,f"- {inv['Part']} : ${inv['Price USD']} | Remain {inv['Remain hrs']} hrs", ln=True)
+                chart_buf = create_performance_chart_image(df_res, sel_gen)
+                if chart_buf:
+                    pdf.ln(5)
+                    pdf.set_font("Helvetica","B",10)
+                    pdf.cell(0,7,"Performance Charts:", ln=True)
+                    chart_path = f"/tmp/chart_{sel_gen}.png"
+                    with open(chart_path, "wb") as f:
+                        f.write(chart_buf.getvalue())
+                    try:
+                        pdf.image(chart_path, x=10, w=190)
+                    except Exception:
+                        pass
                 pdf_bytes = pdf.output(dest="S")
                 pdf_data = pdf_bytes.encode("latin-1",errors="replace") if isinstance(pdf_bytes,str) else bytes(pdf_bytes)
-                st.download_button("📥 تحميل الفاتورة PDF", data=pdf_data, file_name=f"Invoice_{sel_gen}.pdf", mime="application/pdf", use_container_width=True)
-            else:
-                st.success("لا توجد قطع حرجة - لا فاتورة حالياً")
+                st.download_button("📥 تحميل التقرير الشامل PDF", data=pdf_data, file_name=f"Full_Report_{sel_gen}_{datetime.now().strftime('%Y%m%d')}.pdf", mime="application/pdf", use_container_width=True, key="full_pdf")
+                st.success("✅ التقرير جاهز مع الرسوم البيانية!")
 
     elif "2." in selected_app:
         st.title("🎛️ Remote IoT Control")
@@ -573,10 +621,11 @@ else:
             st.info("Reset sent!")
 
     elif "3." in selected_app:
-        st.title("📊 Daily + Alerts + دفتر الفنيين - V4.1 FIXED ✅")
+        st.title("📊 Daily + Alerts + واتساب للعملاء - V4.2 ✅")
+        st.info("زر واتساب الآن يظهر للعملاء المشتركين + Admin - مربوط بالدفتر")
         alerts=check_critical_parts()
         if alerts:
-            st.error(f"🚨 يوجد {len(alerts)} تنبيه حرج - مربوط بالدفتر!")
+            st.error(f"🚨 يوجد {len(alerts)} تنبيه حرج - يظهر للجميع!")
             for al in alerts:
                 c1,c2,c3 = st.columns([3,2,1])
                 with c1:
