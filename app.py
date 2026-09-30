@@ -415,6 +415,9 @@ if "clients_db" not in st.session_state:
 # توجيه المتغير القديم ليقرأ من الـ session_state
 CLIENTS_DATABASE = st.session_state.clients_db
 
+# === التعديل الوحيد المضاف هنا: تحديد كود الأدمن ===
+ADMIN_CODES = ["ADDOMA-2026-PRO"]
+
 import extra_streamlit_components as stx
 import streamlit as st
 
@@ -567,8 +570,7 @@ else:
                 del st.session_state["active_code"]
             st.rerun()
 
-        # ======== التعديل الوحيد: زر إصدار الاشتراكات يظهر للأدمن فقط ========
-        ADMIN_CODES = ["ADDOMA-2026-PRO"]
+        # === التعديل الوحيد هنا: نافذة المشتركين تظهر للأدمن فقط ===
         if st.session_state.get("active_code", "") in ADMIN_CODES:
             st.write("---")
             st.markdown("👑 **لوحة تحكم الأدمن**")
