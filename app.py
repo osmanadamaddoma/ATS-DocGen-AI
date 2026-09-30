@@ -29,7 +29,7 @@ try:
 except ImportError:
     InfluxDBClient = None
 
-st.set_page_config(page_title="المجمع الصناعي الشامل V4.0 - Addoma", page_icon="🔐", layout="wide")
+st.set_page_config(page_title="المجمع الصناعي الشامل V4.1 - Addoma FIXED", page_icon="🔐", layout="wide")
 
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
@@ -161,6 +161,50 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
     liters = kw_load * 0.24 * run_hours
     return round(liters,1), round(liters*2.68,1)
 
+# ===== FIXED: نظام كشف الشبكات السودانية + إنذار واتساب فقط =====
+def detect_carrier(phone):
+    p = phone.replace("+249","0").replace(" ","").strip()
+    if p.startswith(("090","091","096")):
+        return "ZAIN 🟠"
+    elif p.startswith(("092","093","099")):
+        return "MTN 🟡"
+    elif p.startswith(("011","012","010","015","099")):
+        return "SUDANI 🔵"
+    else:
+        return "SUDAN 📱"
+
+@st.dialog("🔔 إنذار صيانة - إرسال واتساب")
+def whatsapp_alert_modal(alert_data):
+    st.error(f"🚨 {alert_data['gen']} - {alert_data['part']}")
+    st.write(f"📍 {alert_data['site']} | ⏱️ باقي {alert_data['remain']:.0f} ساعة | {alert_data.get('level','')}")
+    phone = st.text_input("📱 رقم الفني (يبدأ بـ 09):", value="0912345678", key=f"phone_{alert_data['gen']}_{alert_data['part']}")
+    st.caption(f"الشبكة المكتشفة: {detect_carrier(phone)}")
+    default_msg = f"""*ADDOMA - تنبيه صيانة حرج* 🚨
+
+*المولد:* {alert_data['gen']}
+*القطعة:* {alert_data['part']}
+*الموقع:* {alert_data['site']}
+*الحالة:* {alert_data.get('level','تنبيه')}
+*متبقي:* {alert_data['remain']:.0f} ساعة فقط
+*المطلوب:* تغيير القطعة فوراً قبل التوقف
+
+- نظام المجمع الصناعي V4.1 FIXED
+"""
+    msg = st.text_area("✏️ نص الرسالة:", value=default_msg, height=200, key=f"msg_{alert_data['gen']}_{alert_data['part']}")
+    if st.button("📤 إرسال واتساب الآن", type="primary", use_container_width=True):
+        clean = phone.strip().replace(" ","")
+        if clean.startswith("0"):
+            clean_intl = "249" + clean[1:]
+        elif clean.startswith("+249"):
+            clean_intl = clean.replace("+","")
+        else:
+            clean_intl = clean
+        wa_url = f"https://wa.me/{clean_intl}?text={urllib.parse.quote(msg)}"
+        st.success(f"✅ جاهز للإرسال إلى {detect_carrier(phone)} - {phone}")
+        st.markdown(f'<a href="{wa_url}" target="_blank" style="text-decoration:none;"><div style="background:#25D366;color:white;padding:15px;text-align:center;border-radius:10px;font-size:18px;font-weight:bold;">👉 افتح واتساب وأرسل الآن 📱</div></a>', unsafe_allow_html=True)
+        st.caption(wa_url)
+
+# ===== FIXED: ربط حساب الساعات المتبقية مع ساعات المولد =====
 def check_critical_parts():
     alerts = []
     for main_site in st.session_state.sites_data:
@@ -169,12 +213,17 @@ def check_critical_parts():
                 key = f"parts_{main_site}_{sub_site}_{gen_id}"
                 if key in st.session_state:
                     for part in st.session_state[key]:
-                        life = float(part.get("العمر الافتراضي (ساعة)",250))
-                        used = float(part.get("الساعات المنقضية (ساعة)",0))
-                        remain = life - used
-                        if remain < 50:
-                            alerts.append({"site": f"{main_site}/{sub_site}", "gen": gen_id, "part": part["قطع الغيار / الفلاتر"], "remain": remain})
-    return alerts
+                        try:
+                            life = float(part.get("العمر الافتراضي (ساعة)",250))
+                            used = float(part.get("الساعات المنقضية (ساعة)",0))
+                            remain = life - used
+                            # يطلع إنذار لو باقي 100 ساعة أو أقل - مربوط بالحساب الصحيح
+                            if remain <= 100:
+                                level = "🔴 خطر - توقف" if remain <= 0 else "🟡 قريب - جهز القطعة" if remain <= 50 else "🟠 تنبيه"
+                                alerts.append({"site": f"{main_site}/{sub_site}", "gen": gen_id, "part": part.get("قطع الغيار / الفلاتر","قطعة"), "remain": remain, "level": level})
+                        except Exception:
+                            continue
+    return sorted(alerts, key=lambda x: x["remain"])
 
 def save_to_supabase_auto():
     if supabase:
@@ -231,8 +280,8 @@ st.sidebar.subheader("🌐 Language / اللغة")
 selected_lang = st.sidebar.radio("Select Language", ["Arabic", "English"], index=0 if st.session_state.lang == "ar" else 1, label_visibility="collapsed")
 st.session_state.lang = "ar" if selected_lang == "Arabic" else "en"
 L = st.session_state.lang
-TXT = {"ar": {"title": "🔐 بوابة التفعيل", "code_input": "كود التفعيل:", "btn_activate": "تفعيل", "invalid": "كود غير صحيح", "auth": "ادخل كود صالح", "nav_header": "⚙️ نظام الدومة V4.0", "nav_status": "🟢 مفعل", "btn_chat": "💬 المساعد الذكي", "btn_dashboard": "📊 لوحة التحكم", "btn_apps": "🛠️ التطبيقات", "btn_logout": "🚪 خروج", "choose_app": "اختر النظام:"},
-       "en": {"title": "🔐 Activation Portal", "code_input": "Code:", "btn_activate": "Activate", "invalid": "Invalid", "auth": "Enter valid code", "nav_header": "⚙️ Addoma V4.0", "nav_status": "🟢 Active", "btn_chat": "💬 AI Assistant", "btn_dashboard": "📊 Dashboard", "btn_apps": "🛠️ Apps", "btn_logout": "🚪 Logout", "choose_app": "Select System:"}}[L]
+TXT = {"ar": {"title": "🔐 بوابة التفعيل", "code_input": "كود التفعيل:", "btn_activate": "تفعيل", "invalid": "كود غير صحيح", "auth": "ادخل كود صالح", "nav_header": "⚙️ نظام الدومة V4.1 FIXED", "nav_status": "🟢 مفعل", "btn_chat": "💬 المساعد الذكي", "btn_dashboard": "📊 لوحة التحكم", "btn_apps": "🛠️ التطبيقات", "btn_logout": "🚪 خروج", "choose_app": "اختر النظام:"},
+       "en": {"title": "🔐 Activation Portal", "code_input": "Code:", "btn_activate": "Activate", "invalid": "Invalid", "auth": "Enter valid code", "nav_header": "⚙️ Addoma V4.1 FIXED", "nav_status": "🟢 Active", "btn_chat": "💬 AI Assistant", "btn_dashboard": "📊 Dashboard", "btn_apps": "🛠️ Apps", "btn_logout": "🚪 Logout", "choose_app": "Select System:"}}[L]
 
 # ===== AUTH =====
 if not st.session_state.authenticated:
@@ -250,7 +299,7 @@ if not st.session_state.authenticated:
     st.stop()
 else:
     active_code = st.session_state.get("active_code","")
-    IS_ADMIN = active_code == "ADDOMA-2026-PRO" # <-- أهم سطر: فقط أنت Admin
+    IS_ADMIN = active_code == "ADDOMA-2026-PRO"
     with st.sidebar:
         st.header(TXT["nav_header"])
         st.success(TXT["nav_status"])
@@ -264,7 +313,6 @@ else:
         if st.button(TXT["btn_apps"], use_container_width=True):
             st.session_state.current_page = "main_apps"
         st.write("---")
-        # ===== هنا الحماية: الزر يظهر فقط للـ Admin =====
         if IS_ADMIN:
             st.divider()
             st.markdown("### 🔐 Admin Panel")
@@ -349,20 +397,22 @@ if st.session_state.current_page == "chat":
         st.session_state.messages.append({"role":"assistant","content":ans})
 
 elif st.session_state.current_page == "dashboard":
-    st.title("📊 CEO Dashboard + Alerts")
+    st.title("📊 CEO Dashboard + Alerts FIXED")
     alerts = check_critical_parts()
     if alerts:
-        st.error(f"🚨 يوجد {len(alerts)} تنبيه حرج!")
-        for al in alerts[:5]:
-            st.warning(f"{al['gen']} - {al['part']} | باقي {al['remain']:.0f} ساعة | موقع {al['site']}")
-            wa_msg = urllib.parse.quote(f"تنبيه صيانة: {al['gen']} يحتاج {al['part']} خلال {al['remain']:.0f} ساعة")
-            st.markdown(f"[📱 إرسال واتساب للفني](https://wa.me/249912345678?text={wa_msg})")
+        st.error(f"🚨 يوجد {len(alerts)} تنبيه حرج! - مربوط")
+        for al in alerts:
+            c1,c2 = st.columns([4,1])
+            with c1:
+                st.warning(f"{al['level']} | {al['gen']} - {al['part']} | باقي {al['remain']:.0f} ساعة | موقع {al['site']}")
+            with c2:
+                if st.button("📱 واتساب", key=f"dash_wa_{al['gen']}_{al['part']}"):
+                    whatsapp_alert_modal(al)
     col1,col2,col3 = st.columns(3)
     total_gens = sum(len(v["generators"]) for ms in st.session_state.sites_data.values() for v in ms.values())
     col1.metric("إجمالي المولدات", total_gens)
     col2.metric("تنبيهات حرجة", len(alerts))
     col3.metric("Supabase", "Online" if supabase else "Offline")
-    # ملخص كل المناطق
     all_data=[]
     for main_site, subs in st.session_state.sites_data.items():
         for sub_site, d in subs.items():
@@ -387,13 +437,11 @@ else:
             edit_generator_modal(sel_main, sel_sub, sel_gen)
         if sel_gen:
             gen_info = st.session_state.sites_data[sel_main][sel_sub]["generators"][sel_gen]
-            # QR CODE
             qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={urllib.parse.quote(f'Gen:{sel_gen}|Site:{sel_sub}|Hours:{gen_info['run_hours']}')}"
             c_qr, c_info = st.columns([1,3])
             c_qr.image(qr_url, caption=f"QR {sel_gen}")
             c_info.metric("Run Hours", f"{gen_info['run_hours']} hrs", f"Target {gen_info['target']}")
             c_info.metric("Model", gen_info["model"], f"{gen_info['kw']} kW")
-            # MAINTENANCE TABLE 14 PARTS
             key = f"parts_{sel_main}_{sel_sub}_{sel_gen}"
             if key not in st.session_state:
                 st.session_state[key] = [{"الوحدة": i+1, "تصنيف القطعة": "Service", "قطع الغيار / الفلاتر": list(PARTS_PRICES.keys())[i % len(PARTS_PRICES)], "العمر الافتراضي (ساعة)": 250.0*(i+1), "الساعات المنقضية (ساعة)": 180.0*i, "تجديد (تصفير)": False} for i in range(14)]
@@ -410,7 +458,6 @@ else:
                 st.session_state[key]=new_data
                 save_to_supabase_auto()
                 st.rerun()
-            # حساب
             processed=[]
             for row in st.session_state[key]:
                 life=float(row["العمر الافتراضي (ساعة)"])
@@ -421,7 +468,6 @@ else:
             df_res=pd.DataFrame(processed)
             st.dataframe(df_res, use_container_width=True)
             st.plotly_chart(px.bar(df_res, x="قطع الغيار / الفلاتر", y="نسبة الاستهلاك (%)", color="حالة"), use_container_width=True)
-            # INVOICE
             st.divider()
             st.subheader("🧾 فاتورة قطع الغيار المطلوبة")
             invoice=[]
@@ -465,15 +511,28 @@ else:
             st.info("Reset sent!")
 
     elif "3." in selected_app:
-        st.title("📊 Daily Monitoring + WhatsApp Alerts")
-        today=datetime.now().strftime("%Y-%m-%d")
-        logs=[l for l in st.session_state.daily_logs if l.get("date")==today]
-        st.dataframe(pd.DataFrame(logs) if logs else pd.DataFrame([{"msg":"No logs today"}]), use_container_width=True)
+        st.title("📊 Daily Monitoring + WhatsApp Alerts - V4.1 FIXED ✅")
+        st.info("النظام الآن مربوط: الساعات المتبقية = العمر الافتراضي - الساعات المنقضية")
         alerts=check_critical_parts()
         if alerts:
+            st.error(f"🚨 يوجد {len(alerts)} تنبيه حرج - مربوط بساعات التشغيل الحقيقية!")
             for al in alerts:
-                msg=urllib.parse.quote(f"تنبيه: {al['gen']} - {al['part']} باقي {al['remain']:.0f} ساعة")
-                st.markdown(f"[📱 واتساب تنبيه {al['gen']}](https://wa.me/249912345678?text={msg})")
+                c1,c2,c3 = st.columns([3,2,1])
+                with c1:
+                    st.write(f"{al['level']} | **{al['gen']}** - {al['part']}")
+                with c2:
+                    st.write(f"📍 {al['site']} | باقي {al['remain']:.0f}h")
+                with c3:
+                    if st.button("📱 واتساب", key=f"daily_wa_{al['gen']}_{al['part']}_{al['remain']}"):
+                        whatsapp_alert_modal(al)
+            st.divider()
+        else:
+            st.success("✅ لا يوجد تنبيهات حرجة - كل المولدات آمنة - الإنذار شغال")
+
+        today=datetime.now().strftime("%Y-%m-%d")
+        logs=[l for l in st.session_state.daily_logs if l.get("date")==today]
+        st.subheader("سجل اليوم")
+        st.dataframe(pd.DataFrame(logs) if logs else pd.DataFrame([{"msg":"No logs today"}]), use_container_width=True)
 
     elif "4." in selected_app:
         st.title("🤖 AI Diagnostics")
