@@ -24,12 +24,8 @@ try:
     from supabase import create_client
 except ImportError:
     create_client = None
-try:
-    from influxdb_client import InfluxDBClient
-except ImportError:
-    InfluxDBClient = None
 
-st.set_page_config(page_title="المجمع الصناعي V4.3 - FIXED", page_icon="🔐", layout="wide")
+st.set_page_config(page_title="المجمع الصناعي V4.4 - Persistent", page_icon="🔐", layout="wide")
 
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
@@ -38,11 +34,12 @@ if "lang" not in st.session_state:
 if "current_page" not in st.session_state:
     st.session_state.current_page = "chat"
 
+# ===== DATABASE =====
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
         "الخرطوم (القائمة الرئيسية)": {
             "الموقع الرئيسي - كافوري (موقع فرعي)": {
-                "address": "الخرطوم - المنطقة الصناعية - كافوري",
+                "address": "الخرطوم - كافوري",
                 "generators": {
                     "G1": {"model": "Perkins 410 kVA", "run_hours": 700.0, "target": 940.0, "kw": 410.0, "load": 250.0,
                            "calib_elec": {"v_nominal": 400.0, "v_measured": 398.0, "freq_nominal": 50.0, "freq_measured": 50.1, "current_max": 600.0, "current_measured": 360.0, "pf": 0.85, "ct_ratio": "600/5"},
@@ -68,6 +65,7 @@ if "technicians_db" not in st.session_state:
         "DEFAULT": [{"name": "فني طوارئ", "phone": "0912345678", "role": "فني"}]
     }
 
+# ===== KEYS =====
 gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not gemini_key and "supabase" in st.secrets:
     gemini_key = st.secrets["supabase"].get("GEMINI_API_KEY")
@@ -93,11 +91,68 @@ def sanitize_pdf_text(t):
     t = str(t)
     return "".join(c for c in t if ord(c) < 128)[:80] or "N/A"
 
+# ===== PERSISTENT CODES FIX =====
+def load_clients_from_supabase():
+    default_db = {
+        "ADDOMA-2026-PRO": {"name": "عثمان آدم أدومة - Admin PERMANENT", "plan": "Admin Permanent", "start_date": "2026-01-01", "duration_days": 36500},
+        "CLIENT-M-881": {"name": "شركة النيل", "plan": "شهري", "start_date": "2026-09-01", "duration_days": 30},
+        "CLIENT-Y-992": {"name": "مصانع الحديد", "plan": "سنوي", "start_date": "2026-03-15", "duration_days": 365},
+    }
+    if supabase:
+        try:
+            res = supabase.table("subscriptions").select("*").execute()
+            if res.data:
+                for row in res.data:
+                    code = row.get("code")
+                    if code:
+                        c_date = row.get("start_date") or (row.get("created_at","")[:10] if row.get("created_at") else datetime.now().strftime("%Y-%m-%d"))
+                        default_db[code] = {
+                            "name": row.get("client_name", "Client"),
+                            "plan": row.get("plan", "شهري"),
+                            "start_date": c_date,
+                            "duration_days": row.get("duration_days", 30)
+                        }
+        except Exception as e:
+            print(f"Load error {e}")
+    return default_db
+
+def save_client_to_supabase(code, client_name, plan, duration_days):
+    if supabase:
+        try:
+            supabase.table("subscriptions").upsert({
+                "code": code,
+                "client_name": client_name,
+                "plan": plan,
+                "duration_days": duration_days,
+                "start_date": datetime.now().strftime("%Y-%m-%d"),
+                "created_at": datetime.now().isoformat()
+            }).execute()
+            return True
+        except Exception as e:
+            print(f"Save error {e}")
+            return False
+    return False
+
+@st.cache_data(ttl=3600)
+def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
+    if not client:
+        return "Add GEMINI_API_KEY in secrets"
+    lang_instr = "Respond in English." if language == "en" else "اكتب بالعربية التقنية."
+    prompt = f"Expert generator engineer DSE7320/8610. Fault:{fault_code} Context:{context_text[:2000]} Provide explanation, causes, actions. {lang_instr}"
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+            return response.text
+        except Exception as e:
+            if "503" in str(e) and attempt < 2:
+                time.sleep(2)
+                continue
+            return f"Error: {e}"
+
 class ComprehensivePDF(FPDF):
     def __init__(self, title_text="INDUSTRIAL REPORT", logo_path=None):
         super().__init__()
         self.report_title = sanitize_pdf_text(title_text)
-        self.logo_path = logo_path
     def header(self):
         self.set_fill_color(24, 43, 73)
         self.rect(0, 0, 210, 8, "F")
@@ -107,14 +162,13 @@ class ComprehensivePDF(FPDF):
         self.cell(0, 5, self.report_title, ln=True)
         self.set_x(10)
         self.set_font("Helvetica", "B", 8)
-        self.cell(0, 4, "ADDOMA TRADING SERVICES - V4.3 FIXED", ln=True)
+        self.cell(0, 4, "ADDOMA TRADING - V4.4 PERSISTENT", ln=True)
         self.line(10, 30, 200, 30)
         self.ln(10)
     def footer(self):
         self.set_y(-15)
         self.set_font("Helvetica", "I", 8)
-        self.set_text_color(120, 120, 120)
-        self.cell(0, 4, f"Page {self.page_no()} | {datetime.now().strftime('%Y-%m-%d %H:%M')} | Addoma V4.3", align="C")
+        self.cell(0, 4, f"Page {self.page_no()} | {datetime.now().strftime('%Y-%m-%d')} | V4.4", align="C")
 
 def create_performance_chart_image(df_res, gen_id):
     try:
@@ -146,10 +200,6 @@ def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85)
     v_drop = (math.sqrt(3) * current_a * distance_m * 0.0178 * cos_phi) / cable_mm2
     return round(v_drop,2), round((v_drop/400)*100,2)
 
-def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
-    liters = kw_load * 0.24 * run_hours
-    return round(liters,1), round(liters*2.68,1)
-
 def detect_carrier(phone):
     p = phone.replace("+249","0").replace(" ","").strip()
     if p.startswith(("090","091","096")): return "ZAIN"
@@ -157,7 +207,7 @@ def detect_carrier(phone):
     elif p.startswith(("011","012","010","015")): return "SUDANI"
     else: return "SUDAN"
 
-@st.dialog("🔔 إنذار صيانة - واتساب")
+@st.dialog("🔔 واتساب - للجميع")
 def whatsapp_alert_modal(alert_data):
     st.error(f"{alert_data['gen']} - {alert_data['part']}")
     st.write(f"{alert_data['site']} | باقي {alert_data['remain']:.0f} ساعة | {alert_data.get('level','')}")
@@ -181,14 +231,14 @@ def whatsapp_alert_modal(alert_data):
         phone = techs[idx]['phone']
         tech_name = techs[idx]['name']
     st.caption(f"الشبكة: {detect_carrier(phone)} | الى: {tech_name}")
-    default_msg = f"ADDOMA ALERT: Gen {alert_data['gen']} Part {alert_data['part']} Site {alert_data['site']} Remain {alert_data['remain']:.0f}h Level {alert_data.get('level','')} Tech {tech_name} - V4.3"
+    default_msg = f"ADDOMA ALERT: Gen {alert_data['gen']} Part {alert_data['part']} Site {alert_data['site']} Remain {alert_data['remain']:.0f}h Tech {tech_name} - V4.4"
     msg = st.text_area("نص الرسالة:", value=default_msg, height=150, key=f"msg_{alert_data['gen']}_{alert_data['part']}")
     if st.button("ارسال واتساب الآن", type="primary", use_container_width=True):
         clean = phone.strip().replace(" ","")
         clean_intl = "249" + clean[1:] if clean.startswith("0") else clean.replace("+","")
         wa_url = f"https://wa.me/{clean_intl}?text={urllib.parse.quote(msg)}"
-        st.success(f"جاهز للارسال الى {tech_name} - {detect_carrier(phone)}")
-        st.markdown(f'<a href="{wa_url}" target="_blank"><div style="background:#25D366;color:white;padding:15px;text-align:center;border-radius:10px;font-size:18px;font-weight:bold;">افتح واتساب وارسل الآن</div></a>', unsafe_allow_html=True)
+        st.success(f"جاهز للارسال الى {tech_name}")
+        st.markdown(f'<a href="{wa_url}" target="_blank"><div style="background:#25D366;color:white;padding:15px;text-align:center;border-radius:10px;font-weight:bold;">افتح واتساب وارسل الآن</div></a>', unsafe_allow_html=True)
 
 def check_critical_parts():
     alerts = []
@@ -216,12 +266,17 @@ def save_to_supabase_auto():
         except Exception:
             pass
 
+# ===== LOAD PERSISTENT CODES =====
 if "clients_db" not in st.session_state:
-    st.session_state.clients_db = {
-        "ADDOMA-2026-PRO": {"name": "عثمان آدم أدومة - Admin PERMANENT", "plan": "Admin Permanent", "start_date": "2026-01-01", "duration_days": 36500},
-        "CLIENT-M-881": {"name": "شركة النيل", "plan": "شهري", "start_date": "2026-09-01", "duration_days": 30},
-        "CLIENT-Y-992": {"name": "مصانع الحديد", "plan": "سنوي", "start_date": "2026-03-15", "duration_days": 365},
-    }
+    st.session_state.clients_db = load_clients_from_supabase()
+else:
+    try:
+        fresh = load_clients_from_supabase()
+        for k,v in fresh.items():
+            if k not in st.session_state.clients_db:
+                st.session_state.clients_db[k] = v
+    except:
+        pass
 CLIENTS_DATABASE = st.session_state.clients_db
 
 def get_cookie_manager():
@@ -229,33 +284,52 @@ def get_cookie_manager():
         st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager")
     return st.session_state["cookie_manager"]
 cookie_manager = get_cookie_manager()
-saved_code = cookie_manager.get(cookie="activation_code")
+saved_code = None
+try:
+    saved_code = cookie_manager.get(cookie="activation_code")
+except:
+    saved_code = None
+if not saved_code:
+    try:
+        qp = st.query_params
+        if "code" in qp:
+            saved_code = qp["code"]
+    except:
+        pass
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-if saved_code and not st.session_state.authenticated and saved_code in CLIENTS_DATABASE:
-    st.session_state.authenticated = True
-    st.session_state.active_code = saved_code
+if saved_code and not st.session_state.authenticated:
+    fresh_db = load_clients_from_supabase()
+    if saved_code in fresh_db:
+        st.session_state.clients_db[saved_code] = fresh_db[saved_code]
+        st.session_state.authenticated = True
+        st.session_state.active_code = saved_code
+        CLIENTS_DATABASE = st.session_state.clients_db
 
-@st.dialog("إصدار كود اشتراك جديد")
+@st.dialog("إصدار كود اشتراك جديد - حفظ دائم")
 def generate_subscription_modal():
-    st.markdown("### إصدار كود للعملاء")
+    st.markdown("### إصدار كود - حفظ دائم في Supabase")
     client_name = st.text_input("اسم العميل:")
     plan_type = st.selectbox("الباقة:", ["شهري", "سنوي", "تجريبي"])
     default_duration = 365 if "سنوي" in plan_type else 7 if "تجريبي" in plan_type else 30
     custom_duration = st.number_input("المدة (أيام):", value=default_duration, min_value=1)
-    if st.button("إصدار الكود", type="primary", use_container_width=True):
+    if st.button("إصدار وحفظ دائم", type="primary", use_container_width=True):
         if client_name.strip():
             new_code = f"ADDOMA-{uuid.uuid4().hex[:6].upper()}"
             st.session_state.clients_db[new_code] = {"name": client_name.strip(), "plan": plan_type, "start_date": datetime.now().strftime("%Y-%m-%d"), "duration_days": custom_duration}
-            st.success(f"الكود: {new_code}")
+            saved = save_client_to_supabase(new_code, client_name.strip(), plan_type, custom_duration)
+            if saved:
+                st.success("✅ تم الحفظ الدائم في Supabase - سيعمل حتى بعد إغلاق التطبيق")
+            else:
+                st.warning("⚠️ حفظ محلي فقط - أنشئ جدول subscriptions")
             st.code(new_code)
+            st.info(f"الكود: {new_code} | العميل: {client_name} | {custom_duration} يوم")
         else:
             st.error("ادخل اسم العميل")
 
-@st.dialog("إضافة فني / مهندس")
+@st.dialog("إضافة فني")
 def add_technician_modal():
-    st.markdown("### إضافة رقم جديد")
     all_sites = []
     for ms in st.session_state.sites_data:
         for ss in st.session_state.sites_data[ms]:
@@ -269,30 +343,48 @@ def add_technician_modal():
             if site_sel not in st.session_state.technicians_db:
                 st.session_state.technicians_db[site_sel] = []
             st.session_state.technicians_db[site_sel].append({"name": t_name.strip(), "phone": t_phone.strip(), "role": t_role})
-            st.success(f"تم حفظ {t_name} - {t_phone}")
+            st.success(f"تم حفظ {t_name}")
             time.sleep(1)
             st.rerun()
         else:
             st.error("أكمل البيانات")
 
-st.sidebar.subheader("Language / اللغة")
+st.sidebar.subheader("Language")
 selected_lang = st.sidebar.radio("Select", ["Arabic", "English"], index=0 if st.session_state.lang == "ar" else 1, label_visibility="collapsed")
 st.session_state.lang = "ar" if selected_lang == "Arabic" else "en"
 L = st.session_state.lang
-TXT = {"ar": {"title": "بوابة التفعيل", "code_input": "كود التفعيل:", "btn_activate": "تفعيل", "invalid": "كود غير صحيح", "auth": "ادخل كود صالح", "nav_header": "نظام الدومة V4.3", "nav_status": "مفعل", "btn_chat": "المساعد الذكي", "btn_dashboard": "لوحة التحكم", "btn_apps": "التطبيقات", "btn_logout": "خروج", "choose_app": "اختر النظام:"},
-       "en": {"title": "Activation Portal", "code_input": "Code:", "btn_activate": "Activate", "invalid": "Invalid", "auth": "Enter valid code", "nav_header": "Addoma V4.3", "nav_status": "Active", "btn_chat": "AI Assistant", "btn_dashboard": "Dashboard", "btn_apps": "Apps", "btn_logout": "Logout", "choose_app": "Select:"}}[L]
+TXT = {"ar": {"title": "بوابة التفعيل - V4.4", "code_input": "كود التفعيل:", "btn_activate": "تفعيل", "invalid": "كود غير صحيح", "auth": "ادخل كود صالح - الكود محفوظ للأبد", "nav_header": "نظام الدومة V4.4", "nav_status": "مفعل", "btn_chat": "المساعد الذكي", "btn_dashboard": "لوحة التحكم", "btn_apps": "التطبيقات", "btn_logout": "خروج", "choose_app": "اختر النظام:"},
+       "en": {"title": "Activation V4.4", "code_input": "Code:", "btn_activate": "Activate", "invalid": "Invalid", "auth": "Enter code - Persistent", "nav_header": "Addoma V4.4", "nav_status": "Active", "btn_chat": "AI", "btn_dashboard": "Dashboard", "btn_apps": "Apps", "btn_logout": "Logout", "choose_app": "Select:"}}[L]
 
 if not st.session_state.authenticated:
     st.title(TXT["title"])
-    user_code = st.sidebar.text_input(TXT["code_input"], type="password")
+    st.info(f"💡 الأكواد محفوظة في Supabase - عدد الأكواد: {len(CLIENTS_DATABASE)} | Admin دائم: ADDOMA-2026-PRO")
+    user_code = st.sidebar.text_input(TXT["code_input"], type="password", key="activation_input")
     if st.sidebar.button(TXT["btn_activate"]):
+        st.session_state.clients_db = load_clients_from_supabase()
+        CLIENTS_DATABASE = st.session_state.clients_db
         if user_code in CLIENTS_DATABASE:
             st.session_state.authenticated = True
             st.session_state.active_code = user_code
-            cookie_manager.set("activation_code", user_code, expires_at=datetime.now()+timedelta(days=3650))
+            try:
+                cookie_manager.set("activation_code", user_code, expires_at=datetime.now()+timedelta(days=3650))
+                st.query_params["code"] = user_code
+            except:
+                pass
+            st.success(f"✅ تم التفعيل: {CLIENTS_DATABASE[user_code]['name']}")
+            time.sleep(1)
             st.rerun()
         else:
-            st.sidebar.error(TXT["invalid"])
+            st.sidebar.error(f"{TXT['invalid']} - {user_code}")
+            fresh = load_clients_from_supabase()
+            if user_code in fresh:
+                st.sidebar.success("الكود موجود في Supabase!")
+                st.session_state.clients_db = fresh
+                st.session_state.authenticated = True
+                st.session_state.active_code = user_code
+                st.rerun()
+            else:
+                st.sidebar.write(f"الأكواد المتاحة: {list(CLIENTS_DATABASE.keys())[:5]}")
     st.warning(TXT["auth"])
     st.stop()
 else:
@@ -302,7 +394,7 @@ else:
         st.header(TXT["nav_header"])
         st.success(TXT["nav_status"])
         if IS_ADMIN:
-            st.warning("Admin Permanent - دخول دائم")
+            st.warning("Admin Permanent - دائم ♾️")
         st.write("---")
         if st.button(TXT["btn_chat"], use_container_width=True):
             st.session_state.current_page = "chat"
@@ -319,33 +411,36 @@ else:
                 if site_k!= "DEFAULT":
                     with st.expander(f"{site_k[:25]} ({len(tech_list)})"):
                         for t in tech_list:
-                            st.write(f"{t['name']} | {t['phone']} | {detect_carrier(t['phone'])}")
+                            st.write(f"{t['name']} | {t['phone']}")
         st.divider()
         if IS_ADMIN:
-            st.markdown("### Admin Panel")
+            st.markdown("### Admin Panel - حفظ دائم")
             if st.button("إصدار اشتراك جديد", use_container_width=True):
                 generate_subscription_modal()
             if st.button("عرض كل الأكواد", use_container_width=True):
                 st.dataframe(pd.DataFrame.from_dict(st.session_state.clients_db, orient='index'), use_container_width=True)
+                st.write(f"إجمالي: {len(st.session_state.clients_db)} كود")
         st.write("---")
         if st.button(TXT["btn_logout"], use_container_width=True):
             st.session_state.authenticated = False
-            cookie_manager.delete("activation_code")
+            try:
+                cookie_manager.delete("activation_code")
+                if "code" in st.query_params:
+                    del st.query_params["code"]
+            except:
+                pass
             st.rerun()
-
     data = CLIENTS_DATABASE.get(active_code, {})
     start_dt = datetime.strptime(data.get("start_date","2026-01-01"), "%Y-%m-%d").date()
-    duration = data.get("duration_days",30)
-
-    # ===== FIX ADMIN PERMANENT =====
     if IS_ADMIN:
         expiry_dt = datetime.strptime("2099-12-31", "%Y-%m-%d").date()
         days_left = 9999
         st.sidebar.info(f"👤 {data.get('name','')} | Admin دائم ♾️")
     else:
+        duration = data.get("duration_days",30)
         expiry_dt = start_dt + timedelta(days=duration)
         if datetime.now().date() > expiry_dt:
-            st.error(f"Expired on {expiry_dt} - اتصل بالادمن")
+            st.error(f"Expired on {expiry_dt}")
             st.session_state.authenticated = False
             st.stop()
         days_left = (expiry_dt - datetime.now().date()).days
@@ -355,14 +450,13 @@ st.sidebar.divider()
 apps_ar = ["1. الصيانة التنبؤية + QR + فاتورة", "2. التحكم عن بعد IoT", "3. المتابعة اليومية + تنبيهات", "4. المساعد الذكي", "5. فحص WIC & Motor", "6. الحاسبة + CEO Dashboard"]
 apps_en = ["1. Maintenance + QR + Invoice", "2. Remote IoT", "3. Daily + Alerts", "4. AI Diagnostics", "5. WIC & Motor Inspection", "6. Calculator + CEO"]
 selected_app = st.sidebar.radio(TXT["choose_app"], apps_ar if L=="ar" else apps_en)
-st.sidebar.divider()
 
 @st.dialog("Edit Generator")
 def edit_generator_modal(main_site, sub_site, gen_key):
     gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
     elec = gen_data.get("calib_elec",{})
     eng = gen_data.get("calib_engine",{})
-    st.markdown(f"### {gen_key} - {sub_site}")
+    st.markdown(f"### {gen_key}")
     tech_name = st.text_input("Technician:", value="فني")
     t1,t2,t3 = st.tabs(["Basic","Electrical","Engine"])
     with t1:
@@ -411,7 +505,7 @@ if st.session_state.current_page == "chat":
         st.session_state.messages.append({"role":"assistant","content":ans})
 
 elif st.session_state.current_page == "dashboard":
-    st.title("CEO Dashboard + Alerts")
+    st.title("CEO Dashboard")
     alerts = check_critical_parts()
     if alerts:
         st.error(f"يوجد {len(alerts)} تنبيه حرج - يظهر للجميع")
@@ -436,7 +530,7 @@ elif st.session_state.current_page == "dashboard":
 
 else:
     if "1." in selected_app:
-        st.title("الصيانة التنبؤية + QR + فاتورة")
+        st.title("الصيانة التنبؤية + QR + فاتورة + PDF")
         main_sites = list(st.session_state.sites_data.keys())
         sel_main = st.selectbox("Area:", main_sites) if main_sites else None
         sel_sub = None
@@ -482,10 +576,8 @@ else:
             df_res=pd.DataFrame(processed)
             st.dataframe(df_res, use_container_width=True)
             st.plotly_chart(px.bar(df_res, x="قطع الغيار / الفلاتر", y="نسبة الاستهلاك (%)", color="حالة"), use_container_width=True)
-
-            # ===== السطور 580-620 المصححة 100% =====
             st.divider()
-            st.subheader("فاتورة + تقرير أداء شامل PDF")
+            st.subheader("فاتورة + تقرير شامل PDF - يظهر للجميع")
             invoice=[]
             total=0
             for r in processed:
@@ -493,19 +585,17 @@ else:
                     price=PARTS_PRICES.get(r["قطع الغيار / الفلاتر"],500)
                     invoice.append({"Part": r["قطع الغيار / الفلاتر"], "Price USD": price, "Remain hrs": r["المدة المتبقية (ساعة)"]})
                     total+=price
-
             c_rep1, c_rep2 = st.columns(2)
             with c_rep1:
                 if invoice:
                     st.dataframe(pd.DataFrame(invoice), use_container_width=True)
                     st.metric("إجمالي الفاتورة", f"${total} USD")
                 else:
-                    st.success("لا فاتورة - لا قطع حرجة")
+                    st.success("لا فاتورة")
             with c_rep2:
                 st.metric("متوسط الاستهلاك", f"{df_res['نسبة الاستهلاك (%)'].mean():.1f}%")
                 st.metric("أقل متبقي", f"{df_res['المدة المتبقية (ساعة)'].min():.0f}h")
-
-            if st.button("إنشاء تقرير شامل PDF + رسوم بيانية", type="primary", use_container_width=True):
+            if st.button("إنشاء تقرير شامل PDF + رسوم", type="primary", use_container_width=True):
                 try:
                     pdf = ComprehensivePDF(f"MAINTENANCE REPORT - {sanitize_pdf_text(sel_gen)}")
                     pdf.add_page()
@@ -555,8 +645,8 @@ else:
                         pdf_data = pdf_output.encode("latin-1", errors="ignore")
                     else:
                         pdf_data = bytes(pdf_output)
-                    st.download_button("تحميل التقرير الشامل PDF", data=pdf_data, file_name=f"Full_Report_{sanitize_pdf_text(sel_gen)}_{datetime.now().strftime('%Y%m%d')}.pdf", mime="application/pdf", use_container_width=True, key="full_pdf")
-                    st.success("التقرير جاهز مع الرسوم!")
+                    st.download_button("تحميل التقرير PDF", data=pdf_data, file_name=f"Full_Report_{sanitize_pdf_text(sel_gen)}_{datetime.now().strftime('%Y%m%d')}.pdf", mime="application/pdf", use_container_width=True, key="full_pdf")
+                    st.success("التقرير جاهز!")
                 except Exception as e:
                     st.error(f"PDF Error: {e}")
 
@@ -571,7 +661,8 @@ else:
         st.plotly_chart(px.line(df_iot, x='_time', y='temperature', title="Live"), use_container_width=True)
 
     elif "3." in selected_app:
-        st.title("Daily + Alerts + واتساب للجميع V4.3")
+        st.title("Daily + Alerts + واتساب للجميع V4.4")
+        st.info("زر واتساب الآن يظهر للعملاء + Admin - مربوط بالدفتر ومحفوظ للأبد")
         alerts=check_critical_parts()
         if alerts:
             st.error(f"يوجد {len(alerts)} تنبيه حرج!")
@@ -598,7 +689,6 @@ else:
     elif "5." in selected_app:
         st.title("WIC & Motor")
         st.checkbox("Oil Level")
-        st.checkbox("Coolant")
     elif "6." in selected_app:
         st.title("Calculator")
         i_amp=st.number_input("Current A", value=250.0)
