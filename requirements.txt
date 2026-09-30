@@ -26,7 +26,6 @@ beautifulsoup4
 requests
 fpdf2
 google-genai
-gtts
 influxdb-client
 extra-streamlit-components
 kaleido
@@ -54,3 +53,8 @@ pyzbar
 extra-streamlit-components
 arabic-reshaper
 python-bidi
+streamlit
+extra-streamlit-components
+fpdf
+supabase
+openpyxl
