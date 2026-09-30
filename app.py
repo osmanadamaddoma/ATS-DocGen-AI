@@ -60,6 +60,18 @@ if "daily_logs" not in st.session_state:
     today_str = datetime.now().strftime("%Y-%m-%d")
     st.session_state.daily_logs = [{"timestamp": f"{today_str} 08:30:00", "date": today_str, "site": "الخرطوم - كافوري", "generator": "G1", "technician": "أحمد فني", "run_hours": 700.0, "v_measured": 398.0, "oil_press": 4.5, "coolant_temp": 85.0, "status": "طبيعي"}]
 
+# ===== NEW: دفتر أرقام الفنيين والمهندسين - يدوي =====
+if "technicians_db" not in st.session_state:
+    st.session_state.technicians_db = {
+        "الخرطوم (القائمة الرئيسية) / الموقع الرئيسي - كافوري (موقع فرعي)": [
+            {"name": "م. عثمان - مسؤول", "phone": "0912345678", "role": "مهندس"},
+            {"name": "أحمد فني", "phone": "0923456789", "role": "فني"},
+        ],
+        "DEFAULT": [
+            {"name": "فني طوارئ", "phone": "0912345678", "role": "فني"}
+        ]
+    }
+
 # ===== KEYS =====
 gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not gemini_key and "supabase" in st.secrets:
@@ -161,24 +173,49 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
     liters = kw_load * 0.24 * run_hours
     return round(liters,1), round(liters*2.68,1)
 
-# ===== FIXED: نظام كشف الشبكات السودانية + إنذار واتساب فقط =====
 def detect_carrier(phone):
     p = phone.replace("+249","0").replace(" ","").strip()
     if p.startswith(("090","091","096")):
         return "ZAIN 🟠"
     elif p.startswith(("092","093","099")):
         return "MTN 🟡"
-    elif p.startswith(("011","012","010","015","099")):
+    elif p.startswith(("011","012","010","015")):
         return "SUDANI 🔵"
     else:
         return "SUDAN 📱"
 
-@st.dialog("🔔 إنذار صيانة - إرسال واتساب")
+@st.dialog("🔔 إنذار صيانة - إرسال واتساب للفني المحفوظ")
 def whatsapp_alert_modal(alert_data):
     st.error(f"🚨 {alert_data['gen']} - {alert_data['part']}")
     st.write(f"📍 {alert_data['site']} | ⏱️ باقي {alert_data['remain']:.0f} ساعة | {alert_data.get('level','')}")
-    phone = st.text_input("📱 رقم الفني (يبدأ بـ 09):", value="0912345678", key=f"phone_{alert_data['gen']}_{alert_data['part']}")
-    st.caption(f"الشبكة المكتشفة: {detect_carrier(phone)}")
+
+    # جلب أرقام الموقع أو الافتراضي
+    site_key = alert_data['site']
+    techs = st.session_state.technicians_db.get(site_key, [])
+    if not techs:
+        # حاول بالمفتاح الرئيسي
+        for k in st.session_state.technicians_db.keys():
+            if k!= "DEFAULT" and k in site_key or site_key in k:
+                techs = st.session_state.technicians_db[k]
+                break
+    if not techs:
+        techs = st.session_state.technicians_db.get("DEFAULT", [])
+
+    options = [f"{t['name']} - {t['phone']} ({t['role']}) | {detect_carrier(t['phone'])}" for t in techs]
+    options.append("➕ رقم جديد غير محفوظ")
+
+    sel = st.selectbox("📱 اختر الفني/المهندس المحفوظ:", options, key=f"sel_tech_{alert_data['gen']}_{alert_data['part']}")
+
+    if "رقم جديد" in sel:
+        phone = st.text_input("اكتب الرقم الجديد (يبدأ بـ 09):", value="09", key=f"new_phone_{alert_data['gen']}_{alert_data['part']}")
+        tech_name = "فني"
+    else:
+        idx = options.index(sel)
+        phone = techs[idx]['phone']
+        tech_name = techs[idx]['name']
+
+    st.caption(f"الشبكة: {detect_carrier(phone)} | سيتم الإرسال إلى: {tech_name}")
+
     default_msg = f"""*ADDOMA - تنبيه صيانة حرج* 🚨
 
 *المولد:* {alert_data['gen']}
@@ -186,25 +223,19 @@ def whatsapp_alert_modal(alert_data):
 *الموقع:* {alert_data['site']}
 *الحالة:* {alert_data.get('level','تنبيه')}
 *متبقي:* {alert_data['remain']:.0f} ساعة فقط
-*المطلوب:* تغيير القطعة فوراً قبل التوقف
+*الفني المسؤول:* {tech_name}
+*المطلوب:* تغيير القطعة فوراً
 
-- نظام المجمع الصناعي V4.1 FIXED
+- نظام V4.1
 """
     msg = st.text_area("✏️ نص الرسالة:", value=default_msg, height=200, key=f"msg_{alert_data['gen']}_{alert_data['part']}")
     if st.button("📤 إرسال واتساب الآن", type="primary", use_container_width=True):
         clean = phone.strip().replace(" ","")
-        if clean.startswith("0"):
-            clean_intl = "249" + clean[1:]
-        elif clean.startswith("+249"):
-            clean_intl = clean.replace("+","")
-        else:
-            clean_intl = clean
+        clean_intl = "249" + clean[1:] if clean.startswith("0") else clean.replace("+","")
         wa_url = f"https://wa.me/{clean_intl}?text={urllib.parse.quote(msg)}"
-        st.success(f"✅ جاهز للإرسال إلى {detect_carrier(phone)} - {phone}")
+        st.success(f"✅ جاهز للإرسال إلى {tech_name} - {detect_carrier(phone)}")
         st.markdown(f'<a href="{wa_url}" target="_blank" style="text-decoration:none;"><div style="background:#25D366;color:white;padding:15px;text-align:center;border-radius:10px;font-size:18px;font-weight:bold;">👉 افتح واتساب وأرسل الآن 📱</div></a>', unsafe_allow_html=True)
-        st.caption(wa_url)
 
-# ===== FIXED: ربط حساب الساعات المتبقية مع ساعات المولد =====
 def check_critical_parts():
     alerts = []
     for main_site in st.session_state.sites_data:
@@ -217,9 +248,8 @@ def check_critical_parts():
                             life = float(part.get("العمر الافتراضي (ساعة)",250))
                             used = float(part.get("الساعات المنقضية (ساعة)",0))
                             remain = life - used
-                            # يطلع إنذار لو باقي 100 ساعة أو أقل - مربوط بالحساب الصحيح
                             if remain <= 100:
-                                level = "🔴 خطر - توقف" if remain <= 0 else "🟡 قريب - جهز القطعة" if remain <= 50 else "🟠 تنبيه"
+                                level = "🔴 خطر" if remain <= 0 else "🟡 قريب" if remain <= 50 else "🟠 تنبيه"
                                 alerts.append({"site": f"{main_site}/{sub_site}", "gen": gen_id, "part": part.get("قطع الغيار / الفلاتر","قطعة"), "remain": remain, "level": level})
                         except Exception:
                             continue
@@ -275,13 +305,35 @@ def generate_subscription_modal():
         else:
             st.error("ادخل اسم العميل")
 
+@st.dialog("👷 إضافة فني / مهندس جديد")
+def add_technician_modal():
+    st.markdown("### إضافة رقم جديد لدفتر الفنيين")
+    all_sites = []
+    for ms in st.session_state.sites_data:
+        for ss in st.session_state.sites_data[ms]:
+            all_sites.append(f"{ms} / {ss}")
+    site_sel = st.selectbox("اختر الموقع:", all_sites)
+    t_name = st.text_input("اسم الفني/المهندس:", placeholder="م. أحمد")
+    t_phone = st.text_input("رقم الهاتف (يبدأ بـ 09):", placeholder="0912345678")
+    t_role = st.selectbox("الدور:", ["مهندس", "فني", "مسؤول صيانة", "طوارئ"])
+    if st.button("💾 حفظ في الدفتر", type="primary", use_container_width=True):
+        if t_name and t_phone:
+            if site_sel not in st.session_state.technicians_db:
+                st.session_state.technicians_db[site_sel] = []
+            st.session_state.technicians_db[site_sel].append({"name": t_name.strip(), "phone": t_phone.strip(), "role": t_role})
+            st.success(f"✅ تم حفظ {t_name} - {t_phone} - {detect_carrier(t_phone)}")
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.error("أكمل البيانات")
+
 # ===== LANGUAGE =====
 st.sidebar.subheader("🌐 Language / اللغة")
 selected_lang = st.sidebar.radio("Select Language", ["Arabic", "English"], index=0 if st.session_state.lang == "ar" else 1, label_visibility="collapsed")
 st.session_state.lang = "ar" if selected_lang == "Arabic" else "en"
 L = st.session_state.lang
-TXT = {"ar": {"title": "🔐 بوابة التفعيل", "code_input": "كود التفعيل:", "btn_activate": "تفعيل", "invalid": "كود غير صحيح", "auth": "ادخل كود صالح", "nav_header": "⚙️ نظام الدومة V4.1 FIXED", "nav_status": "🟢 مفعل", "btn_chat": "💬 المساعد الذكي", "btn_dashboard": "📊 لوحة التحكم", "btn_apps": "🛠️ التطبيقات", "btn_logout": "🚪 خروج", "choose_app": "اختر النظام:"},
-       "en": {"title": "🔐 Activation Portal", "code_input": "Code:", "btn_activate": "Activate", "invalid": "Invalid", "auth": "Enter valid code", "nav_header": "⚙️ Addoma V4.1 FIXED", "nav_status": "🟢 Active", "btn_chat": "💬 AI Assistant", "btn_dashboard": "📊 Dashboard", "btn_apps": "🛠️ Apps", "btn_logout": "🚪 Logout", "choose_app": "Select System:"}}[L]
+TXT = {"ar": {"title": "🔐 بوابة التفعيل", "code_input": "كود التفعيل:", "btn_activate": "تفعيل", "invalid": "كود غير صحيح", "auth": "ادخل كود صالح", "nav_header": "⚙️ نظام الدومة V4.1", "nav_status": "🟢 مفعل", "btn_chat": "💬 المساعد الذكي", "btn_dashboard": "📊 لوحة التحكم", "btn_apps": "🛠️ التطبيقات", "btn_logout": "🚪 خروج", "choose_app": "اختر النظام:"},
+       "en": {"title": "🔐 Activation Portal", "code_input": "Code:", "btn_activate": "Activate", "invalid": "Invalid", "auth": "Enter valid code", "nav_header": "⚙️ Addoma V4.1", "nav_status": "🟢 Active", "btn_chat": "💬 AI Assistant", "btn_dashboard": "📊 Dashboard", "btn_apps": "🛠️ Apps", "btn_logout": "🚪 Logout", "choose_app": "Select System:"}}[L]
 
 # ===== AUTH =====
 if not st.session_state.authenticated:
@@ -304,7 +356,7 @@ else:
         st.header(TXT["nav_header"])
         st.success(TXT["nav_status"])
         if IS_ADMIN:
-            st.warning("👑 Admin Mode - أنت المسؤول")
+            st.warning("👑 Admin Mode")
         st.write("---")
         if st.button(TXT["btn_chat"], use_container_width=True):
             st.session_state.current_page = "chat"
@@ -320,6 +372,16 @@ else:
                 generate_subscription_modal()
             if st.button("📋 عرض كل الأكواد", use_container_width=True):
                 st.dataframe(pd.DataFrame.from_dict(st.session_state.clients_db, orient='index'), use_container_width=True)
+            st.divider()
+            st.markdown("### 👷 دفتر الفنيين")
+            if st.button("➕ إضافة فني/مهندس", use_container_width=True):
+                add_technician_modal()
+            # عرض الدفتر
+            for site_k, tech_list in st.session_state.technicians_db.items():
+                if site_k!= "DEFAULT":
+                    with st.expander(f"📍 {site_k[:20]}.. ({len(tech_list)})"):
+                        for t in tech_list:
+                            st.write(f"{t['name']} | {t['phone']} | {detect_carrier(t['phone'])}")
         st.write("---")
         if st.button(TXT["btn_logout"], use_container_width=True):
             st.session_state.authenticated = False
@@ -375,7 +437,7 @@ def edit_generator_modal(main_site, sub_site, gen_key):
         st.session_state.sites_data[main_site][sub_site]["generators"][gen_key] = {"model": new_model, "run_hours": new_run_hours, "target": new_target, "kw": new_kw, "load": new_load, "calib_elec": {"v_nominal": v_nom, "v_measured": v_meas, "freq_nominal": f_nom, "freq_measured": f_meas, "current_max": c_max, "current_measured": c_meas, "pf": pf_val, "ct_ratio": ct_rat}, "calib_engine": {"oil_press_bar": o_press, "coolant_temp_c": c_temp, "rpm": r_rpm, "battery_v": b_volt, "ambient_temp": ambient_t}}
         st.session_state.daily_logs.append({"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "date": datetime.now().strftime("%Y-%m-%d"), "site": f"{main_site}-{sub_site}", "generator": gen_key, "technician": tech_name, "run_hours": new_run_hours, "v_measured": v_meas, "oil_press": o_press, "coolant_temp": c_temp, "status": "Updated"})
         save_to_supabase_auto()
-        st.success("Saved + Synced to Supabase!")
+        st.success("Saved + Synced!")
         st.rerun()
 
 # ===== PAGES =====
@@ -397,14 +459,14 @@ if st.session_state.current_page == "chat":
         st.session_state.messages.append({"role":"assistant","content":ans})
 
 elif st.session_state.current_page == "dashboard":
-    st.title("📊 CEO Dashboard + Alerts FIXED")
+    st.title("📊 CEO Dashboard + Alerts + دفتر الفنيين")
     alerts = check_critical_parts()
     if alerts:
-        st.error(f"🚨 يوجد {len(alerts)} تنبيه حرج! - مربوط")
+        st.error(f"🚨 يوجد {len(alerts)} تنبيه حرج! - مربوط بالدفتر")
         for al in alerts:
             c1,c2 = st.columns([4,1])
             with c1:
-                st.warning(f"{al['level']} | {al['gen']} - {al['part']} | باقي {al['remain']:.0f} ساعة | موقع {al['site']}")
+                st.warning(f"{al['level']} | {al['gen']} - {al['part']} | باقي {al['remain']:.0f}h | {al['site']}")
             with c2:
                 if st.button("📱 واتساب", key=f"dash_wa_{al['gen']}_{al['part']}"):
                     whatsapp_alert_modal(al)
@@ -412,7 +474,7 @@ elif st.session_state.current_page == "dashboard":
     total_gens = sum(len(v["generators"]) for ms in st.session_state.sites_data.values() for v in ms.values())
     col1.metric("إجمالي المولدات", total_gens)
     col2.metric("تنبيهات حرجة", len(alerts))
-    col3.metric("Supabase", "Online" if supabase else "Offline")
+    col3.metric("عدد الفنيين", sum(len(v) for v in st.session_state.technicians_db.values()))
     all_data=[]
     for main_site, subs in st.session_state.sites_data.items():
         for sub_site, d in subs.items():
@@ -511,11 +573,10 @@ else:
             st.info("Reset sent!")
 
     elif "3." in selected_app:
-        st.title("📊 Daily Monitoring + WhatsApp Alerts - V4.1 FIXED ✅")
-        st.info("النظام الآن مربوط: الساعات المتبقية = العمر الافتراضي - الساعات المنقضية")
+        st.title("📊 Daily + Alerts + دفتر الفنيين - V4.1 FIXED ✅")
         alerts=check_critical_parts()
         if alerts:
-            st.error(f"🚨 يوجد {len(alerts)} تنبيه حرج - مربوط بساعات التشغيل الحقيقية!")
+            st.error(f"🚨 يوجد {len(alerts)} تنبيه حرج - مربوط بالدفتر!")
             for al in alerts:
                 c1,c2,c3 = st.columns([3,2,1])
                 with c1:
@@ -527,11 +588,9 @@ else:
                         whatsapp_alert_modal(al)
             st.divider()
         else:
-            st.success("✅ لا يوجد تنبيهات حرجة - كل المولدات آمنة - الإنذار شغال")
-
+            st.success("✅ لا يوجد تنبيهات حرجة")
         today=datetime.now().strftime("%Y-%m-%d")
         logs=[l for l in st.session_state.daily_logs if l.get("date")==today]
-        st.subheader("سجل اليوم")
         st.dataframe(pd.DataFrame(logs) if logs else pd.DataFrame([{"msg":"No logs today"}]), use_container_width=True)
 
     elif "4." in selected_app:
