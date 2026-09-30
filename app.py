@@ -441,6 +441,7 @@ if saved_code and not st.session_state.authenticated:
         st.session_state.active_code = saved_code
 
 # --- دالة النافذة المنبثقة لإصدار أكواد الاشتراكات ---       # ===== فقط الأدمن يرى زر إصدار الأكواد =====
+        
         ADMIN_CODES = ["ADDOMA-2026-PRO"]  # ضع هنا أكوادك أنت فقط
         current_active_code = st.session_state.get("active_code", "")
         
