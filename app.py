@@ -393,10 +393,9 @@ CLIENTS_DATABASE = {
     },
 }
 
-# === بداية الإضافة الجديدة لحل مشكلة كود غير صحيح - بدون مساس بالهيكل الأصلي ===
+# === بداية الإضافة لحل مشكلة كود غير صحيح + الحفاظ على الجلسة بعد التنشيط ===
 ADMIN_CODES = ["ADDOMA-2026-PRO"]
 
-# تحميل الأكواد المصدرة من نافذة الأدمن من Supabase حتى لا يرجع للصفر
 if supabase:
     try:
         res_load = supabase.table("subscriptions").select("*").execute()
@@ -411,27 +410,61 @@ if supabase:
                 }
     except Exception as e:
         print(f"Load subscriptions error: {e}")
-# === نهاية الإضافة الجديدة ===
+# === نهاية الإضافة ===
 
 import extra_streamlit_components as stx
 import streamlit as st
 
 def get_cookie_manager():
     if "cookie_manager" not in st.session_state:
-        st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager")
+        st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager_persistent_v6_fixed")
     return st.session_state["cookie_manager"]
 
 cookie_manager = get_cookie_manager()
 
-saved_code = cookie_manager.get(cookie="activation_code")
+# === بداية إصلاح الحفاظ على النافذة بعد التنشيط F5 - لا تخرج ===
+saved_code = None
+try:
+    saved_code = cookie_manager.get(cookie="activation_code_v5")
+    if not saved_code:
+        saved_code = cookie_manager.get(cookie="activation_code")
+except:
+    saved_code = None
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if saved_code and not st.session_state.authenticated:
-    if saved_code in CLIENTS_DATABASE:
+    clean_saved = str(saved_code).strip().upper()
+    if clean_saved in CLIENTS_DATABASE:
         st.session_state.authenticated = True
-        st.session_state.active_code = saved_code
+        st.session_state.active_code = clean_saved
+        st.session_state.user_email = CLIENTS_DATABASE[clean_saved]["name"]
+        if clean_saved in ADMIN_CODES:
+            st.session_state.role = "admin"
+        else:
+            st.session_state.role = "client"
+    else:
+        if supabase:
+            try:
+                res = supabase.table("subscriptions").select("*").execute()
+                for row in res.data:
+                    c = str(row.get("code","")).strip().upper()
+                    if c == clean_saved:
+                        CLIENTS_DATABASE[c] = {
+                            "name": row.get("client_name", "عميل"),
+                            "plan": row.get("plan", "شهري"),
+                            "start_date": row.get("start_date", datetime.now().strftime("%Y-%m-%d")),
+                            "duration_days": int(row.get("duration_days", 30)),
+                        }
+                        st.session_state.authenticated = True
+                        st.session_state.active_code = c
+                        st.session_state.user_email = CLIENTS_DATABASE[c]["name"]
+                        st.session_state.role = "admin" if c in ADMIN_CODES else "client"
+                        break
+            except:
+                pass
+# === نهاية إصلاح الحفاظ على الجلسة ===
 
 # --- خيار تحديد اللغة في الشريط الجانبي ---
 st.sidebar.subheader("🌐 Language / اللغة")
@@ -488,7 +521,7 @@ if not st.session_state.authenticated:
     user_code = st.sidebar.text_input(TXT["code_input"], type="password")
 
     if st.sidebar.button(TXT["btn_activate"]):
-        # === إصلاح مشكلة كود غير صحيح بعد الإصدار من نافذة الأدمن - إعادة تحميل قبل التحقق ===
+        # === إعادة تحميل قبل التحقق لحل مشكلة كود غير صحيح ===
         if supabase:
             try:
                 res_reload = supabase.table("subscriptions").select("*").execute()
@@ -514,7 +547,8 @@ if not st.session_state.authenticated:
                 st.session_state.role = "admin"
             else:
                 st.session_state.role = "client"
-            expires_at = datetime.now() + timedelta(days=30)
+            expires_at = datetime.now() + timedelta(days=365)
+            cookie_manager.set("activation_code_v5", clean_code, expires_at=expires_at)
             cookie_manager.set("activation_code", clean_code, expires_at=expires_at)
             st.rerun()
         else:
@@ -540,6 +574,7 @@ else:
         st.write("---")
         if st.button(TXT["btn_logout"], type="primary", use_container_width=True):
             st.session_state.authenticated = False
+            cookie_manager.delete("activation_code_v5")
             cookie_manager.delete("activation_code")
             if "active_code" in st.session_state:
                 del st.session_state["active_code"]
@@ -570,6 +605,7 @@ if input_code in CLIENTS_DATABASE:
     else:
         st.sidebar.error(f"❌ License expired on ({expiry_dt}).")
         st.session_state.authenticated = False
+        cookie_manager.delete("activation_code_v5")
         cookie_manager.delete("activation_code")
         st.stop()
 
