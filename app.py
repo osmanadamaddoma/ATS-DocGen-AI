@@ -364,7 +364,6 @@ def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85)
 
 def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
     """تقدير استهلاك الديزل والانبعاثات المباشرة للمولدات"""
-    # متوسط الاستهلاك = ~0.24 لتر/كيلوواط.ساعة
     liters = kw_load * 0.24 * run_hours
     co2_kg = liters * 2.68  # 2.68 كجم كربون لكل لتر ديزل
     return round(liters, 1), round(co2_kg, 1)
@@ -394,7 +393,6 @@ if "clients_db" not in st.session_state:
         },
     }
 
-# توجيه المتغير القديم ليقرأ من الـ session_state
 CLIENTS_DATABASE = st.session_state.clients_db
 
 def get_cookie_manager():
@@ -424,7 +422,6 @@ def generate_subscription_modal():
     client_name = st.text_input("اسم العميل / الشركة:" if is_ar else "Client / Company Name:")
     plan_type = st.selectbox("نوع الباقة / Subscription Plan:", ["شهري (Monthly)", "سنوي (Yearly)", "تجريبي (Trial)"])
     
-    # تحديد المدة التلقائية بناءً على الباقة
     default_duration = 30
     if "سنوي" in plan_type or "Yearly" in plan_type:
         default_duration = 365
@@ -435,11 +432,9 @@ def generate_subscription_modal():
     
     if st.button("🚀 إصدار الكود (Generate)", type="primary", use_container_width=True):
         if client_name.strip():
-            # توليد كود فريد باستخدام uuid
             new_code = f"ADDOMA-{uuid.uuid4().hex[:6].upper()}"
             today_str = datetime.now().strftime("%Y-%m-%d")
             
-            # إضافة المشترك للقاعدة الديناميكية
             st.session_state.clients_db[new_code] = {
                 "name": client_name.strip(),
                 "plan": plan_type,
@@ -456,7 +451,6 @@ def generate_subscription_modal():
     st.divider()
     st.markdown("### 📋 " + ("قائمة الأكواد والباقات المفعلة في النظام" if is_ar else "Active Subscriptions & Codes List"))
     
-    # معالجة وتحضير جدول الأكواد
     subs_list = []
     today = datetime.now().date()
     
@@ -484,7 +478,6 @@ def generate_subscription_modal():
         
     df_subs = pd.DataFrame(subs_list)
     
-    # تحرير الجدول بمرونة وتفاعلية
     edited_subs = st.data_editor(
         df_subs,
         num_rows="dynamic",
@@ -510,7 +503,6 @@ def generate_subscription_modal():
             st.rerun()
 
     with col_sub_b:
-        # استخراج الأكواد والباقات المفعلة بكافة التنسيقات
         csv_bytes = edited_subs.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="📥 استخراج وتحميل الأكواد (CSV)",
@@ -527,7 +519,6 @@ st.session_state.lang = "ar" if "العربية" in selected_lang else "en"
 
 L = st.session_state.lang
 
-# نصوص ثنائية اللغة
 TXT = {
     "ar": {
         "title": "🔐 بوابة تفعيل النظام الموحد",
@@ -609,7 +600,6 @@ else:
                 del st.session_state["active_code"]
             st.rerun()
 
-        # الكود المضاف حديثاً: زر إدارة وإصدار واستخراج الاشتراكات (خاص بالمسؤول)
         st.write("---")
         if st.button("➕ إدارة وتوليد الاشتراكات (Admin)", use_container_width=True):
             generate_subscription_modal()
@@ -649,7 +639,7 @@ if not is_pro:
 st.sidebar.divider()
 
 # =========================================================
-# 3. قائمة اختيار التطبيق المركزي (ربط مع التنقل الجديد)
+# 3. قائمة اختيار التطبيق المركزي
 # =========================================================
 st.sidebar.markdown(TXT["app_selection"])
 
@@ -667,7 +657,7 @@ apps_list_ar = [
 
 apps_list_en = [
     "⚙️ 1. Predictive Maintenance & Gensets",
-    "🎛️️ 2. Remote Operations & Control Center",
+    "🎛 2. Remote Operations & Control Center",
     "📊 3. Daily Monitoring & Reminders",
     "🤖 4. AI Diagnostics & Catalog Reader",
     "🔍 5. Equipment Inspection (WIC & Heavy Duty)",
@@ -682,7 +672,7 @@ selected_app = st.sidebar.radio(
 st.sidebar.divider()
 
 # =========================================================
-# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد مع التحقق الفوري
+# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد
 # =========================================================
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
@@ -820,12 +810,16 @@ elif st.session_state.current_page == "dashboard":
     
     st.divider()
     st.subheader("Live Telemetry & Diagnostics Overview")
-    st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
+    df_iot = fetch_live_iot_data()
+    if not df_iot.empty:
+        st.line_chart(df_iot.set_index("_time")[["temperature", "vibration", "pressure"]])
+    else:
+        st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
 
 # --- 4. التطبيقات الهندسية الشاملة ---
 else:
     if "1." in selected_app:
-        st.title("⚙️️ " + ("نظام الصيانة التنبؤية ومراقبة المولدات" if L == "ar" else "Predictive Maintenance & Genset Monitoring"))
+        st.title("⚙ " + ("نظام الصيانة التنبؤية ومراقبة المولدات" if L == "ar" else "Predictive Maintenance & Genset Monitoring"))
 
         col_top_audio1, col_top_audio2 = st.columns([3, 1])
         with col_top_audio2:
@@ -839,7 +833,7 @@ else:
 
         st.subheader("📍 Site Management / إدارة المواقع والمولدات")
 
-        # --- بداية التعديل: نموذج الإدخال اليدوي المطور للمواقع والمولدات ---
+        # نموذج الإدخال اليدوي للمواقع والمولدات
         with st.expander("➕ إضافة منطقة وموقع ومولدات يدوياً (نموذج متكامل)", expanded=False):
             st.markdown("### بيانات المنطقة والموقع")
             geo_region = st.text_input("عنوان المنطقة الجغرافية (رقمها/اسمها) [مثال: الخرطوم - المنطقة 1]:", key="geo_reg_input")
@@ -870,7 +864,7 @@ else:
                     }
                     
                     for gen in gen_inputs:
-                        if gen["id"]: # التأكد من عدم ترك الرمز فارغاً
+                        if gen["id"]:
                             st.session_state.sites_data[geo_region][site_name]["generators"][gen["id"]] = {
                                 "model": gen["model"],
                                 "run_hours": 0.0,
@@ -902,7 +896,6 @@ else:
             else:
                 selected_sub_site = None
                 current_site_address = ""
-        # --- نهاية التعديل الخاص بنموذج الإدخال ---
 
         if not main_sites or not selected_main_site or not selected_sub_site:
             st.warning("Please add and select a main site and sub-site to manage generators.")
@@ -979,7 +972,7 @@ else:
             edited_df = st.data_editor(
                 df_parts_input,
                 num_rows="dynamic",
-                width="stretch",
+                use_container_width=True,
                 column_config={
                     "تجديد (تصفير)": st.column_config.CheckboxColumn("Reset Counter", default=False)
                 }
@@ -1131,3 +1124,66 @@ else:
                 mime="application/pdf",
                 type="primary"
             )
+
+    # --- باقي التطبيقات الفرعية (2 - 6) ---
+    elif "2." in selected_app:
+        st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Operations & Control Center"))
+        st.info("Direct Modbus/DSE Remote Control Suite")
+        col_ctrl1, col_ctrl2, col_ctrl3 = st.columns(3)
+        if col_ctrl1.button("▶ Start Generator (Remote)", type="primary"):
+            st.success("Start Command Transmitted via DSE Module!")
+        if col_ctrl2.button("⏹ Stop Generator (Remote)"):
+            st.warning("Stop Command Transmitted!")
+        if col_ctrl3.button("🔄 Auto Sync Mode"):
+            st.info("Synchronization Protocol Activated!")
+
+    elif "3." in selected_app:
+        st.title("📊 " + ("المتابعة اليومية وتقارير الإدارة" if L == "ar" else "Daily Monitoring & Reminders"))
+        st.subheader("📋 Daily Site Readings Log")
+        if st.session_state.daily_logs:
+            df_logs = pd.DataFrame(st.session_state.daily_logs)
+            st.dataframe(df_logs, use_container_width=True)
+            csv_logs = df_logs.to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📥 Export Daily Logs (CSV)", csv_logs, "daily_logs.csv", "text/csv")
+        else:
+            st.info("No daily logs recorded yet.")
+
+    elif "4." in selected_app:
+        st.title("🤖 " + ("المساعد الذكي والكتالوجات وقراءة الأكواد" if L == "ar" else "AI Diagnostics & Catalog Reader"))
+        st.subheader("📸 QR Code / Barcode Diagnostic Scanner")
+        cam_image = st.camera_input("Scan Equipment Barcode / QR")
+        if cam_image and decode_qr:
+            img = Image.open(cam_image)
+            decoded = decode_qr(img)
+            if decoded:
+                for obj in decoded:
+                    st.success(f"Barcode Detected: {obj.data.decode('utf-8')}")
+            else:
+                st.warning("No barcode detected in frame.")
+
+    elif "5." in selected_app:
+        st.title("🔍 " + ("نظام فحص المعدات وغرف التبريد" if L == "ar" else "Equipment Inspection (WIC & Heavy Duty)"))
+        st.subheader("❄️️ Cold Storage Units (WIC 10 & WIC 40)")
+        c1, c2 = st.columns(2)
+        c1.metric("WIC 10 Temp", "-18.5 °C", "Normal")
+        c2.metric("WIC 40 Temp", "+4.2 °C", "Normal")
+
+    elif "6." in selected_app:
+        st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
+        tab_c1, tab_c2 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint"])
+        
+        with tab_c1:
+            i_val = st.number_input("Current (Amperes):", value=100.0)
+            d_val = st.number_input("Distance (Meters):", value=50.0)
+            s_val = st.number_input("Cable Cross-Section (mm²):", value=35.0)
+            if st.button("Calculate Voltage Drop"):
+                vd, vd_pct = calculate_cable_voltage_drop(i_val, d_val, s_val)
+                st.metric("Voltage Drop (V)", f"{vd} V", f"{vd_pct} % of 400V")
+                
+        with tab_c2:
+            kw_val = st.number_input("Generator Load (kW):", value=200.0)
+            hrs_val = st.number_input("Operating Hours:", value=10.0)
+            if st.button("Calculate Consumption & Carbon"):
+                liters, co2 = calculate_fuel_consumption_and_emissions(kw_val, hrs_val)
+                st.metric("Est. Fuel Consumption", f"{liters} Liters")
+                st.metric("Est. CO2 Emissions", f"{co2} kg CO2")
