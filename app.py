@@ -362,12 +362,52 @@ def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85)
     v_drop_pct = (v_drop / 400.0) * 100
     return round(v_drop, 2), round(v_drop_pct, 2)
 
-def calculate_fuel_consumption_and_emissions(kw_load, run_hours):
-    """تقدير استهلاك الديزل والانبعاثات المباشرة للمولدات"""
-    # متوسط الاستهلاك = ~0.24 لتر/كيلوواط.ساعة
-    liters = kw_load * 0.24 * run_hours
-    co2_kg = liters * 2.68 # 2.68 كجم كربون لكل لتر ديزل
-    return round(liters, 1), round(co2_kg, 1)
+def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perkins", kw_capacity=None):
+    """تقدير استهلاك الديزل والانبعاثات - نسخة ذكية تقرأ من جدولك CSV حسب نسبة التحميل ونوع المحرك"""
+    fuel_table = {
+        100: {"CAT C32": 0.241, "Cummins KTA50": 0.245, "Perkins 2506": 0.249, "AVG": 0.24, "eff": 34},
+        75: {"CAT C32": 0.247, "Cummins KTA50": 0.253, "Perkins 2506": 0.259, "AVG": 0.25, "eff": 33},
+        50: {"CAT C32": 0.265, "Cummins KTA50": 0.271, "Perkins 2506": 0.276, "AVG": 0.27, "eff": 31},
+        25: {"CAT C32": 0.306, "Cummins KTA50": 0.318, "Perkins 2506": 0.324, "AVG": 0.31, "eff": 27},
+    }
+
+    if kw_capacity and kw_capacity > 0:
+        load_pct = (kw_load / kw_capacity) * 100.0
+    else:
+        load_pct = 100.0 if kw_load > 100 else kw_load
+
+    load_pct = max(25.0, min(100.0, load_pct))
+
+    model_key = "AVG"
+    if "CAT" in str(gen_model).upper():
+        model_key = "CAT C32"
+    elif "CUMMINS" in str(gen_model).upper() or "KTA" in str(gen_model).upper():
+        model_key = "Cummins KTA50"
+    elif "PERKINS" in str(gen_model).upper():
+        model_key = "Perkins 2506"
+
+    loads = sorted(fuel_table.keys())
+    if load_pct in fuel_table:
+        sfc = fuel_table[load_pct][model_key]
+        eff = fuel_table[load_pct]["eff"]
+    else:
+        lower = max([l for l in loads if l <= load_pct], default=25)
+        upper = min([l for l in loads if l >= load_pct], default=100)
+        if lower == upper:
+            sfc = fuel_table[lower][model_key]
+            eff = fuel_table[lower]["eff"]
+        else:
+            sfc_low = fuel_table[lower][model_key]
+            sfc_up = fuel_table[upper][model_key]
+            eff_low = fuel_table[lower]["eff"]
+            eff_up = fuel_table[upper]["eff"]
+            ratio = (load_pct - lower) / (upper - lower)
+            sfc = sfc_low + ratio * (sfc_up - sfc_low)
+            eff = eff_low + ratio * (eff_up - eff_low)
+
+    liters = kw_load * sfc * run_hours
+    co2_kg = liters * 2.68
+    return round(liters, 1), round(co2_kg, 1), round(sfc, 3), round(eff, 1)
 
 # =========================================================
 # 2. نظام الاشتراكات الموحد والباقات (مع إدارة الكوكيز)
@@ -417,7 +457,7 @@ import streamlit as st
 
 def get_cookie_manager():
     if "cookie_manager" not in st.session_state:
-        st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager_persistent_final")
+        st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager_persistent_final_v3")
     return st.session_state["cookie_manager"]
 
 cookie_manager = get_cookie_manager()
@@ -1241,7 +1281,6 @@ else:
             st.warning("⚠️ **WIC Cold Room Checklist:** Check expansion valves, defrost heaters, and refrigerant flow for WIC 10 and WIC 40 units.")
 
     elif "6." in selected_app:
-        # الميزة الهندسية المستحدثة الجديدة: الحاسبة الذكية للهبوط في الجهد والانبعاثات
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
 
         tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint"])
@@ -1262,13 +1301,28 @@ else:
                 st.success("✅ Cable size is acceptable under IEC standards.")
 
         with tab_calc2:
-            st.subheader("🌱 Fuel Consumption & CO2 Emission Estimator")
-            ec1, ec2 = st.columns(2)
+            st.subheader("🌱 Fuel Consumption & CO2 Emission Estimator - Smart Table Based")
+            ec1, ec2, ec3 = st.columns(3)
             load_kw = ec1.number_input("Running Load (kW):", value=200.0)
             hours_run = ec2.number_input("Operating Hours:", value=24.0)
+            cap_kw = ec3.number_input("Generator Capacity (kW):", value=410.0)
 
-            est_liters, est_co2 = calculate_fuel_consumption_and_emissions(load_kw, hours_run)
+            current_model = "Perkins"
+            if 'gen_info' in locals():
+                try:
+                    current_model = gen_info.get('model', 'Perkins')
+                    cap_kw = float(gen_info.get('kw', cap_kw))
+                except:
+                    pass
 
-            mc1, mc2 = st.columns(2)
-            mc1.metric("Estimated Diesel Used", f"{est_liters} Liters")
-            mc2.metric("Estimated CO2 Output", f"{est_co2} kg")
+            est_liters, est_co2, est_sfc, est_eff = calculate_fuel_consumption_and_emissions(load_kw, hours_run, current_model, cap_kw)
+
+            mc1, mc2, mc3, mc4 = st.columns(4)
+            mc1.metric("Diesel Used", f"{est_liters} L")
+            mc2.metric("CO2 Output", f"{est_co2} kg")
+            mc3.metric("SFC Real", f"{est_sfc} L/kWh")
+            mc4.metric("Efficiency", f"{est_eff}%")
+
+            st.caption(f"المحرك: {current_model} | نسبة التحميل: {(load_kw/cap_kw*100):.1f}% | القيمة من جدولك CSV")
+            if (load_kw/cap_kw*100) < 50:
+                st.warning("⚠️ تحميل أقل من 50% - المولد يهدر وقود! الكفاءة منخفضة حسب جدولك.")
