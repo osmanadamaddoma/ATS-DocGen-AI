@@ -1110,7 +1110,7 @@ else:
             with col_up2:
                 parts_img_file = st.file_uploader("Upload Maintenance Photo", type=["png", "jpg", "jpeg"])
 
-            # === دالة التقرير الشامل 1405 - مع عنوان الموقع في الترويسة وكل الرسوم ===
+            # === دالة التقرير الشامل 1475 - مصححة بالكامل ===
             def generate_full_pdf_bytes():
                 import matplotlib.pyplot as plt
                 temp_logo_path = None
@@ -1128,7 +1128,6 @@ else:
                     temp_charts.append(p)
                     return p
 
-                # --- رسم 1: استهلاك القطع ---
                 fig1, ax1 = plt.subplots(figsize=(6,3.5))
                 colors_mpl = ['green' if x<70 else 'orange' if x<90 else 'red' for x in df_result["نسبة الاستهلاك (%)"]]
                 ax1.barh(df_result["قطع الغيار / الفلاتر"], df_result["نسبة الاستهلاك (%)"], color=colors_mpl)
@@ -1137,13 +1136,11 @@ else:
                 ax1.invert_yaxis()
                 chart1_path = save_temp_chart(fig1)
 
-                # --- رسم 2: ساعات التشغيل ---
                 fig2, ax2 = plt.subplots(figsize=(3.5,3.5))
                 ax2.pie([current_h, rem_h], labels=['Elapsed', 'Remaining'], autopct='%1.1f%%', colors=["#182b49", "#28a745"])
                 ax2.set_title("Run Hours Ratio")
                 chart2_path = save_temp_chart(fig2)
 
-                # --- رسم 3 و 4: منحنى الوقود من جدول CSV ---
                 ft = get_fuel_table_from_csv(st.session_state.get("fuel_csv_upload", None) if "fuel_csv_upload" in st.session_state and st.session_state.fuel_csv_upload else None)
                 loads = sorted(ft.keys())
 
@@ -1167,7 +1164,6 @@ else:
                 ax4.grid(True, alpha=0.3)
                 chart4_path = save_temp_chart(fig4)
 
-                # === بناء PDF 4 صفحات ===
                 pdf = ComprehensivePDF(
                     "COMPREHENSIVE GENERATOR REPORT - WITH FUEL CURVE & MAINTENANCE",
                     logo_path=temp_logo_path,
@@ -1177,7 +1173,6 @@ else:
                 )
                 pdf.add_page()
 
-                # صفحة 1: بيانات المولد والموقع في الترويسة
                 pdf.set_fill_color(245, 247, 250)
                 pdf.rect(10, 35, 190, 48, "F")
                 pdf.set_xy(12, 37)
@@ -1202,7 +1197,6 @@ else:
                 pdf.cell(0, 5, f"Oil Recommendation [Ambient {amb_temp_val} C]: {'20W50' if amb_temp_val>=45 else '15W40'}", ln=True)
 
                 pdf.ln(3)
-                # جدول الصيانة
                 headers_pdf = ["#", "Part / Service Name", "Lifespan", "Used", "Remain", "Status"]
                 widths = [10, 60, 25, 25, 25, 45]
                 pdf.set_font("Helvetica", "B", 8)
@@ -1225,7 +1219,6 @@ else:
                     pdf.cell(widths[5], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1, fill=fill)
                     pdf.ln()
 
-                # صفحة 2: كل الرسوم
                 pdf.add_page()
                 pdf.set_font("Helvetica", "B", 11)
                 pdf.cell(0, 8, "Page 2: Performance Charts - Parts Usage, Run Hours, Fuel & Efficiency", ln=True, align="C")
@@ -1242,7 +1235,6 @@ else:
                 pdf.set_font("Helvetica", "", 7)
                 pdf.multi_cell(0, 4, f"Site Address in Header Footer: {sanitize_latin_only(current_site_address)} | Analysis: Low load (<50%) increases SFC from {ft[100]['AVG']} to {ft[25]['AVG']} L/kWh (+29% waste). Recommendation: Keep load >70% for {ft[75]['eff']}% efficiency.")
 
-                # صفحة 3: جدول الوقود التفصيلي
                 pdf.add_page()
                 pdf.set_font("Helvetica", "B", 11)
                 pdf.cell(0, 8, "Page 3: Detailed Fuel Table From Your CSV - Predictive Maintenance", ln=True, align="C")
@@ -1250,8 +1242,9 @@ else:
                 pdf.set_font("Helvetica", "B", 8)
                 pdf.set_fill_color(24,43,73)
                 pdf.set_text_color(255,255,255)
-                f_headers = ["Load %", "CAT g/kWh", "Cummins", "Perkins", "SFC L/kWh", "Eff %", "CO2 kg/L"]
-                f_widths = [18, 25, 25, 18, 25]
+                # === الإصلاح النهائي هنا 7 أعمدة مع 7 عرض ===
+                f_headers = ["Load %", "CAT g/kWh", "Cummins", "Perkins", "SFC L/kWh", "Eff %", "CO2"]
+                f_widths = [20, 25, 25, 25, 25, 20, 20]
                 for h,w in zip(f_headers, f_widths):
                     pdf.cell(w, 6, h, border=1, fill=True, align="C")
                 pdf.ln()
@@ -1267,7 +1260,6 @@ else:
                     pdf.cell(f_widths[6], 5, "2.68", border=1, align="C")
                     pdf.ln()
 
-                # تنظيف الملفات المؤقتة
                 for p in temp_charts:
                     try:
                         if os.path.exists(p):
@@ -1278,14 +1270,23 @@ else:
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
 
-            st.download_button(
-                label=f"🖨️ Download COMPREHENSIVE Report ({selected_gen}) - 3 Pages With Fuel Curve & Site Address",
-                data=generate_full_pdf_bytes(),
-                file_name=f"COMPREHENSIVE_Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-                type="primary"
-            )
+            try:
+                pdf_bytes = generate_full_pdf_bytes()
+            except Exception as e:
+                st.error(f"PDF Error: {e}")
+                pdf_bytes = None
+
+            if pdf_bytes:
+                st.download_button(
+                    label=f"🖨️ Download COMPREHENSIVE Report ({selected_gen}) - 3 Pages With Fuel Curve & Site Address",
+                    data=pdf_bytes,
+                    file_name=f"COMPREHENSIVE_Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    type="primary"
+                )
+            else:
+                st.warning("PDF generation failed")
 
     elif "2." in selected_app:
         st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
@@ -1456,6 +1457,8 @@ else:
 
         with tab_calc3:
             st.subheader("📈 منحنى استهلاك الوقود مقابل التحميل - من جدولك")
+            st.markdown("هذا الرسم يوضح كيف يزيد الاستهلاك عند التحميل المنخفض - نفس بيانات ملفك CSV")
+
             ft = get_fuel_table_from_csv(st.session_state.get("fuel_csv_upload", None) if "fuel_csv_upload" in st.session_state and st.session_state.fuel_csv_upload else None)
             df_plot = pd.DataFrame([
                 {"Load %": k, "CAT C32": v["CAT C32"], "Cummins KTA50": v["Cummins KTA50"], "Perkins 2506": v["Perkins 2506"], "AVG": v["AVG"], "Efficiency %": v["eff"]}
