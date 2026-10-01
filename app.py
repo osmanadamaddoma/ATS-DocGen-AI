@@ -234,7 +234,7 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
             return f"❌ Error: {err_msg}"
 
 # =========================================================
-# 1. دوال النظام المساعدة وتصميم تقرير الـ PDF المطور
+# 1. دوال النظام المساعدة وتصميم تقرير الـ PDF المطور الشامل
 # =========================================================
 def sanitize_latin_only(text):
     if not isinstance(text, str):
@@ -248,10 +248,16 @@ class ComprehensivePDF(FPDF):
         self,
         title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT",
         logo_path=None,
+        site_address="N/A",
+        main_site="N/A",
+        sub_site="N/A",
     ):
         super().__init__()
         self.report_title = title_text
         self.logo_path = logo_path
+        self.site_address = site_address
+        self.main_site = main_site
+        self.sub_site = sub_site
 
     def header(self):
         self.set_fill_color(24, 43, 73)
@@ -283,7 +289,7 @@ class ComprehensivePDF(FPDF):
         self.cell(
             0,
             4,
-            "Power Systems & Electro-Mechanical Maintenance Division",
+            f"SITE: {sanitize_latin_only(self.site_address)} | {sanitize_latin_only(self.main_site)} - {sanitize_latin_only(self.sub_site)}",
             ln=True,
         )
 
@@ -310,7 +316,7 @@ class ComprehensivePDF(FPDF):
         self.cell(
             0,
             4,
-            f"Page {self.page_no()} | Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            f"Page {self.page_no()} | Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Site: {sanitize_latin_only(self.site_address)}",
             align="C",
         )
 
@@ -362,7 +368,6 @@ def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85)
     v_drop_pct = (v_drop / 400.0) * 100
     return round(v_drop, 2), round(v_drop_pct, 2)
 
-# === الخطوة الجديدة: تحميل جدول الوقود من CSV تلقائيا ===
 def get_fuel_table_from_csv(uploaded_csv=None):
     """قراءة جدول الوقود من ملف CSV المرفوع او استخدام الجدول الداخلي"""
     default_table = {
@@ -374,14 +379,12 @@ def get_fuel_table_from_csv(uploaded_csv=None):
     if uploaded_csv is not None:
         try:
             df = pd.read_csv(uploaded_csv)
-            # نتوقع اعمدة: Load %, CAT C32 g/kWh, Cummins KTA50, Perkins 2506, SFC L/kWh, كفاءة %
             table = {}
             for _, row in df.iterrows():
                 load = int(row.get("Load %", 0))
                 if load == 0:
                     continue
                 sfc = float(row.get("SFC L/kWh", 0.24))
-                # تحويل الجرام الى لتر اذا لزم
                 def g_to_l(g):
                     try:
                         return float(g) / 850.0
@@ -471,7 +474,6 @@ CLIENTS_DATABASE = {
     },
 }
 
-# === بداية الإضافة الجديدة لحل مشكلة كود غير صحيح + الحفظ بعد التنشيط ===
 ADMIN_CODES = ["ADDOMA-2026-PRO"]
 
 if supabase:
@@ -488,7 +490,6 @@ if supabase:
                 }
     except Exception as e:
         print(f"Load subscriptions error: {e}")
-# === نهاية الإضافة ===
 
 import extra_streamlit_components as stx
 import streamlit as st
@@ -500,7 +501,6 @@ def get_cookie_manager():
 
 cookie_manager = get_cookie_manager()
 
-# === بداية إصلاح الحفظ المضمون بعد التنشيط F5 ===
 query_params = st.query_params
 code_from_url = query_params.get("code", None)
 
@@ -544,7 +544,6 @@ if final_saved and not st.session_state.authenticated:
                         break
             except:
                 pass
-# === نهاية إصلاح الحفظ ===
 
 # --- خيار تحديد اللغة في الشريط الجانبي ---
 st.sidebar.subheader("🌐 Language / اللغة")
@@ -553,7 +552,6 @@ st.session_state.lang = "ar" if "العربية" in selected_lang else "en"
 
 L = st.session_state.lang
 
-# نصوص ثنائية اللغة
 TXT = {
     "ar": {
         "title": "🔐 بوابة تفعيل النظام الموحد",
@@ -595,7 +593,6 @@ TXT = {
     }
 }[L]
 
-# --- الواجهة والتأكيد ---
 if not st.session_state.authenticated:
     st.title(TXT["title"])
     user_code = st.sidebar.text_input(TXT["code_input"], type="password")
@@ -632,7 +629,6 @@ if not st.session_state.authenticated:
                 pass
 
             st.query_params["code"] = clean_code
-
             st.rerun()
         else:
             st.sidebar.error(TXT["invalid_code"])
@@ -707,10 +703,6 @@ if not is_pro:
     st.stop()
 
 st.sidebar.divider()
-
-# =========================================================
-# 3. قائمة اختيار التطبيق المركزي (ربط مع التنقل الجديد)
-# =========================================================
 st.sidebar.markdown(TXT["app_selection"])
 
 def on_app_change():
@@ -741,9 +733,6 @@ selected_app = st.sidebar.radio(
 )
 st.sidebar.divider()
 
-# =========================================================
-# النافذة المنبثقة (Modal) لإدخال/تحديث بيانات المولد مع التحقق الفوري
-# =========================================================
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
     gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
@@ -830,11 +819,6 @@ def edit_generator_modal(main_site, sub_site, gen_key):
             st.success("✅ Saved successfully!")
             st.rerun()
 
-# =========================================================
-# --- عرض الواجهات الرئيسية (المدمجة) ---
-# =========================================================
-
-# --- 2. واجهة المساعد الذكي (Chat UI) ---
 if st.session_state.current_page == "chat":
     st.title("🤖 " + ("المساعد الذكي الهندسي" if L == "ar" else "Smart AI Assistant"))
     st.caption("Addoma Trading Services - Industrial AI Engine")
@@ -869,7 +853,6 @@ if st.session_state.current_page == "chat":
 
         st.session_state.messages.append({"role": "assistant", "content": response_text})
 
-# --- 3. واجهة لوحة التحكم (Dashboard UI) ---
 elif st.session_state.current_page == "dashboard":
     st.title("📊 " + ("لوحة تحكم الأنظمة والمتابعة" if L == "ar" else "Systems Control Dashboard"))
 
@@ -882,7 +865,6 @@ elif st.session_state.current_page == "dashboard":
     st.subheader("Live Telemetry & Diagnostics Overview")
     st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
 
-# --- 4. التطبيقات الهندسية الشاملة ---
 else:
     if "1." in selected_app:
         st.title("⚙️ " + ("نظام الصيانة التنبؤية ومراقبة المولدات" if L == "ar" else "Predictive Maintenance & Genset Monitoring"))
@@ -899,7 +881,6 @@ else:
 
         st.subheader("📍 Site Management / إدارة المواقع والمولدات")
 
-        # --- بداية التعديل: نموذج الإدخال اليدوي المطور للمواقع والمولدات ---
         with st.expander("➕ إضافة منطقة وموقع ومولدات يدوياً (نموذج متكامل)", expanded=False):
             st.markdown("### بيانات المنطقة والموقع")
             geo_region = st.text_input("عنوان المنطقة الجغرافية (رقمها/اسمها) [مثال: الخرطوم - المنطقة 1]:", key="geo_reg_input")
@@ -930,7 +911,7 @@ else:
                     }
 
                     for gen in gen_inputs:
-                        if gen["id"]: # التأكد من عدم ترك الرمز فارغاً
+                        if gen["id"]:
                             st.session_state.sites_data[geo_region][site_name]["generators"][gen["id"]] = {
                                 "model": gen["model"],
                                 "run_hours": 0.0,
@@ -962,7 +943,6 @@ else:
             else:
                 selected_sub_site = None
                 current_site_address = ""
-        # --- نهاية التعديل الخاص بنموذج الإدخال ---
 
         if not main_sites or not selected_main_site or not selected_sub_site:
             st.warning("Please add and select a main site and sub-site to manage generators.")
@@ -1130,50 +1110,99 @@ else:
             with col_up2:
                 parts_img_file = st.file_uploader("Upload Maintenance Photo", type=["png", "jpg", "jpeg"])
 
+            # === دالة التقرير الشامل 1405 - مع عنوان الموقع في الترويسة وكل الرسوم ===
             def generate_full_pdf_bytes():
+                import matplotlib.pyplot as plt
                 temp_logo_path = None
+                temp_charts = []
+
                 if logo_file:
                     temp_logo_path = f"temp_logo_{uuid.uuid4().hex}.png"
                     with open(temp_logo_path, "wb") as f:
                         f.write(logo_file.getbuffer())
 
-                pdf = ComprehensivePDF("GENERATOR PREDICTIVE MAINTENANCE REPORT", logo_path=temp_logo_path)
+                def save_temp_chart(fig):
+                    p = f"/tmp/chart_{uuid.uuid4().hex}.png"
+                    fig.savefig(p, dpi=150, bbox_inches='tight')
+                    plt.close(fig)
+                    temp_charts.append(p)
+                    return p
+
+                # --- رسم 1: استهلاك القطع ---
+                fig1, ax1 = plt.subplots(figsize=(6,3.5))
+                colors_mpl = ['green' if x<70 else 'orange' if x<90 else 'red' for x in df_result["نسبة الاستهلاك (%)"]]
+                ax1.barh(df_result["قطع الغيار / الفلاتر"], df_result["نسبة الاستهلاك (%)"], color=colors_mpl)
+                ax1.set_xlabel("Usage %")
+                ax1.set_title(f"Parts Usage - {selected_gen}")
+                ax1.invert_yaxis()
+                chart1_path = save_temp_chart(fig1)
+
+                # --- رسم 2: ساعات التشغيل ---
+                fig2, ax2 = plt.subplots(figsize=(3.5,3.5))
+                ax2.pie([current_h, rem_h], labels=['Elapsed', 'Remaining'], autopct='%1.1f%%', colors=["#182b49", "#28a745"])
+                ax2.set_title("Run Hours Ratio")
+                chart2_path = save_temp_chart(fig2)
+
+                # --- رسم 3 و 4: منحنى الوقود من جدول CSV ---
+                ft = get_fuel_table_from_csv(st.session_state.get("fuel_csv_upload", None) if "fuel_csv_upload" in st.session_state and st.session_state.fuel_csv_upload else None)
+                loads = sorted(ft.keys())
+
+                fig3, ax3 = plt.subplots(figsize=(6,3.2))
+                ax3.plot(loads, [ft[l]["CAT C32"] for l in loads], marker='o', label='CAT C32')
+                ax3.plot(loads, [ft[l]["Cummins KTA50"] for l in loads], marker='s', label='Cummins')
+                ax3.plot(loads, [ft[l]["Perkins 2506"] for l in loads], marker='^', label='Perkins')
+                ax3.plot(loads, [ft[l]["AVG"] for l in loads], marker='d', linestyle='--', label='AVG')
+                ax3.set_xlabel("Load %")
+                ax3.set_ylabel("SFC L/kWh")
+                ax3.set_title("Fuel SFC Curve - From Your CSV")
+                ax3.legend(fontsize=7)
+                ax3.grid(True, alpha=0.3)
+                chart3_path = save_temp_chart(fig3)
+
+                fig4, ax4 = plt.subplots(figsize=(6,2.5))
+                ax4.plot(loads, [ft[l]["eff"] for l in loads], marker='o', color='green')
+                ax4.set_xlabel("Load %")
+                ax4.set_ylabel("Efficiency %")
+                ax4.set_title("Efficiency vs Load")
+                ax4.grid(True, alpha=0.3)
+                chart4_path = save_temp_chart(fig4)
+
+                # === بناء PDF 4 صفحات ===
+                pdf = ComprehensivePDF(
+                    "COMPREHENSIVE GENERATOR REPORT - WITH FUEL CURVE & MAINTENANCE",
+                    logo_path=temp_logo_path,
+                    site_address=current_site_address,
+                    main_site=selected_main_site,
+                    sub_site=selected_sub_site
+                )
                 pdf.add_page()
 
+                # صفحة 1: بيانات المولد والموقع في الترويسة
                 pdf.set_fill_color(245, 247, 250)
-                pdf.rect(10, 35, 190, 45, "F")
+                pdf.rect(10, 35, 190, 48, "F")
                 pdf.set_xy(12, 37)
-                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_font("Helvetica", "B", 10)
                 pdf.set_text_color(24, 43, 73)
-
-                pdf.cell(0, 5, f"Generator Data Site Address: {sanitize_latin_only(current_site_address)}", ln=True)
+                pdf.cell(0, 6, f"Site Address (In Header): {sanitize_latin_only(current_site_address)}", ln=True)
                 pdf.set_x(12)
-                pdf.cell(0, 5, f"Main Site: {sanitize_latin_only(selected_main_site)} | Sub Site: {sanitize_latin_only(selected_sub_site)}", ln=True)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.cell(0, 5, f"Main Region: {sanitize_latin_only(selected_main_site)} | Sub Site: {sanitize_latin_only(selected_sub_site)}", ln=True)
                 pdf.set_x(12)
-                pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | Capacity: {gen_info['kw']} kW", ln=True)
+                pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | {gen_info['kw']} kW | Load: {gen_info['load']} kW", ln=True)
                 pdf.set_x(12)
-                pdf.cell(0, 5, f"Current Run Hours: {gen_info['run_hours']} hrs | Target Hours: {gen_info['target']} hrs", ln=True)
+                pdf.cell(0, 5, f"Run Hours: {gen_info['run_hours']} hrs | Target: {gen_info['target']} hrs | Voltage: {calib_e.get('v_measured')} V | Oil: {calib_m.get('oil_press_bar')} Bar", ln=True)
+                pdf.set_x(12)
+                pdf.cell(0, 5, f"Fuel SFC Now: {ft[75]['AVG'] if gen_info['load']/gen_info['kw']*100>60 else ft[50]['AVG']} L/kWh | Efficiency: {ft[75]['eff'] if gen_info['load']/gen_info['kw']*100>60 else ft[50]['eff']}% | CO2 Factor: 2.68 kg/L", ln=True)
 
                 amb_temp_val = calib_m.get('ambient_temp', 43.0)
-
-                pdf.ln(2)
+                pdf.ln(1)
                 pdf.set_x(12)
-                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_font("Helvetica", "B", 8)
                 pdf.set_text_color(200, 30, 30)
-                pdf.cell(0, 5, "Engine Oil Recommendation based on Ambient Temperature:", ln=True)
+                pdf.cell(0, 5, f"Oil Recommendation [Ambient {amb_temp_val} C]: {'20W50' if amb_temp_val>=45 else '15W40'}", ln=True)
 
-                pdf.set_x(12)
-                pdf.set_font("Helvetica", "B", 9)
-                pdf.set_text_color(24, 43, 73)
-                if amb_temp_val >= 45:
-                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 20W50", ln=True)
-                elif amb_temp_val >= 43:
-                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 15W40", ln=True)
-                else:
-                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: USE STANDARD OIL SIZE 15W40", ln=True)
-
-                pdf.ln(8)
-
+                pdf.ln(3)
+                # جدول الصيانة
                 headers_pdf = ["#", "Part / Service Name", "Lifespan", "Used", "Remain", "Status"]
                 widths = [10, 60, 25, 25, 25, 45]
                 pdf.set_font("Helvetica", "B", 8)
@@ -1196,15 +1225,66 @@ else:
                     pdf.cell(widths[5], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1, fill=fill)
                     pdf.ln()
 
+                # صفحة 2: كل الرسوم
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 11)
+                pdf.cell(0, 8, "Page 2: Performance Charts - Parts Usage, Run Hours, Fuel & Efficiency", ln=True, align="C")
+                if os.path.exists(chart1_path):
+                    pdf.image(chart1_path, x=10, y=20, w=90)
+                if os.path.exists(chart2_path):
+                    pdf.image(chart2_path, x=110, y=20, w=80)
+                if os.path.exists(chart3_path):
+                    pdf.image(chart3_path, x=10, y=95, w=90)
+                if os.path.exists(chart4_path):
+                    pdf.image(chart4_path, x=110, y=95, w=90)
+
+                pdf.set_xy(10, 165)
+                pdf.set_font("Helvetica", "", 7)
+                pdf.multi_cell(0, 4, f"Site Address in Header Footer: {sanitize_latin_only(current_site_address)} | Analysis: Low load (<50%) increases SFC from {ft[100]['AVG']} to {ft[25]['AVG']} L/kWh (+29% waste). Recommendation: Keep load >70% for {ft[75]['eff']}% efficiency.")
+
+                # صفحة 3: جدول الوقود التفصيلي
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 11)
+                pdf.cell(0, 8, "Page 3: Detailed Fuel Table From Your CSV - Predictive Maintenance", ln=True, align="C")
+                pdf.ln(2)
+                pdf.set_font("Helvetica", "B", 8)
+                pdf.set_fill_color(24,43,73)
+                pdf.set_text_color(255,255,255)
+                f_headers = ["Load %", "CAT g/kWh", "Cummins", "Perkins", "SFC L/kWh", "Eff %", "CO2 kg/L"]
+                f_widths = [18, 25, 25, 18, 25]
+                for h,w in zip(f_headers, f_widths):
+                    pdf.cell(w, 6, h, border=1, fill=True, align="C")
+                pdf.ln()
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_text_color(0,0,0)
+                for load in sorted(ft.keys(), reverse=True):
+                    pdf.cell(f_widths[0], 5, f"{load}%", border=1, align="C")
+                    pdf.cell(f_widths[1], 5, str(ft[load].get("g_cat", int(ft[load]["CAT C32"]*850))), border=1, align="C")
+                    pdf.cell(f_widths[2], 5, str(ft[load].get("g_cummins", int(ft[load]["Cummins KTA50"]*850))), border=1, align="C")
+                    pdf.cell(f_widths[3], 5, str(ft[load].get("g_perkins", int(ft[load]["Perkins 2506"]*850))), border=1, align="C")
+                    pdf.cell(f_widths[4], 5, str(ft[load]["AVG"]), border=1, align="C")
+                    pdf.cell(f_widths[5], 5, str(ft[load]["eff"])+"%", border=1, align="C")
+                    pdf.cell(f_widths[6], 5, "2.68", border=1, align="C")
+                    pdf.ln()
+
+                # تنظيف الملفات المؤقتة
+                for p in temp_charts:
+                    try:
+                        if os.path.exists(p):
+                            os.remove(p)
+                    except:
+                        pass
+
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
 
             st.download_button(
-                label=f"🖨️ Download Full Report for ({selected_gen})",
+                label=f"🖨️ Download COMPREHENSIVE Report ({selected_gen}) - 3 Pages With Fuel Curve & Site Address",
                 data=generate_full_pdf_bytes(),
-                file_name=f"Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                file_name=f"COMPREHENSIVE_Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
                 mime="application/pdf",
-                use_container_width=True
+                use_container_width=True,
+                type="primary"
             )
 
     elif "2." in selected_app:
@@ -1343,8 +1423,6 @@ else:
             st.file_uploader("📂 ارفع جدولك CSV الجديد (اختياري - سيحل محل الجدول الداخلي):", type=["csv"], key="fuel_csv_upload")
 
             fuel_table_active = get_fuel_table_from_csv(st.session_state.get("fuel_csv_upload", None) if "fuel_csv_upload" in st.session_state else None)
-            # محاولة قراءة الملف المرفوع من st.file_uploader مباشرة
-            csv_file = st.session_state.get("fuel_csv_file", None)
 
             ec1, ec2, ec3 = st.columns(3)
             load_kw = ec1.number_input("Running Load (kW):", value=200.0)
@@ -1359,7 +1437,6 @@ else:
                 except:
                     pass
 
-            # اذا كان هناك ملف CSV مرفوع في نفس الصفحة
             uploaded_for_calc = None
             if 'fuel_csv_upload' in st.session_state and st.session_state.fuel_csv_upload is not None:
                 uploaded_for_calc = st.session_state.fuel_csv_upload
@@ -1379,9 +1456,6 @@ else:
 
         with tab_calc3:
             st.subheader("📈 منحنى استهلاك الوقود مقابل التحميل - من جدولك")
-            st.markdown("هذا الرسم يوضح كيف يزيد الاستهلاك عند التحميل المنخفض - نفس بيانات ملفك CSV")
-
-            # بناء DataFrame للرسم
             ft = get_fuel_table_from_csv(st.session_state.get("fuel_csv_upload", None) if "fuel_csv_upload" in st.session_state and st.session_state.fuel_csv_upload else None)
             df_plot = pd.DataFrame([
                 {"Load %": k, "CAT C32": v["CAT C32"], "Cummins KTA50": v["Cummins KTA50"], "Perkins 2506": v["Perkins 2506"], "AVG": v["AVG"], "Efficiency %": v["eff"]}
