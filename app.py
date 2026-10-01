@@ -362,14 +362,52 @@ def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85)
     v_drop_pct = (v_drop / 400.0) * 100
     return round(v_drop, 2), round(v_drop_pct, 2)
 
-def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perkins", kw_capacity=None):
-    """تقدير استهلاك الديزل والانبعاثات - نسخة ذكية تقرأ من جدولك CSV حسب نسبة التحميل ونوع المحرك"""
-    fuel_table = {
-        100: {"CAT C32": 0.241, "Cummins KTA50": 0.245, "Perkins 2506": 0.249, "AVG": 0.24, "eff": 34},
-        75: {"CAT C32": 0.247, "Cummins KTA50": 0.253, "Perkins 2506": 0.259, "AVG": 0.25, "eff": 33},
-        50: {"CAT C32": 0.265, "Cummins KTA50": 0.271, "Perkins 2506": 0.276, "AVG": 0.27, "eff": 31},
-        25: {"CAT C32": 0.306, "Cummins KTA50": 0.318, "Perkins 2506": 0.324, "AVG": 0.31, "eff": 27},
+# === الخطوة الجديدة: تحميل جدول الوقود من CSV تلقائيا ===
+def get_fuel_table_from_csv(uploaded_csv=None):
+    """قراءة جدول الوقود من ملف CSV المرفوع او استخدام الجدول الداخلي"""
+    default_table = {
+        100: {"CAT C32": 0.241, "Cummins KTA50": 0.245, "Perkins 2506": 0.249, "AVG": 0.24, "eff": 34, "g_cat": 205, "g_cummins": 208, "g_perkins": 212},
+        75: {"CAT C32": 0.247, "Cummins KTA50": 0.253, "Perkins 2506": 0.259, "AVG": 0.25, "eff": 33, "g_cat": 210, "g_cummins": 215, "g_perkins": 220},
+        50: {"CAT C32": 0.265, "Cummins KTA50": 0.271, "Perkins 2506": 0.276, "AVG": 0.27, "eff": 31, "g_cat": 225, "g_cummins": 230, "g_perkins": 235},
+        25: {"CAT C32": 0.306, "Cummins KTA50": 0.318, "Perkins 2506": 0.324, "AVG": 0.31, "eff": 27, "g_cat": 260, "g_cummins": 270, "g_perkins": 275},
     }
+    if uploaded_csv is not None:
+        try:
+            df = pd.read_csv(uploaded_csv)
+            # نتوقع اعمدة: Load %, CAT C32 g/kWh, Cummins KTA50, Perkins 2506, SFC L/kWh, كفاءة %
+            table = {}
+            for _, row in df.iterrows():
+                load = int(row.get("Load %", 0))
+                if load == 0:
+                    continue
+                sfc = float(row.get("SFC L/kWh", 0.24))
+                # تحويل الجرام الى لتر اذا لزم
+                def g_to_l(g):
+                    try:
+                        return float(g) / 850.0
+                    except:
+                        return sfc
+                table[load] = {
+                    "CAT C32": g_to_l(row.get("CAT C32 g/kWh", sfc*850)),
+                    "Cummins KTA50": g_to_l(row.get("Cummins KTA50", sfc*850)),
+                    "Perkins 2506": g_to_l(row.get("Perkins 2506", sfc*850)),
+                    "AVG": sfc,
+                    "eff": int(row.get("كفاءة %", 30)),
+                    "g_cat": int(row.get("CAT C32 g/kWh", 200)),
+                    "g_cummins": int(row.get("Cummins KTA50", 200)),
+                    "g_perkins": int(row.get("Perkins 2506", 200)),
+                }
+            if table:
+                return table
+        except Exception as e:
+            print(f"CSV parse error: {e}")
+            return default_table
+    return default_table
+
+def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perkins", kw_capacity=None, fuel_table=None):
+    """تقدير استهلاك الديزل والانبعاثات - نسخة ذكية تقرأ من جدول CSV حسب نسبة التحميل ونوع المحرك"""
+    if fuel_table is None:
+        fuel_table = get_fuel_table_from_csv()
 
     if kw_capacity and kw_capacity > 0:
         load_pct = (kw_load / kw_capacity) * 100.0
@@ -1283,7 +1321,7 @@ else:
     elif "6." in selected_app:
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
 
-        tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint"])
+        tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint", "📈 SFC Curve - جدولك"])
 
         with tab_calc1:
             st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
@@ -1302,6 +1340,12 @@ else:
 
         with tab_calc2:
             st.subheader("🌱 Fuel Consumption & CO2 Emission Estimator - Smart Table Based")
+            st.file_uploader("📂 ارفع جدولك CSV الجديد (اختياري - سيحل محل الجدول الداخلي):", type=["csv"], key="fuel_csv_upload")
+
+            fuel_table_active = get_fuel_table_from_csv(st.session_state.get("fuel_csv_upload", None) if "fuel_csv_upload" in st.session_state else None)
+            # محاولة قراءة الملف المرفوع من st.file_uploader مباشرة
+            csv_file = st.session_state.get("fuel_csv_file", None)
+
             ec1, ec2, ec3 = st.columns(3)
             load_kw = ec1.number_input("Running Load (kW):", value=200.0)
             hours_run = ec2.number_input("Operating Hours:", value=24.0)
@@ -1315,7 +1359,13 @@ else:
                 except:
                     pass
 
-            est_liters, est_co2, est_sfc, est_eff = calculate_fuel_consumption_and_emissions(load_kw, hours_run, current_model, cap_kw)
+            # اذا كان هناك ملف CSV مرفوع في نفس الصفحة
+            uploaded_for_calc = None
+            if 'fuel_csv_upload' in st.session_state and st.session_state.fuel_csv_upload is not None:
+                uploaded_for_calc = st.session_state.fuel_csv_upload
+                fuel_table_active = get_fuel_table_from_csv(uploaded_for_calc)
+
+            est_liters, est_co2, est_sfc, est_eff = calculate_fuel_consumption_and_emissions(load_kw, hours_run, current_model, cap_kw, fuel_table_active)
 
             mc1, mc2, mc3, mc4 = st.columns(4)
             mc1.metric("Diesel Used", f"{est_liters} L")
@@ -1326,3 +1376,26 @@ else:
             st.caption(f"المحرك: {current_model} | نسبة التحميل: {(load_kw/cap_kw*100):.1f}% | القيمة من جدولك CSV")
             if (load_kw/cap_kw*100) < 50:
                 st.warning("⚠️ تحميل أقل من 50% - المولد يهدر وقود! الكفاءة منخفضة حسب جدولك.")
+
+        with tab_calc3:
+            st.subheader("📈 منحنى استهلاك الوقود مقابل التحميل - من جدولك")
+            st.markdown("هذا الرسم يوضح كيف يزيد الاستهلاك عند التحميل المنخفض - نفس بيانات ملفك CSV")
+
+            # بناء DataFrame للرسم
+            ft = get_fuel_table_from_csv(st.session_state.get("fuel_csv_upload", None) if "fuel_csv_upload" in st.session_state and st.session_state.fuel_csv_upload else None)
+            df_plot = pd.DataFrame([
+                {"Load %": k, "CAT C32": v["CAT C32"], "Cummins KTA50": v["Cummins KTA50"], "Perkins 2506": v["Perkins 2506"], "AVG": v["AVG"], "Efficiency %": v["eff"]}
+                for k, v in sorted(ft.items())
+            ])
+
+            fig_curve = go.Figure()
+            fig_curve.add_trace(go.Scatter(x=df_plot["Load %"], y=df_plot["CAT C32"], mode='lines+markers', name='CAT C32'))
+            fig_curve.add_trace(go.Scatter(x=df_plot["Load %"], y=df_plot["Cummins KTA50"], mode='lines+markers', name='Cummins KTA50'))
+            fig_curve.add_trace(go.Scatter(x=df_plot["Load %"], y=df_plot["Perkins 2506"], mode='lines+markers', name='Perkins 2506'))
+            fig_curve.update_layout(title="SFC (L/kWh) vs Load % - كلما قل التحميل زاد الاستهلاك", xaxis_title="Load %", yaxis_title="SFC L/kWh")
+            st.plotly_chart(fig_curve, use_container_width=True)
+
+            fig_eff = px.line(df_plot, x="Load %", y="Efficiency %", markers=True, title="الكفاءة % vs التحميل - من جدولك")
+            st.plotly_chart(fig_eff, use_container_width=True)
+
+            st.dataframe(df_plot, use_container_width=True)
