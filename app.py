@@ -393,7 +393,7 @@ CLIENTS_DATABASE = {
     },
 }
 
-# === بداية الإضافة لحل مشكلة كود غير صحيح + الحفاظ على الجلسة بعد التنشيط ===
+# === بداية الإضافة الجديدة لحل مشكلة كود غير صحيح + الحفظ بعد التنشيط ===
 ADMIN_CODES = ["ADDOMA-2026-PRO"]
 
 if supabase:
@@ -417,12 +417,15 @@ import streamlit as st
 
 def get_cookie_manager():
     if "cookie_manager" not in st.session_state:
-        st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager_persistent_v6_fixed")
+        st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager_persistent_final")
     return st.session_state["cookie_manager"]
 
 cookie_manager = get_cookie_manager()
 
-# === بداية إصلاح الحفاظ على النافذة بعد التنشيط F5 - لا تخرج ===
+# === بداية إصلاح الحفظ المضمون بعد التنشيط F5 ===
+query_params = st.query_params
+code_from_url = query_params.get("code", None)
+
 saved_code = None
 try:
     saved_code = cookie_manager.get(cookie="activation_code_v5")
@@ -431,19 +434,18 @@ try:
 except:
     saved_code = None
 
+final_saved = code_from_url if code_from_url else saved_code
+
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
-if saved_code and not st.session_state.authenticated:
-    clean_saved = str(saved_code).strip().upper()
+if final_saved and not st.session_state.authenticated:
+    clean_saved = str(final_saved).strip().upper()
     if clean_saved in CLIENTS_DATABASE:
         st.session_state.authenticated = True
         st.session_state.active_code = clean_saved
         st.session_state.user_email = CLIENTS_DATABASE[clean_saved]["name"]
-        if clean_saved in ADMIN_CODES:
-            st.session_state.role = "admin"
-        else:
-            st.session_state.role = "client"
+        st.session_state.role = "admin" if clean_saved in ADMIN_CODES else "client"
     else:
         if supabase:
             try:
@@ -464,7 +466,7 @@ if saved_code and not st.session_state.authenticated:
                         break
             except:
                 pass
-# === نهاية إصلاح الحفاظ على الجلسة ===
+# === نهاية إصلاح الحفظ ===
 
 # --- خيار تحديد اللغة في الشريط الجانبي ---
 st.sidebar.subheader("🌐 Language / اللغة")
@@ -521,7 +523,6 @@ if not st.session_state.authenticated:
     user_code = st.sidebar.text_input(TXT["code_input"], type="password")
 
     if st.sidebar.button(TXT["btn_activate"]):
-        # === إعادة تحميل قبل التحقق لحل مشكلة كود غير صحيح ===
         if supabase:
             try:
                 res_reload = supabase.table("subscriptions").select("*").execute()
@@ -543,13 +544,17 @@ if not st.session_state.authenticated:
             st.session_state.authenticated = True
             st.session_state.active_code = clean_code
             st.session_state.user_email = CLIENTS_DATABASE[clean_code]["name"]
-            if clean_code in ADMIN_CODES:
-                st.session_state.role = "admin"
-            else:
-                st.session_state.role = "client"
+            st.session_state.role = "admin" if clean_code in ADMIN_CODES else "client"
+
             expires_at = datetime.now() + timedelta(days=365)
-            cookie_manager.set("activation_code_v5", clean_code, expires_at=expires_at)
-            cookie_manager.set("activation_code", clean_code, expires_at=expires_at)
+            try:
+                cookie_manager.set("activation_code_v5", clean_code, expires_at=expires_at)
+                cookie_manager.set("activation_code", clean_code, expires_at=expires_at)
+            except:
+                pass
+
+            st.query_params["code"] = clean_code
+
             st.rerun()
         else:
             st.sidebar.error(TXT["invalid_code"])
@@ -574,8 +579,13 @@ else:
         st.write("---")
         if st.button(TXT["btn_logout"], type="primary", use_container_width=True):
             st.session_state.authenticated = False
-            cookie_manager.delete("activation_code_v5")
-            cookie_manager.delete("activation_code")
+            try:
+                cookie_manager.delete("activation_code_v5")
+                cookie_manager.delete("activation_code")
+            except:
+                pass
+            if "code" in st.query_params:
+                del st.query_params["code"]
             if "active_code" in st.session_state:
                 del st.session_state["active_code"]
             st.rerun()
@@ -605,8 +615,13 @@ if input_code in CLIENTS_DATABASE:
     else:
         st.sidebar.error(f"❌ License expired on ({expiry_dt}).")
         st.session_state.authenticated = False
-        cookie_manager.delete("activation_code_v5")
-        cookie_manager.delete("activation_code")
+        try:
+            cookie_manager.delete("activation_code_v5")
+            cookie_manager.delete("activation_code")
+        except:
+            pass
+        if "code" in st.query_params:
+            del st.query_params["code"]
         st.stop()
 
 if not is_pro:
