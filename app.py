@@ -42,14 +42,6 @@ try:
 except ImportError:
     decode_qr = None
 
-# === Addoma Brain - Orchestrator Integration (غير مغير لأي سطر من كودك الأصلي) ===
-try:
-    import orchestrator as brain
-    BRAIN_ENABLED = True
-except ImportError:
-    brain = None
-    BRAIN_ENABLED = False
-
 # =========================================================
 # 0. إعدادات الصفحة الرئيسية وتهيئة الذكاء الاصطناعي والصوت واللغة
 # =========================================================
@@ -740,20 +732,6 @@ selected_app = st.sidebar.radio(
     on_change=on_app_change
 )
 st.sidebar.divider()
-st.sidebar.markdown(TXT["app_selection"]) 
-
-# === قسم الأوركسترا - يدعم كل أكوادك في GitHub ===
-if BRAIN_ENABLED:
-    st.sidebar.subheader("🧠 Addoma Brain - GitHub Sync")
-    if st.sidebar.button("🔄 مزامنة كل المستودعات الآن", use_container_width=True):
-        with st.sidebar:
-            with st.spinner("جاري سحب الأكواد من GitHub..."):
-                sync_res = brain.sync_all_repos_to_app()
-                st.success(f"تم سحب {len([v for v in sync_res.values() if v])} مستودع حي!")
-                for repo, code in sync_res.items():
-                    if code:
-                        st.caption(f"✅ {repo}: {len(code)} حرف")
-    st.sidebar.divider()
 
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
@@ -1424,4 +1402,20 @@ else:
     elif "6." in selected_app:
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
 
-        tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbo
+        tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint", "📈 SFC Curve - جدولك"])
+
+        with tab_calc1:
+            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
+            c1, c2, c3 = st.columns(3)
+            i_amp = c1.number_input("Current (Amperes / أمبير):", value=250.0)
+            dist_m = c2.number_input("Cable Length (Meters / متر):", value=120.0)
+            c_size = c3.selectbox("Cable Size (mm² / مقطع الكابل):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4)
+
+            v_drop, v_drop_pct = calculate_cable_voltage_drop(i_amp, dist_m, c_size)
+
+            st.metric("Voltage Drop (فقد الجهد)", f"{v_drop} V", f"{v_drop_pct}%")
+            if v_drop_pct > 4.0:
+                st.error("⚠️ Warning: Voltage drop exceeds standard 4% limit! Consider using a larger cable size.")
+            else:
+                st.success("✅ Cable size is acceptable under IEC standards.")
+
