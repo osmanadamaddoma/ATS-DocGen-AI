@@ -42,6 +42,14 @@ try:
 except ImportError:
     decode_qr = None
 
+# === Addoma Brain - Orchestrator Integration (غير مغير لأي سطر من كودك الأصلي) ===
+try:
+    import orchestrator as brain
+    BRAIN_ENABLED = True
+except ImportError:
+    brain = None
+    BRAIN_ENABLED = False
+
 # =========================================================
 # 0. إعدادات الصفحة الرئيسية وتهيئة الذكاء الاصطناعي والصوت واللغة
 # =========================================================
