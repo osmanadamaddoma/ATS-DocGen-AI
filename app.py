@@ -740,6 +740,20 @@ selected_app = st.sidebar.radio(
     on_change=on_app_change
 )
 st.sidebar.divider()
+st.sidebar.markdown(TEXT["app_selection"]) 
+
+# === قسم الأوركسترا - يدعم كل أكوادك في GitHub ===
+if BRAIN_ENABLED:
+    st.sidebar.subheader("🧠 Addoma Brain - GitHub Sync")
+    if st.sidebar.button("🔄 مزامنة كل المستودعات الآن", use_container_width=True):
+        with st.sidebar:
+            with st.spinner("جاري سحب الأكواد من GitHub..."):
+                sync_res = brain.sync_all_repos_to_app()
+                st.success(f"تم سحب {len([v for v in sync_res.values() if v])} مستودع حي!")
+                for repo, code in sync_res.items():
+                    if code:
+                        st.caption(f"✅ {repo}: {len(code)} حرف")
+    st.sidebar.divider()
 
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
