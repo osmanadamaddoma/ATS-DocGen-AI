@@ -1397,69 +1397,93 @@ else:
             st.markdown(f"### Diagnostic Report: `{clean_fault}`")
 
             ai_res = analyze_fault_with_gemini(clean_fault, language=L)
+                elif "2." in selected_app:
+        st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
+        df_iot = fetch_live_iot_data()
+        if not df_iot.empty:
+            latest = df_iot.iloc[-1]
+            col1, col2, col3 = st.columns(3)
+            col1.metric("🌡️ Temp (°C)", f"{latest['temperature']:.1f}")
+            col2.metric("〰️ Vibration (mm/s)", f"{latest['vibration']:.2f}")
+            col3.metric("🗜️ Oil Press (Bar)", f"{latest['pressure']:.1f}")
+            fig_temp = px.line(df_iot, x='_time', y='temperature', title="Live Sensor Trend")
+            st.plotly_chart(fig_temp, use_container_width=True)
+        st.divider()
+        st.subheader("🕹️ Remote Operations Panel")
+        rc1, rc2, rc3 = st.columns(3)
+        with rc1:
+            if st.button("🟢 Start Generator", use_container_width=True):
+                st.success("Start signal dispatched!")
+        with rc2:
+            if st.button("🔴 Emergency Stop", use_container_width=True):
+                st.error("Emergency Stop dispatched!")
+        with rc3:
+            if st.button("🔄 Reset Alarms", use_container_width=True):
+                st.info("DSE Panel Reset!")
+
+    elif "3." in selected_app:
+        st.title("📊 " + ("المتابعة اليومية وتقارير الإدارة" if L == "ar" else "Daily Monitoring & Tech Reminders"))
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        tab_mgr1, tab_mgr2 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders"])
+        with tab_mgr1:
+            today_logs = [log for log in st.session_state.daily_logs if log.get("date") == today_str]
+            st.write(f"Date: {today_str}")
+            if today_logs:
+                st.dataframe(pd.DataFrame(today_logs), use_container_width=True)
+            else:
+                st.warning("No logs registered today.")
+        with tab_mgr2:
+            tech_phone = st.text_input("Technician Phone Number:", value="249912345678")
+            reminder_msg = f"Addoma Maintenance Reminder: Please register daily genset logs for ({today_str})."
+            encoded_msg = urllib.parse.quote(reminder_msg)
+            whatsapp_url = f"https://wa.me/{tech_phone}?text={encoded_msg}"
+            st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px;">💬 Send WhatsApp Reminder</button></a>', unsafe_allow_html=True)
+
+    elif "4." in selected_app:
+        st.title("🤖 " + ("المساعد الذكي والكتالوجات وقراءة الأكواد" if L == "ar" else "AI Diagnostics & Fault Code Reader"))
+        fault_input = st.text_input("Enter Fault Code (e.g., Over Current / DSE 8610 Error / Oil Low):", value="Over Current")
+        if st.button("🔍 Analyze Fault", use_container_width=True):
+            clean_fault = fault_input.strip()
+            st.markdown(f"### Diagnostic Report: `{clean_fault}`")
+            ai_res = analyze_fault_with_gemini(clean_fault, language=L)
             st.markdown(ai_res)
 
     elif "5." in selected_app:
         st.title("🔍 " + ("نظام فحص المعدات مقارنة بصرية" if L == "ar" else "Equipment Visual Inspection (WIC & Gensets)"))
-
-        eq_type = st.selectbox("Equipment Type:", [
-            "Industrial Diesel Generator",
-            "WIC 10 & WIC 40 Cold Rooms / غرف تبريد",
-            "3-Phase Electric Motor"
-        ])
-
+        eq_type = st.selectbox("Equipment Type:", ["Industrial Diesel Generator", "WIC 10 & WIC 40 Cold Rooms / غرف تبريد", "3-Phase Electric Motor"])
         c_img1, c_img2 = st.columns(2)
         with c_img1:
             st.write("🟢 Reference (Normal)")
             good_img = st.file_uploader("Good Part Photo", type=["png", "jpg"], key="gi")
-            if good_img: st.image(Image.open(good_img), use_container_width=True)
+            if good_img:
+                st.image(Image.open(good_img), use_container_width=True)
         with c_img2:
             st.write("🔴 Inspection Item (Defective)")
             bad_img = st.file_uploader("Inspected Part Photo", type=["png", "jpg"], key="bi")
-            if bad_img: st.image(Image.open(bad_img), use_container_width=True)
-
+            if bad_img:
+                st.image(Image.open(bad_img), use_container_width=True)
         if "WIC" in eq_type:
             st.warning("⚠️ **WIC Cold Room Checklist:** Check expansion valves, defrost heaters, and refrigerant flow for WIC 10 and WIC 40 units.")
 
     elif "6." in selected_app:
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
-
-        tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint", "📈 SFC Curve - جدولك"])
-
+        tab_calc1, tab_calc2, tab_calc3 = st.tabs(["Cable Voltage Drop", "Fuel & Carbon", "Load"])
         with tab_calc1:
-                elif "6." in selected_app:
-        st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
-        tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon", "📐 Load Calculator"])
-        
-        with tab_calc1:
-            st.subheader("⚡ حساب هبوط الجهد للكابلات")
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                i_amp = st.number_input("Current (A) / التيار", value=100.0, min_value=1.0)
-            with c2:
-                dist = st.number_input("Distance (m) / المسافة", value=50.0, min_value=1.0)
-            with c3:
-                cable_mm2 = st.number_input("Cable Size mm2 / مقطع الكابل", value=16.0, min_value=1.0)
-            if st.button("Calculate Voltage Drop", use_container_width=True):
-                vd, vdp = calculate_cable_voltage_drop(i_amp, dist, cable_mm2)
-                st.success(f"Voltage Drop: {vd} V ({vdp} %)")
-                if vdp > 5:
-                    st.error("⚠️ هبوط الجهد عالي! زد مقطع الكابل")
-                else:
-                    st.info("✅ هبوط الجهد ضمن المسموح")
-        
+            st.subheader("Cable Voltage Drop")
+            curr = st.number_input("Current A", value=100.0, key="calc_curr")
+            dist_m = st.number_input("Distance m", value=50.0, key="calc_dist")
+            cable_sz = st.number_input("Cable mm2", value=16.0, key="calc_cable")
+            if st.button("Calculate Drop", key="calc_btn1"):
+                vd, vdp = calculate_cable_voltage_drop(curr, dist_m, cable_sz)
+                st.metric("Voltage Drop", f"{vd} V", f"{vdp} %")
         with tab_calc2:
-            st.subheader("🌱 حساب الوقود والانبعاثات")
-            st.info("يستخدم جدول الوقود من CSV الخاص بك")
-            kw_l = st.number_input("Load kW", value=100.0)
-            hrs = st.number_input("Run Hours", value=8.0)
-            if st.button("Calculate Fuel"):
-                fuel, co2, sfc, eff = calculate_fuel_consumption_and_emissions(kw_l, hrs)
+            st.subheader("Fuel and Carbon")
+            kw_load = st.number_input("Load kW", value=100.0, key="fuel_kw")
+            run_h = st.number_input("Run Hours", value=8.0, key="fuel_h")
+            if st.button("Calculate Fuel", key="fuel_btn"):
+                fuel, co2, sfc, eff = calculate_fuel_consumption_and_emissions(kw_load, run_h)
                 st.metric("Fuel Liters", f"{fuel} L")
-                st.metric("CO2", f"{co2} kg")
-                st.metric("SFC", f"{sfc} L/kWh")
-                st.metric("Efficiency", f"{eff} %")
-        
+                st.metric("CO2 kg", f"{co2} kg")
         with tab_calc3:
-            st.subheader("📐 Load Calculator")
-            st.info("حاسبة الأحمال - جاهزة")
+            st.subheader("Load Calculator")
+            st.info("Load calculator ready")
