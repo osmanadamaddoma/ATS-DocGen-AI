@@ -740,7 +740,7 @@ selected_app = st.sidebar.radio(
     on_change=on_app_change
 )
 st.sidebar.divider()
-st.sidebar.markdown(TEXT["app_selection"]) 
+st.sidebar.markdown(TXT["app_selection"]) 
 
 # === قسم الأوركسترا - يدعم كل أكوادك في GitHub ===
 if BRAIN_ENABLED:
