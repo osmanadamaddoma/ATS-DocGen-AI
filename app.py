@@ -1427,6 +1427,39 @@ else:
         tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint", "📈 SFC Curve - جدولك"])
 
         with tab_calc1:
-            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
+                elif "6." in selected_app:
+        st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
+        tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon", "📐 Load Calculator"])
+        
+        with tab_calc1:
+            st.subheader("⚡ حساب هبوط الجهد للكابلات")
             c1, c2, c3 = st.columns(3)
-            i_amp = c1.number_input("Current
+            with c1:
+                i_amp = st.number_input("Current (A) / التيار", value=100.0, min_value=1.0)
+            with c2:
+                dist = st.number_input("Distance (m) / المسافة", value=50.0, min_value=1.0)
+            with c3:
+                cable_mm2 = st.number_input("Cable Size mm2 / مقطع الكابل", value=16.0, min_value=1.0)
+            if st.button("Calculate Voltage Drop", use_container_width=True):
+                vd, vdp = calculate_cable_voltage_drop(i_amp, dist, cable_mm2)
+                st.success(f"Voltage Drop: {vd} V ({vdp} %)")
+                if vdp > 5:
+                    st.error("⚠️ هبوط الجهد عالي! زد مقطع الكابل")
+                else:
+                    st.info("✅ هبوط الجهد ضمن المسموح")
+        
+        with tab_calc2:
+            st.subheader("🌱 حساب الوقود والانبعاثات")
+            st.info("يستخدم جدول الوقود من CSV الخاص بك")
+            kw_l = st.number_input("Load kW", value=100.0)
+            hrs = st.number_input("Run Hours", value=8.0)
+            if st.button("Calculate Fuel"):
+                fuel, co2, sfc, eff = calculate_fuel_consumption_and_emissions(kw_l, hrs)
+                st.metric("Fuel Liters", f"{fuel} L")
+                st.metric("CO2", f"{co2} kg")
+                st.metric("SFC", f"{sfc} L/kWh")
+                st.metric("Efficiency", f"{eff} %")
+        
+        with tab_calc3:
+            st.subheader("📐 Load Calculator")
+            st.info("حاسبة الأحمال - جاهزة")
