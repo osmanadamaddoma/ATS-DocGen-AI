@@ -1,4 +1,5 @@
 # orchestrator.py - عقل النظام الموزع - Addoma Trading Services
+# متوافق 100% مع app.py القديم 1500 سطر
 import streamlit as st
 import os
 
@@ -8,7 +9,6 @@ except ImportError:
     Github = None
 
 def get_github_token():
-    # يحاول يجيب التوكن من Secrets أو من Environment
     try:
         return st.secrets["github"]["token"]
     except:
@@ -39,7 +39,6 @@ def fetch_live_code(repo_name, file_path="main.py"):
         return None
 
 def auto_orchestrator(need: str):
-    """المايسترو: حسب الحاجة يشغل المستودع المناسب"""
     need = need.lower()
     routing = {
         "fuel": "addoma-fuel-calc",
@@ -69,6 +68,16 @@ def list_my_repos():
     except:
         return []
 
+# === هذه الدالة هي التي كان يناديها app.py في السطر 751 ===
+def sync_all_repos_to_app():
+    """يجعل كل مستودعاتك تدعم بعضها - متوافق مع كودك القديم"""
+    repos = ["addoma-core", "addoma-dse-driver", "addoma-fuel-calc", "addoma-report-pdf", "addoma-iot-esp32", "addoma-cable-calc"]
+    results = {}
+    for repo in repos:
+        code = fetch_live_code(repo)
+        results[repo] = code
+    return results
+
 def run_addoma_brain():
     st.sidebar.markdown("### 🧠 Addoma Brain")
     repos = list_my_repos()
@@ -76,3 +85,7 @@ def run_addoma_brain():
         st.sidebar.success(f"متصل بـ {len(repos)} مستودع")
     else:
         st.sidebar.warning("أضف GITHUB_TOKEN في Secrets")
+
+# دعم الاستدعاء القديم والجديد
+def get_all_sync():
+    return sync_all_repos_to_app()
