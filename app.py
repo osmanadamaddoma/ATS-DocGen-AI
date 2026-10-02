@@ -1424,4 +1424,9 @@ else:
     elif "6." in selected_app:
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
 
-        tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbo
+        tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint", "📈 SFC Curve - جدولك"])
+
+        with tab_calc1:
+            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
+            c1, c2, c3 = st.columns(3)
+            i_amp = c1.number_input("Current
