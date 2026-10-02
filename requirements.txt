@@ -20,3 +20,4 @@ influxdb-client
 PyGithub
 pytz
 python-dotenv
+PyGithub
