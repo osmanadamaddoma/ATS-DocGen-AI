@@ -1,16 +1,25 @@
 # orchestrator.py - عقل النظام الموزع - Addoma Trading Services
 import streamlit as st
-from github import Github
-import importlib.util
 import os
 
-GITHUB_TOKEN = st.secrets.get("github", {}).get("token") or os.environ.get("GITHUB_TOKEN")
+try:
+    from github import Github
+except ImportError:
+    Github = None
+
+def get_github_token():
+    # يحاول يجيب التوكن من Secrets أو من Environment
+    try:
+        return st.secrets["github"]["token"]
+    except:
+        return os.environ.get("GITHUB_TOKEN")
 
 def get_github_client():
-    if not GITHUB_TOKEN:
+    token = get_github_token()
+    if not token or Github is None:
         return None
     try:
-        return Github(GITHUB_TOKEN)
+        return Github(token)
     except:
         return None
 
@@ -30,10 +39,8 @@ def fetch_live_code(repo_name, file_path="main.py"):
         return None
 
 def auto_orchestrator(need: str):
-    """المايسترو: حسب الحاجة يشغل المستودع المناسب تلقائيا"""
+    """المايسترو: حسب الحاجة يشغل المستودع المناسب"""
     need = need.lower()
-
-    # خريطة الاحتياجات -> المستودعات
     routing = {
         "fuel": "addoma-fuel-calc",
         "وقود": "addoma-fuel-calc",
@@ -46,35 +53,26 @@ def auto_orchestrator(need: str):
         "iot": "addoma-iot-esp32",
         "cable": "addoma-cable-calc"
     }
-
     for keyword, repo in routing.items():
         if keyword in need:
             code = fetch_live_code(repo)
             if code:
-                # يشغل الكود في مساحة منفصلة ويرجع النتيجة
-                local_vars = {}
-                try:
-                    exec(code, {}, local_vars)
-                    return {"repo": repo, "code": code, "vars": local_vars, "status": "loaded"}
-                except Exception as e:
-                    return {"repo": repo, "error": str(e), "status": "error"}
-
+                return {"repo": repo, "code": code, "status": "loaded"}
     return {"status": "no_match", "need": need}
 
 def list_my_repos():
-    """يرجع كل مستودعاتك في GitHub"""
     g = get_github_client()
     if not g:
         return []
     try:
-        return [r.name for r in g.get_user().get_repos() if not r.private or True][:50]
+        return [r.name for r in g.get_user().get_repos()][:50]
     except:
         return []
 
-def sync_all_repos_to_app():
-    """يجعل كل مستودعاتك تدعم بعضها"""
-    repos = ["addoma-core", "addoma-dse-driver", "addoma-fuel-calc", "addoma-report-pdf", "addoma-iot-esp32"]
-    results = {}
-    for repo in repos:
-        results[repo] = fetch_live_code(repo)
-    return results
+def run_addoma_brain():
+    st.sidebar.markdown("### 🧠 Addoma Brain")
+    repos = list_my_repos()
+    if repos:
+        st.sidebar.success(f"متصل بـ {len(repos)} مستودع")
+    else:
+        st.sidebar.warning("أضف GITHUB_TOKEN في Secrets")
