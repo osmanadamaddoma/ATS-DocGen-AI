@@ -1246,13 +1246,29 @@ else:
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
 
         # --- مزامنة تلقائية مع المولدات وقاعدة البيانات ---
-        fuel_table_live = get_fuel_table_from_csv(st.session_state.get("fuel_csv_upload", None) if "fuel_csv_upload" in st.session_state else None)
-        main_key = list(st.session_state.sites_data.keys())[0] if st.session_state.sites_data else None
-        gen_info = None
-        if main_key:
-            sub_key = list(st.session_state.sites_data[main_key].keys())[0]
-            gen_key = list(st.session_state.sites_data[main_key][sub_key]["generators"].keys())[0]
-            gen_info = st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]
+                # تعريف جدول الوقود مباشرة بدون دالة خارجية (حل مشكلة الأندرويد)
+        fuel_table_live = {
+            10: {"AVG": 0.32, "eff": 18, "g_cat": 215, "g_cummins": 218, "g_perkins": 222},
+            25: {"AVG": 0.28, "eff": 24, "g_cat": 210, "g_cummins": 212, "g_perkins": 216},
+            50: {"AVG": 0.25, "eff": 29, "g_cat": 205, "g_cummins": 208, "g_perkins": 212},
+            75: {"AVG": 0.23, "eff": 33, "g_cat": 200, "g_cummins": 203, "g_perkins": 206},
+            100: {"AVG": 0.22, "eff": 35, "g_cat": 198, "g_cummins": 200, "g_perkins": 203},
+        }
+        def calculate_cable_voltage_drop_local(i, l, size, pf=0.85):
+            rho = 0.0178
+            r = rho * l / size
+            v_drop = 1.732 * i * r * pf
+            v_pct = (v_drop / 400) * 100
+            return round(v_drop, 2), round(v_pct, 2)
+        def calc_fuel_local(kw, hrs, model, gen_kw, table):
+            pct = int((kw/gen_kw)*100) if gen_kw>0 else 75
+            # أقرب حمل
+            closest = min(table.keys(), key=lambda x: abs(x-pct))
+            sfc = table[closest]["AVG"]
+            liters = kw * sfc * hrs
+            co2 = liters * 2.68
+            eff = table[closest]["eff"]
+            return round(liters,2), round(co2,2), sfc, eff
 
         tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint", "📈 SFC & AI Predictive"])
 
