@@ -1275,6 +1275,10 @@ else:
         with tab_calc1:
             st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator - AI Assisted")
             c1, c2, c3, c4 = st.columns(4)
+            gen_info = None  # أضف هذا السطر لتعريف المتغير كقيمة فارغة مبدئياً
+
+i_amp = c1.number_input("Current (Amperes / أمبير):", value=float(gen_info['calib_elec']['current_measured']) if gen_info else 250.0, key="ai_i_amp")
+
             i_amp = c1.number_input("Current (Amperes / أمبير):", value=float(gen_info['calib_elec']['current_measured']) if gen_info else 250.0, key="ai_i_amp")
             dist_m = c2.number_input("Cable Length (Meters / متر):", value=120.0, key="ai_dist")
             c_size = c3.selectbox("Cable Size (mm² / مقطع الكابل):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4, key="ai_size")
