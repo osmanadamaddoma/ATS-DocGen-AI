@@ -1377,11 +1377,11 @@ st.plotly_chart(fig_fuel, use_container_width=True)
 
 if st.button("💾 حفظ وتزامن مع ساعات المولد والتقرير", key="save_fuel"):
                 # تحديث ساعات التشغيل تلقائيا
- if gen_info:
+     if gen_info:
                     st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["run_hours"] += hrs
                     st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["load"] = kw_load
-                log = {"date": datetime.now().isoformat(), "type": "fuel_calc", "gen": gen_key if gen_info else "G1", "kw": kw_load, "hrs": hrs, "liters": liters, "co2": co2, "sfc": sfc, "eff": eff}
-                st.session_state.daily_logs.append(log)
+ log = {"date": datetime.now().isoformat(), "type": "fuel_calc", "gen": gen_key if gen_info else "G1", "kw": kw_load, "hrs": hrs, "liters": liters, "co2": co2, "sfc": sfc, "eff": eff}
+ st.session_state.daily_logs.append(log)
                 if supabase:
                     try: supabase.table("fuel_logs").insert([log]).execute()
                     except: pass
