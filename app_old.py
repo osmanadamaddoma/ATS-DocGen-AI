@@ -1381,7 +1381,7 @@ if st.button("💾 حفظ وتزامن مع ساعات المولد والتقر
                     st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["run_hours"] += hrs
                     st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["load"] = kw_load
 pass
- st.session_state.daily_logs.append(log)
+ 
                 if supabase:
                     try: supabase.table("fuel_logs").insert([log]).execute()
                     except: pass
