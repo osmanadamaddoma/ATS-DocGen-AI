@@ -1366,7 +1366,7 @@ with cf2:
                     st.warning("⚠️ حمل منخفض <40% - يسبب تراكم كربون وتقليل عمر المحرك")
 
             # رسم بياني استهلاك تنبؤي 7 أيام
-            days = list(range(1,8))
+days = list(range(1,8))
             fuel_7d = [liters*d for d in days]
             co2_7d = [co2*d for d in days]
             fig_fuel = go.Figure()
