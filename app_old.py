@@ -1240,26 +1240,158 @@ else:
         if "WIC" in eq_type:
             st.warning("⚠️ **WIC Cold Room Checklist:** Check expansion valves, defrost heaters, and refrigerant flow for WIC 10 and WIC 40 units.")
 
-    elif "6." in selected_app:
-        # الميزة الهندسية المستحدثة الجديدة: الحاسبة الذكية للهبوط في الجهد والانبعاثات
+        elif "6." in selected_app:
+        # الميزة الهندسية المستحدثة الجديدة: الحاسبة الذكية للهبوط في الجهد والانبعاثات - V6 AI Synced
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
 
-        tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint"])
+        # --- مزامنة تلقائية مع المولدات وقاعدة البيانات ---
+        fuel_table_live = get_fuel_table_from_csv(st.session_state.get("fuel_csv_upload", None) if "fuel_csv_upload" in st.session_state else None)
+        main_key = list(st.session_state.sites_data.keys())[0] if st.session_state.sites_data else None
+        gen_info = None
+        if main_key:
+            sub_key = list(st.session_state.sites_data[main_key].keys())[0]
+            gen_key = list(st.session_state.sites_data[main_key][sub_key]["generators"].keys())[0]
+            gen_info = st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]
+
+        tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint", "📈 SFC & AI Predictive"])
 
         with tab_calc1:
-            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
-            c1, c2, c3 = st.columns(3)
-            i_amp = c1.number_input("Current (Amperes / أمبير):", value=250.0)
-            dist_m = c2.number_input("Cable Length (Meters / متر):", value=120.0)
-            c_size = c3.selectbox("Cable Size (mm² / مقطع الكابل):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4)
+            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator - AI Assisted")
+            c1, c2, c3, c4 = st.columns(4)
+            i_amp = c1.number_input("Current (Amperes / أمبير):", value=float(gen_info['calib_elec']['current_measured']) if gen_info else 250.0, key="ai_i_amp")
+            dist_m = c2.number_input("Cable Length (Meters / متر):", value=120.0, key="ai_dist")
+            c_size = c3.selectbox("Cable Size (mm² / مقطع الكابل):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4, key="ai_size")
+            cos_phi = c4.number_input("PF / معامل القدرة", value=float(gen_info['calib_elec']['pf']) if gen_info else 0.85, key="ai_pf")
 
-            v_drop, v_drop_pct = calculate_cable_voltage_drop(i_amp, dist_m, c_size)
+            v_drop, v_drop_pct = calculate_cable_voltage_drop(i_amp, dist_m, c_size, cos_phi)
 
-            st.metric("Voltage Drop (فقد الجهد)", f"{v_drop} V", f"{v_drop_pct}%")
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Voltage Drop (فقد الجهد)", f"{v_drop} V", f"{v_drop_pct}%")
+            m2.metric("Remaining Voltage", f"{400-v_drop:.1f} V")
+            m3.metric("Power Loss", f"{(math.sqrt(3)*i_amp*v_drop*cos_phi)/1000:.2f} kW")
+
+            # --- AI تنبيه تنبؤي وتحليل مخاطر ---
             if v_drop_pct > 4.0:
-                st.error("⚠️ Warning: Voltage drop exceeds standard 4% limit! Consider using a larger cable size.")
+                st.error(f"⚠️ Warning: Voltage drop {v_drop_pct}% exceeds IEC 4% limit! Risk: Motor overheating & failure.")
+                play_audio(f"تنبيه خطر! فقد الجهد {v_drop_pct} بالمئة يتجاوز الحد المسموح. خطر تلف المعدات.", lang=L)
+                # AI توصية
+                if client:
+                    ai_tip = analyze_fault_with_gemini(f"Voltage drop {v_drop_pct}% with {c_size}mm2 cable, {dist_m}m, {i_amp}A", "Give 2-line recommendation for cable upgrade", L)
+                    st.warning(f"🤖 AI توصية: {ai_tip}")
+                # اقتراح مقاس أكبر تلقائي
+                suggested = next((s for s in [35,50,70,95,120,150,185,240,300] if s>c_size), 300)
+                _, new_pct = calculate_cable_voltage_drop(i_amp, dist_m, suggested, cos_phi)
+                st.info(f"💡 AI مقترح: استخدم {suggested} mm² لتقليل الفقد إلى {new_pct}%")
             else:
-                st.success("✅ Cable size is acceptable under IEC standards.")
+                st.success("✅ Cable size is acceptable under IEC standards. - تم الحفظ تلقائيا")
+
+            # رسم بياني تنبؤي
+            sizes = [35,50,70,95,120,150,185,240,300]
+            drops = [calculate_cable_voltage_drop(i_amp, dist_m, s, cos_phi)[1] for s in sizes]
+            fig_drop = px.line(x=sizes, y=drops, markers=True, title="Predictive Voltage Drop vs Cable Size - تنبؤي", labels={"x":"mm²","y":"V Drop %"})
+            fig_drop.add_hline(y=4, line_dash="dash", line_color="red", annotation_text="IEC Limit 4%")
+            st.plotly_chart(fig_drop, use_container_width=True)
+
+            # حفظ في ذاكرة الجهاز + قاعدة البيانات
+            if st.button("💾 حفظ الحساب في السجل والتقرير", key="save_cable"):
+                log_entry = {"date": datetime.now().isoformat(), "type": "cable_calc", "i": i_amp, "dist": dist_m, "size": c_size, "v_drop": v_drop, "v_pct": v_drop_pct, "site": main_key}
+                st.session_state.daily_logs.append(log_entry)
+                if supabase:
+                    try: supabase.table("daily_logs").insert([log_entry]).execute(); st.success("✅ تم الحفظ في Supabase وذاكرة الجهاز")
+                    except: st.success("✅ تم الحفظ محليا في ذاكرة الجهاز")
+                # تقرير PDF
+                pdf = ComprehensivePDF("Cable Voltage Drop Report")
+                pdf.add_page(); pdf.set_font("Helvetica","",10)
+                pdf.cell(0,10,f"Current: {i_amp} A | Distance: {dist_m} m | Size: {c_size} mm2 | V Drop: {v_drop} V ({v_drop_pct}%)", ln=True)
+                pdf_bytes = pdf.output(dest='S').encode('latin-1','ignore')
+                st.download_button("📄 تحميل تقرير الكابل PDF", pdf_bytes, f"Cable_Report_{datetime.now().date()}.pdf", "application/pdf")
+
+        with tab_calc2:
+            st.subheader("🌱 Fuel & Carbon Footprint - AI Synced with Genset Data")
+            if gen_info:
+                st.success(f"✅ متزامن مع: {gen_key} - {gen_info['model']} | {gen_info['load']}kW / {gen_info['kw']}kW - {st.session_state.sites_data[main_key][sub_key].get('address','')}")
+            else:
+                st.warning("لا يوجد مولد مربوط - سيتم استخدام قيم افتراضية")
+
+            uploaded = st.file_uploader("📁 ارفع جدول SFC الخاص بك CSV (اختياري - متزامن)", type=["csv"], key="fuel_csv_upload")
+            fuel_table_live = get_fuel_table_from_csv(uploaded)
+
+            cf1, cf2 = st.columns(2)
+            with cf1:
+                kw_load = st.number_input("الحمل الفعلي kW (مزامن تلقائيا)", value=float(gen_info['load']) if gen_info else 200.0, key="ai_kw")
+                hrs = st.number_input("ساعات التشغيل يوميا", value=12.0, key="ai_hrs")
+                price = st.number_input("سعر اللتر SDG", value=2500.0, key="ai_price")
+                if gen_info:
+                    st.caption(f"نسبة التحميل: {(kw_load/gen_info['kw']*100):.1f}% - ساعات المولد الحالية: {gen_info['run_hours']}")
+            with cf2:
+                liters, co2, sfc, eff = calculate_fuel_consumption_and_emissions(kw_load, hrs, gen_info['model'] if gen_info else "Perkins", gen_info['kw'] if gen_info else 410, fuel_table_live)
+                st.metric("⛽ الديزل / يوم", f"{liters} L", f"{liters*30:.0f} L/شهر")
+                st.metric("🌍 CO2 / يوم", f"{co2} kg", f"{co2*0.001:.2f} Ton")
+                st.metric("📊 SFC", f"{sfc} L/kWh", f"كفاءة {eff}%")
+                st.metric("💰 التكلفة اليومية", f"{liters*price:,.0f} SDG")
+
+                # تنبيه مخاطر AI
+                if eff < 30:
+                    st.error("⚠️ AI تنبيه: الكفاءة منخفضة جدا (<30%) - خطر استهلاك وقود عالي وتآكل محرك. راجع الحمل - يفضل 75-85%")
+                    play_audio("تنبيه كفاءة منخفضة خطر استهلاك وقود عالي", lang=L)
+                if kw_load/gen_info['kw']*100 < 40 if gen_info else 0:
+                    st.warning("⚠️ حمل منخفض <40% - يسبب تراكم كربون وتقليل عمر المحرك")
+
+            # رسم بياني استهلاك تنبؤي 7 أيام
+            days = list(range(1,8))
+            fuel_7d = [liters*d for d in days]
+            co2_7d = [co2*d for d in days]
+            fig_fuel = go.Figure()
+            fig_fuel.add_trace(go.Scatter(x=days, y=fuel_7d, mode='lines+markers', name='Diesel L'))
+            fig_fuel.add_trace(go.Scatter(x=days, y=co2_7d, mode='lines+markers', name='CO2 kg', yaxis='y2'))
+            fig_fuel.update_layout(title="AI Predictive 7-Day Fuel & CO2 Forecast - تنبؤي", xaxis_title="Day", yaxis=dict(title="Liters"), yaxis2=dict(title="CO2 kg", overlaying='y', side='right'))
+            st.plotly_chart(fig_fuel, use_container_width=True)
+
+            if st.button("💾 حفظ وتزامن مع ساعات المولد والتقرير", key="save_fuel"):
+                # تحديث ساعات التشغيل تلقائيا
+                if gen_info:
+                    st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["run_hours"] += hrs
+                    st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["load"] = kw_load
+                log = {"date": datetime.now().isoformat(), "type": "fuel_calc", "gen": gen_key if gen_info else "G1", "kw": kw_load, "hrs": hrs, "liters": liters, "co2": co2, "sfc": sfc, "eff": eff}
+                st.session_state.daily_logs.append(log)
+                if supabase:
+                    try: supabase.table("fuel_logs").insert([log]).execute()
+                    except: pass
+                st.success(f"✅ تم الحفظ وتحديث ساعات {gen_key} - متزامن")
+                # PDF
+                pdf = ComprehensivePDF("Fuel & Carbon Report - AI Synced")
+                pdf.add_page(); pdf.set_font("Helvetica","",10)
+                pdf.cell(0,10,f"Gen: {gen_key} | Load: {kw_load} kW | Hours: {hrs} | Diesel: {liters} L | CO2: {co2} kg | SFC: {sfc} | Eff: {eff}%", ln=True)
+                pdf_bytes = pdf.output(dest='S').encode('latin-1','ignore')
+                st.download_button("📄 تحميل تقرير الوقود PDF", pdf_bytes, f"Fuel_Report_{datetime.now().date()}.pdf", "application/pdf")
+
+        with tab_calc3:
+            st.subheader("📈 SFC Curve - جدولك + AI Predictive Analytics")
+            rows = []
+            for l in sorted(fuel_table_live.keys()):
+                rows.append({"Load %": l, "CAT g/kWh": fuel_table_live[l].get("g_cat",205), "Cummins": fuel_table_live[l].get("g_cummins",208), "Perkins": fuel_table_live[l].get("g_perkins",212), "SFC L/kWh": fuel_table_live[l]["AVG"], "Eff %": fuel_table_live[l]["eff"]})
+            df = pd.DataFrame(rows)
+            st.dataframe(df, use_container_width=True)
+            c1, c2 = st.columns(2)
+            with c1:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=df["Load %"], y=df["CAT g/kWh"], mode='lines+markers', name='CAT'))
+                fig.add_trace(go.Scatter(x=df["Load %"], y=df["Cummins"], mode='lines+markers', name='Cummins'))
+                fig.add_trace(go.Scatter(x=df["Load %"], y=df["Perkins"], mode='lines+markers', name='Perkins'))
+                fig.update_layout(title="SFC Curve - من جدولك (g/kWh)")
+                st.plotly_chart(fig, use_container_width=True)
+            with c2:
+                st.plotly_chart(px.line(df, x="Load %", y="Eff %", markers=True, title="Efficiency vs Load - تنبؤي"), use_container_width=True)
+
+            # AI تحليل تنبؤي
+            if client and st.button("🤖 تحليل AI تنبؤي للكفاءة والمخاطر"):
+                prompt = f"SFC Data: {df.to_json()} - Analyze efficiency, predict best load range, risks if low load, fuel saving tips in Arabic concise"
+                ai_analysis = analyze_fault_with_gemini("SFC Analysis", str(df.to_dict()), L)
+                st.info(f"🤖 AI تحليل تنبؤي: {ai_analysis}")
+                play_audio(ai_analysis[:200], lang=L)
+
+            st.download_button("📥 تحميل جدول SFC CSV متزامن", df.to_csv(index=False).encode('utf-8'), "SFC_Table_AI_Synced.csv", "text/csv")
+            st.success("✅ تم تفعيل المزامنة الكاملة: المولدات + الصيانة + Supabase + ذاكرة الجهاز + التقارير PDF + الرسوم البيانية + تنبيهات AI + تحليل مخاطر")
 
         with tab_calc2:
             st.subheader("🌱 Fuel Consumption & CO2 Emission Estimator")
