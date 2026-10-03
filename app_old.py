@@ -1356,4 +1356,65 @@ else:
                         catalog_pages = []
                         with pdfplumber.open(manual_file) as pdf:
                             for i, page in enumerate(pdf.pages):
-                                catalog_pages.append({"page_num": i + 1, "content": page.extract_text() or "
+                                catalog_pages.append({"page_num": i + 1, "content": page.extract_text() or ""})
+                        st.session_state.catalog_pages = catalog_pages
+                        st.session_state.loaded_manual_name = manual_file.name
+                        st.success(f"Parsed {len(catalog_pages)} pages.")
+
+        with col_files2:
+            st.subheader("📷 Screen & Barcode Reader")
+            fault_image = st.file_uploader("Upload Alarm Screenshot", type=["png", "jpg", "jpeg"])
+            fault_cam = st.camera_input("📸 Capture Screen")
+
+        st.divider()
+
+        fault_input = st.text_input("Enter Fault Code (e.g., Over Current / DSE 8610 Error / Oil Low):", value="Over Current")
+
+        if st.button("🔍 Analyze Fault", use_container_width=True):
+            clean_fault = fault_input.strip()
+            st.markdown(f"### Diagnostic Report: `{clean_fault}`")
+
+            ai_res = analyze_fault_with_gemini(clean_fault, language=L)
+            st.markdown(ai_res)
+
+    elif "5." in selected_app:
+        st.title("🔍 " + ("نظام فحص المعدات مقارنة بصرية" if L == "ar" else "Equipment Visual Inspection (WIC & Gensets)"))
+
+        eq_type = st.selectbox("Equipment Type:", [
+            "Industrial Diesel Generator",
+            "WIC 10 & WIC 40 Cold Rooms / غرف تبريد",
+            "3-Phase Electric Motor"
+        ])
+
+        c_img1, c_img2 = st.columns(2)
+        with c_img1:
+            st.write("🟢 Reference (Normal)")
+            good_img = st.file_uploader("Good Part Photo", type=["png", "jpg"], key="gi")
+            if good_img: st.image(Image.open(good_img), use_container_width=True)
+        with c_img2:
+            st.write("🔴 Inspection Item (Defective)")
+            bad_img = st.file_uploader("Inspected Part Photo", type=["png", "jpg"], key="bi")
+            if bad_img: st.image(Image.open(bad_img), use_container_width=True)
+
+        if "WIC" in eq_type:
+            st.warning("⚠️ **WIC Cold Room Checklist:** Check expansion valves, defrost heaters, and refrigerant flow for WIC 10 and WIC 40 units.")
+
+    elif "6." in selected_app:
+        st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
+
+        tab_calc1, tab_calc2, tab_calc3 = st.tabs(["⚡ Cable Voltage Drop", "🌱 Fuel & Carbon Footprint", "📈 SFC Curve - جدولك"])
+
+        with tab_calc1:
+            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
+            c1, c2, c3 = st.columns(3)
+            i_amp = c1.number_input("Current (Amperes / أمبير):", value=250.0)
+            dist_m = c2.number_input("Cable Length (Meters / متر):", value=120.0)
+            c_size = c3.selectbox("Cable Size (mm² / مقطع الكابل):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4)
+
+            v_drop, v_drop_pct = calculate_cable_voltage_drop(i_amp, dist_m, c_size)
+
+            st.metric("Voltage Drop (فقد الجهد)", f"{v_drop} V", f"{v_drop_pct}%")
+            if v_drop_pct > 4.0:
+                st.error("⚠️ Warning: Voltage drop exceeds standard 4% limit! Consider using a larger cable size.")
+            else:
+                st.success("✅ Cabl
