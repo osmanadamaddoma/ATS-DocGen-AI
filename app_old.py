@@ -1416,4 +1416,4 @@ else:
             if v_drop_pct > 4.0:
                 st.error("⚠️ Warning: Voltage drop exceeds standard 4% limit! Consider using a larger cable size.")
             else:
-                st.success("✅ Cable size calculated successfully!")
+                st.success("✅ Cable siz
