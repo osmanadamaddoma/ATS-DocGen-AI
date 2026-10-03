@@ -1345,7 +1345,7 @@ with tab_calc2:
             fuel_table_live = get_fuel_table_from_csv(uploaded)
 
             cf1, cf2 = st.columns(2)
-            with cf1:
+          with cf1:
                 kw_load = st.number_input("الحمل الفعلي kW (مزامن تلقائيا)", value=float(gen_info['load']) if gen_info else 200.0, key="ai_kw")
                 hrs = st.number_input("ساعات التشغيل يوميا", value=12.0, key="ai_hrs")
                 price = st.number_input("سعر اللتر SDG", value=2500.0, key="ai_price")
@@ -1393,7 +1393,7 @@ with tab_calc2:
                 pdf_bytes = pdf.output(dest='S').encode('latin-1','ignore')
                 st.download_button("📄 تحميل تقرير الوقود PDF", pdf_bytes, f"Fuel_Report_{datetime.now().date()}.pdf", "application/pdf")
 
-        with tab_calc3:
+with tab_calc3:
             st.subheader("📈 SFC Curve - جدولك + AI Predictive Analytics")
             rows = []
             for l in sorted(fuel_table_live.keys()):
