@@ -1367,7 +1367,7 @@ with cf2:
 
             # رسم بياني استهلاك تنبؤي 7 أيام
 days = list(range(1,8))
-            fuel_7d = [liters*d for d in days]
+fuel_7d = [liters*d for d in days]
             co2_7d = [co2*d for d in days]
             fig_fuel = go.Figure()
             fig_fuel.add_trace(go.Scatter(x=days, y=fuel_7d, mode='lines+markers', name='Diesel L'))
