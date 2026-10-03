@@ -1345,7 +1345,7 @@ with tab_calc2:
             fuel_table_live = get_fuel_table_from_csv(uploaded)
 
             cf1, cf2 = st.columns(2)
-          with cf1:
+with cf1:
                 kw_load = st.number_input("الحمل الفعلي kW (مزامن تلقائيا)", value=float(gen_info['load']) if gen_info else 200.0, key="ai_kw")
                 hrs = st.number_input("ساعات التشغيل يوميا", value=12.0, key="ai_hrs")
                 price = st.number_input("سعر اللتر SDG", value=2500.0, key="ai_price")
