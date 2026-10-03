@@ -1375,9 +1375,9 @@ fig_fuel.add_trace(go.Scatter(x=days, y=co2_7d, mode='lines+markers', name='CO2 
 fig_fuel.update_layout(title="AI Predictive 7-Day Fuel & CO2 Forecast - تنبؤي", xaxis_title="Day", yaxis=dict(title="Liters"), yaxis2=dict(title="CO2 kg", overlaying='y', side='right'))
 st.plotly_chart(fig_fuel, use_container_width=True)
 
-            if st.button("💾 حفظ وتزامن مع ساعات المولد والتقرير", key="save_fuel"):
+if st.button("💾 حفظ وتزامن مع ساعات المولد والتقرير", key="save_fuel"):
                 # تحديث ساعات التشغيل تلقائيا
-                if gen_info:
+if gen_info:
                     st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["run_hours"] += hrs
                     st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["load"] = kw_load
                 log = {"date": datetime.now().isoformat(), "type": "fuel_calc", "gen": gen_key if gen_info else "G1", "kw": kw_load, "hrs": hrs, "liters": liters, "co2": co2, "sfc": sfc, "eff": eff}
