@@ -1323,6 +1323,16 @@ else:
                 pdf.cell(0,10,f"Current: {i_amp} A | Distance: {dist_m} m | Size: {c_size} mm2 | V Drop: {v_drop} V ({v_drop_pct}%)", ln=True)
                 pdf_bytes = pdf.output(dest='S').encode('latin-1','ignore')
                 st.download_button("📄 تحميل تقرير الكابل PDF", pdf_bytes, f"Cable_Report_{datetime.now().date()}.pdf", "application/pdf")
+def get_fuel_table_from_csv(uploaded_file):
+    if uploaded_file is not None:
+        try:
+            import pandas as pd
+            return pd.read_csv(uploaded_file)
+        except Exception as e:
+            st.error(f"❌ حدث خطأ أثناء قراءة الملف: {e}")
+            return None
+    return None
+
 
         with tab_calc2:
             st.subheader("🌱 Fuel & Carbon Footprint - AI Synced with Genset Data")
