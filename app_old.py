@@ -1,3 +1,4 @@
+
 import os
 import re
 import json
@@ -1240,7 +1241,7 @@ else:
         if "WIC" in eq_type:
             st.warning("⚠️ **WIC Cold Room Checklist:** Check expansion valves, defrost heaters, and refrigerant flow for WIC 10 and WIC 40 units.")
 
-                                                                                     elif "6." in selected_app:
+    elif "6." in selected_app:
         # الميزة الهندسية المستحدثة الجديدة: الحاسبة الذكية للهبوط في الجهد والانبعاثات - V6 AI Synced
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
 
@@ -1392,7 +1393,6 @@ else:
 
             st.download_button("📥 تحميل جدول SFC CSV متزامن", df.to_csv(index=False).encode('utf-8'), "SFC_Table_AI_Synced.csv", "text/csv")
             st.success("✅ تم تفعيل المزامنة الكاملة: المولدات + الصيانة + Supabase + ذاكرة الجهاز + التقارير PDF + الرسوم البيانية + تنبيهات AI + تحليل مخاطر")
-
         with tab_calc2:
             st.subheader("🌱 Fuel Consumption & CO2 Emission Estimator")
             ec1, ec2 = st.columns(2)
