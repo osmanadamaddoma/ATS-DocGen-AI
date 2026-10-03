@@ -1334,7 +1334,7 @@ def get_fuel_table_from_csv(uploaded_file):
     return None
 
 
-        with tab_calc2:
+with tab_calc2:
             st.subheader("🌱 Fuel & Carbon Footprint - AI Synced with Genset Data")
             if gen_info:
                 st.success(f"✅ متزامن مع: {gen_key} - {gen_info['model']} | {gen_info['load']}kW / {gen_info['kw']}kW - {st.session_state.sites_data[main_key][sub_key].get('address','')}")
