@@ -1367,13 +1367,13 @@ with cf2:
 
             # رسم بياني استهلاك تنبؤي 7 أيام
 days = list(range(1,8))
-            fuel_7d = [liters*d for d in days]
-            co2_7d = [co2*d for d in days]
-            fig_fuel = go.Figure()
-            fig_fuel.add_trace(go.Scatter(x=days, y=fuel_7d, mode='lines+markers', name='Diesel L'))
-            fig_fuel.add_trace(go.Scatter(x=days, y=co2_7d, mode='lines+markers', name='CO2 kg', yaxis='y2'))
-            fig_fuel.update_layout(title="AI Predictive 7-Day Fuel & CO2 Forecast - تنبؤي", xaxis_title="Day", yaxis=dict(title="Liters"), yaxis2=dict(title="CO2 kg", overlaying='y', side='right'))
-            st.plotly_chart(fig_fuel, use_container_width=True)
+fuel_7d = [liters*d for d in days]
+co2_7d = [co2*d for d in days]
+fig_fuel = go.Figure()
+fig_fuel.add_trace(go.Scatter(x=days, y=fuel_7d, mode='lines+markers', name='Diesel L'))
+fig_fuel.add_trace(go.Scatter(x=days, y=co2_7d, mode='lines+markers', name='CO2 kg', yaxis='y2'))
+fig_fuel.update_layout(title="AI Predictive 7-Day Fuel & CO2 Forecast - تنبؤي", xaxis_title="Day", yaxis=dict(title="Liters"), yaxis2=dict(title="CO2 kg", overlaying='y', side='right'))
+st.plotly_chart(fig_fuel, use_container_width=True)
 
             if st.button("💾 حفظ وتزامن مع ساعات المولد والتقرير", key="save_fuel"):
                 # تحديث ساعات التشغيل تلقائيا
