@@ -1129,7 +1129,7 @@ else:
             with col_up2:
                 parts_img_file = st.file_uploader("Upload Maintenance Photo", type=["png", "jpg", "jpeg"])
 
-                        def generate_full_pdf_bytes():
+    def generate_full_pdf_bytes():
                 pdf = ComprehensivePDF("FULL PREDICTIVE MAINTENANCE & PERFORMANCE REPORT")
                 pdf.add_page()
                 
