@@ -54,6 +54,38 @@ def get_fuel_table_from_csv(uploaded_file):
             pass # في حال حدوث خطأ في القراءة، نعود للقيم الافتراضية
             
     return default_data
+def calculate_fuel_consumption_and_emissions(kw_load, hrs, model, rating_kw, fuel_table_live=None):
+    try:
+        # تحويل القيم إلى أرقام لضمان عدم حدوث أخطاء رياضية
+        kw_load = float(kw_load)
+        hrs = float(hrs)
+        rating_kw = float(rating_kw) if rating_kw else 410.0
+        
+        # حساب نسبة الحمل
+        load_pct = (kw_load / rating_kw) * 100 if rating_kw > 0 else 0
+        
+        # قيم افتراضية للاستهلاك والكفاءة
+        sfc = 0.25
+        eff = 35
+        
+        # استخراج القيم الدقيقة من جدول الوقود المحدث
+        if fuel_table_live:
+            valid_keys = [k for k in fuel_table_live.keys() if isinstance(k, (int, float))]
+            if valid_keys:
+                # البحث عن أقرب نسبة حمل في الجدول
+                closest_load = min(valid_keys, key=lambda x: abs(x - load_pct))
+                sfc = fuel_table_live[closest_load].get("AVG", 0.25)
+                eff = fuel_table_live[closest_load].get("eff", 35)
+        
+        # الحسابات النهائية
+        liters = round(kw_load * sfc * hrs, 2)
+        co2 = round(liters * 2.68, 2) # معامل انبعاثات الديزل القياسي
+        
+        return liters, co2, sfc, eff
+        
+    except Exception:
+        # إرجاع قيم افتراضية آمنة في حال وجود أي نقص في البيانات لمنع توقف التطبيق
+        return 0.0, 0.0, 0.25, 35
 
 # محاولة استيراد مكتبة Supabase
 try:
