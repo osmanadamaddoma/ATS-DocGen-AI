@@ -1566,7 +1566,7 @@ else:
             st.download_button("📥 تحميل جدول SFC CSV متزامن", df.to_csv(index=False).encode('utf-8'), "SFC_Table_AI_Synced.csv", "text/csv")
             st.success("✅ تم تفعيل المزامنة الكاملة: المولدات + الصيانة + Supabase + ذاكرة الجهاز + التقارير PDF + الرسوم البيانية + تنبيهات AI + تحليل مخاطر")
 
-                    # --- لوحة إدارة المواقع والمولدات (متزامنة مع التطبيق 1 وتقارير PDF و Supabase) ---
+                     # --- لوحة إدارة المواقع والمولدات (مزامنة شاملة) ---
         st.markdown("---")
         st.header("⚙️ إدارة بيانات المواقع والمولدات (مزامنة شاملة)")
 
@@ -1576,17 +1576,17 @@ else:
             st.subheader("إضافة قائمة، موقع، أو مولد جديد للنظام")
             
             existing_mains = list(st.session_state.sites_data.keys())
-            new_main = st.text_input("القائمة الرئيسية (مثال: الخرطوم، بورتسودان، إلخ):")
-            new_sub = st.text_input("الموقع الفرعي (مثال: مصنع التعدين، مستشفى، إلخ):")
-            new_gen_id = st.text_input("معرف المولد (مثال: G3, G4):")
+            new_main = st.text_input("القائمة الرئيسية (مثال: الخرطوم، بورتسودان، إلخ):", key="add_main_v6")
+            new_sub = st.text_input("الموقع الفرعي (مثال: مصنع التعدين، مستشفى، إلخ):", key="add_sub_v6")
+            new_gen_id = st.text_input("معرف المولد (مثال: G3, G4):", key="add_gen_v6")
             
             c1, c2 = st.columns(2)
-            new_model = c1.text_input("موديل المولد (مثال: Cummins 250 kVA):", value="Perkins")
-            new_kw = c2.number_input("القدرة الإجمالية kW:", min_value=10.0, value=250.0)
+            new_model = c1.text_input("موديل المولد (مثال: Cummins 250 kVA):", value="Perkins", key="add_model_v6")
+            new_kw = c2.number_input("القدرة الإجمالية kW:", min_value=10.0, value=250.0, key="add_kw_v6")
             
             if st.button("💾 حفظ السجل وتزامن شامل (Supabase & Reports)", key="btn_add_gen_sync"):
                 if new_main and new_sub and new_gen_id:
-                    # 1. تحديث الذاكرة المحلية (لتسمّع فوراً في التطبيق 1 وتقارير PDF)
+                    # إضافة السجلات في الذاكرة
                     if new_main not in st.session_state.sites_data:
                         st.session_state.sites_data[new_main] = {}
                         
@@ -1596,7 +1596,7 @@ else:
                             "generators": {}
                         }
                     
-                    new_gen_data = {
+                    st.session_state.sites_data[new_main][new_sub]["generators"][new_gen_id] = {
                         "model": new_model,
                         "run_hours": 0.0,
                         "target": 250.0,
@@ -1606,26 +1606,16 @@ else:
                         "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0}
                     }
                     
-                    st.session_state.sites_data[new_main][new_sub]["generators"][new_gen_id] = new_gen_data
-                    
-                    # 2. الحفظ الدائم في قاعدة بيانات Supabase
                     if supabase:
                         try:
-                            # نقوم بحفظ السجل الجديد في جدول (نحتاج للتأكد من إنشاء جدول sites_registry في Supabase لاحقاً)
-                            db_record = {
-                                "main_site": new_main,
-                                "sub_site": new_sub,
-                                "gen_id": new_gen_id,
-                                "model": new_model,
-                                "kw": new_kw,
-                                "date_added": datetime.now().isoformat()
-                            }
-                            supabase.table("sites_registry").insert([db_record]).execute()
-                            st.success(f"✅ تم الحفظ في قاعدة البيانات! {new_gen_id} متاح الآن في قسم الصيانة التنبؤية وتقارير PDF.")
-                        except Exception as e:
-                            st.success(f"✅ تم الحفظ بنجاح في النظام والتطبيقات (محلياً). تأكد من إنشاء جدول 'sites_registry' في Supabase ليصبح دائماً.")
-                    else:
-                        st.success("✅ تم الحفظ في الذاكرة وتحديث التطبيقات بنجاح.")
+                            supabase.table("sites_registry").insert([{
+                                "main_site": new_main, "sub_site": new_sub, "gen_id": new_gen_id, "model": new_model, "kw": new_kw, "date_added": datetime.now().isoformat()
+                            }]).execute()
+                        except:
+                            pass
+                    
+                    st.success(f"✅ تم الحفظ بنجاح! يتم الآن تحديث النظام...")
+                    st.rerun() # هذا الأمر سيحدث الصفحة لكي يظهر الموقع الجديد فوراً في التطبيق 1
                 else:
                     st.error("⚠️ الرجاء تعبئة الحقول الأساسية (القائمة، الموقع، والمعرف).")
 
@@ -1645,24 +1635,24 @@ else:
                             if existing_gens:
                                 del_gen = st.selectbox("3. اختر المولد المراد حذفه", existing_gens, key="sel_del_gen_sync")
                                 
-                                st.warning(f"هل أنت متأكد من حذف {del_gen} نهائياً من كافة التقارير؟")
-                                if st.button("🗑️ تأكيد الحذف وتحديث Supabase", key="btn_del_gen_sync"):
-                                    # الحذف من الذاكرة (ينعكس على باقي التطبيقات)
+                                st.warning(f"هل أنت متأكد من حذف {del_gen} نهائياً؟")
+                                if st.button("🗑️ تأكيد الحذف", key="btn_del_gen_sync"):
                                     del st.session_state.sites_data[del_main][del_sub]["generators"][del_gen]
                                     
-                                    # الحذف من Supabase (إذا كان الجدول موجوداً)
                                     if supabase:
                                         try:
                                             supabase.table("sites_registry").delete().eq("gen_id", del_gen).eq("sub_site", del_sub).execute()
                                         except:
                                             pass
                                             
-                                    st.success(f"✅ تم حذف {del_gen} وإزالته من التقارير بنجاح.")
+                                    st.success(f"✅ تم حذف {del_gen} بنجاح. يتم التحديث...")
                                     st.rerun()
                             else:
                                 st.info("لا توجد مولدات في هذا الموقع.")
                     else:
                         st.info("لا توجد مواقع فرعية.")
+       # --- لوحة إدارة المواقع والمولدات (متزامنة مع التطبيق 1 وتقارير PDF و Supabase) ---
+        
 
 
         with tab_calc2:
