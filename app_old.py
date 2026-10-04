@@ -24,6 +24,37 @@ import extra_streamlit_components as stx # مكتبة إدارة الكوكيز 
 from google import genai
 from gtts import gTTS
 
+def get_fuel_table_from_csv(uploaded_file):
+    # القيم الافتراضية لجدول الوقود والكفاءة في حال لم يرفع المستخدم ملف CSV
+    default_data = {
+        25: {"g_cat": 260, "g_cummins": 265, "g_perkins": 270, "AVG": 0.35, "eff": 28},
+        50: {"g_cat": 220, "g_cummins": 225, "g_perkins": 230, "AVG": 0.28, "eff": 32},
+        75: {"g_cat": 205, "g_cummins": 208, "g_perkins": 212, "AVG": 0.25, "eff": 38},
+        100: {"g_cat": 200, "g_cummins": 202, "g_perkins": 205, "AVG": 0.24, "eff": 40}
+    }
+    
+    if uploaded_file is not None:
+        try:
+            import pandas as pd
+            df = pd.read_csv(uploaded_file)
+            custom_data = {}
+            for _, row in df.iterrows():
+                load = int(row.get("Load %", 0))
+                if load > 0:
+                    custom_data[load] = {
+                        "g_cat": row.get("CAT g/kWh", 205),
+                        "g_cummins": row.get("Cummins", 208),
+                        "g_perkins": row.get("Perkins", 212),
+                        "AVG": row.get("SFC L/kWh", 0.25),
+                        "eff": row.get("Eff %", 35)
+                    }
+            if custom_data:
+                return custom_data
+        except Exception:
+            pass # في حال حدوث خطأ في القراءة، نعود للقيم الافتراضية
+            
+    return default_data
+
 # محاولة استيراد مكتبة Supabase
 try:
     from supabase import create_client, Client
