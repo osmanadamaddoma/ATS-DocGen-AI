@@ -966,12 +966,24 @@ else:
         if not gen_list:
             st.info("No generators in this sub-site. Add one from the manual entry form above.")
         else:
-            col_select_g, col_modal_btn = st.columns([2, 1])
+                        # --- أزرار التحكم ومسح الذاكرة ---
+            if st.button("🚨 اضغط هنا لمسح السجلات القديمة المعلقة والبدء من جديد", type="primary", use_container_width=True):
+                st.session_state.sites_data = {}
+                st.rerun()
+
+            col_select_g, col_modal_btn, col_del_btn = st.columns([2, 1, 1])
             with col_select_g:
-                selected_gen = st.selectbox("Select Generator:", gen_list)
+                selected_gen = st.selectbox("📌 اختر المولد:", gen_list)
             with col_modal_btn:
                 st.write("")
+                if st.button("📝 تعديل المعايرة", use_container_width=True):
+                    edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
+            with col_del_btn:
                 st.write("")
+                if st.button("🗑️ حذف المولد", use_container_width=True):
+                    del st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
+                    st.rerun()
+
                 if st.button("📝 Open Calibration Modal"):
                     edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
 
@@ -1117,82 +1129,113 @@ else:
             with col_up2:
                 parts_img_file = st.file_uploader("Upload Maintenance Photo", type=["png", "jpg", "jpeg"])
 
-            def generate_full_pdf_bytes():
-                temp_logo_path = None
-                if logo_file:
-                    temp_logo_path = f"temp_logo_{uuid.uuid4().hex}.png"
-                    with open(temp_logo_path, "wb") as f:
-                        f.write(logo_file.getbuffer())
-
-                pdf = ComprehensivePDF("GENERATOR PREDICTIVE MAINTENANCE REPORT", logo_path=temp_logo_path)
+                        def generate_full_pdf_bytes():
+                pdf = ComprehensivePDF("FULL PREDICTIVE MAINTENANCE & PERFORMANCE REPORT")
                 pdf.add_page()
-
-                pdf.set_fill_color(245, 247, 250)
-                pdf.rect(10, 35, 190, 45, "F")
-                pdf.set_xy(12, 37)
-                pdf.set_font("Helvetica", "B", 9)
-                pdf.set_text_color(24, 43, 73)
-
-                pdf.cell(0, 5, f"Generator Data Site Address: {sanitize_latin_only(current_site_address)}", ln=True)
-                pdf.set_x(12)
-                pdf.cell(0, 5, f"Main Site: {sanitize_latin_only(selected_main_site)} | Sub Site: {sanitize_latin_only(selected_sub_site)}", ln=True)
-                pdf.set_x(12)
-                pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | Capacity: {gen_info['kw']} kW", ln=True)
-                pdf.set_x(12)
-                pdf.cell(0, 5, f"Current Run Hours: {gen_info['run_hours']} hrs | Target Hours: {gen_info['target']} hrs", ln=True)
-
-                amb_temp_val = calib_m.get('ambient_temp', 43.0)
-
-                pdf.ln(2)
-                pdf.set_x(12)
-                pdf.set_font("Helvetica", "B", 9)
-                pdf.set_text_color(200, 30, 30)
-                pdf.cell(0, 5, "Engine Oil Recommendation based on Ambient Temperature:", ln=True)
-
-                pdf.set_x(12)
-                pdf.set_font("Helvetica", "B", 9)
-                pdf.set_text_color(24, 43, 73)
-                if amb_temp_val >= 45:
-                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 20W50", ln=True)
-                elif amb_temp_val >= 43:
-                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 15W40", ln=True)
-                else:
-                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: USE STANDARD OIL SIZE 15W40", ln=True)
-
-                pdf.ln(8)
-
-                headers_pdf = ["#", "Part / Service Name", "Lifespan", "Used", "Remain", "Status"]
-                widths = [10, 60, 25, 25, 25, 45]
-                pdf.set_font("Helvetica", "B", 8)
+                
+                # 1. بيانات الموقع والمولد
+                pdf.set_font("Helvetica", "B", 10)
                 pdf.set_fill_color(24, 43, 73)
                 pdf.set_text_color(255, 255, 255)
-                for h, w in zip(headers_pdf, widths):
-                    pdf.cell(w, 6, h, border=1, fill=True, align="C")
-                pdf.ln()
-
-                pdf.set_font("Helvetica", "", 7)
+                pdf.cell(0, 8, " 1. SITE & GENERATOR DETAILS", ln=True, fill=True)
+                pdf.set_font("Helvetica", "", 9)
                 pdf.set_text_color(0, 0, 0)
-                for i, row in df_result.iterrows():
-                    fill = (i % 2 == 0)
-                    pdf.set_fill_color(240, 243, 246) if fill else pdf.set_fill_color(255, 255, 255)
-                    pdf.cell(widths[0], 5, str(row["الوحدة"]), border=1, align="C", fill=fill)
-                    pdf.cell(widths[1], 5, sanitize_latin_only(str(row["قطع الغيار / الفلاتر"]))[:32], border=1, fill=fill)
-                    pdf.cell(widths[2], 5, str(row["العمر الافتراضي (ساعة)"]), border=1, align="C", fill=fill)
-                    pdf.cell(widths[3], 5, str(row["الساعات المنقضية (ساعة)"]), border=1, align="C", fill=fill)
-                    pdf.cell(widths[4], 5, str(row["المدة المتبقية (ساعة)"]), border=1, align="C", fill=fill)
-                    pdf.cell(widths[5], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1, fill=fill)
-                    pdf.ln()
+                pdf.cell(0, 6, f"Main Site: {selected_main_site} | Sub Site: {selected_sub_site}", ln=True)
+                pdf.cell(0, 6, f"Generator ID: {selected_gen} | Model: {gen_info.get('model', 'N/A')} | Capacity: {gen_info.get('kw', 0)} kW", ln=True)
+                pdf.cell(0, 6, f"Run Hours: {gen_info.get('run_hours', 0)} Hrs | Target: {gen_info.get('target', 0)} Hrs", ln=True)
+                pdf.ln(3)
+
+                # 2. القراءات الكهربائية والميكانيكية
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.set_text_color(255, 255, 255)
+                pdf.cell(0, 8, " 2. ELECTRICAL & MECHANICAL PARAMETERS", ln=True, fill=True)
+                pdf.set_font("Helvetica", "", 9)
+                pdf.set_text_color(0, 0, 0)
+                pdf.cell(0, 6, f"Voltage: {calib_e.get('v_measured', 0)} V | Current: {calib_e.get('current_measured', 0)} A | PF: {calib_e.get('pf', 0)}", ln=True)
+                pdf.cell(0, 6, f"Oil Pressure: {calib_m.get('oil_press_bar', 0)} Bar | Coolant Temp: {calib_m.get('coolant_temp_c', 0)} C", ln=True)
+                
+                # توصية تغيير الزيت
+                amb = calib_m.get('ambient_temp', 43.0)
+                rec_oil = "20W50" if amb >= 45 else ("15W40" if amb >= 43 else "15W40 Standard")
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_text_color(200, 30, 30)
+                pdf.cell(0, 6, f">> RECOMMENDED OIL BASED ON AMBIENT ({amb} C): {rec_oil}", ln=True)
+                pdf.ln(3)
+                
+                # 3. مزامنة استهلاك الوقود حسب الحمل
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.set_text_color(255, 255, 255)
+                pdf.cell(0, 8, " 3. LOAD & FUEL CONSUMPTION (SYNCED)", ln=True, fill=True)
+                pdf.set_font("Helvetica", "", 9)
+                pdf.set_text_color(0, 0, 0)
+                load_kw = gen_info.get('load', 0)
+                hrs = 24.0 # حساب يومي افتراضي
+                sfc = 0.25 # متوسط الاستهلاك
+                daily_fuel = round(load_kw * sfc * hrs, 1)
+                pdf.cell(0, 6, f"Current Load: {load_kw} kW | Est. Daily Diesel: {daily_fuel} Liters (at 24 hrs)", ln=True)
+                pdf.ln(3)
+
+                # 4. جدول الصيانة التنبؤية
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.set_text_color(255, 255, 255)
+                pdf.cell(0, 8, " 4. PREDICTIVE MAINTENANCE SCHEDULE", ln=True, fill=True)
+                pdf.set_font("Helvetica", "B", 7)
+                pdf.set_text_color(0, 0, 0)
+                headers = ["Part Name", "Lifespan", "Used", "Remain", "Status"]
+                widths = [60, 30, 30, 30, 40]
+                for h, w in zip(headers, widths):
+                    pdf.cell(w, 6, h, border=1, align="C", fill=False)
+                pdf.ln()
+                pdf.set_font("Helvetica", "", 7)
+                
+                if 'df_result' in locals() or 'df_result' in globals():
+                    for _, row in df_result.iterrows():
+                        # تنظيف النص لمنع أخطاء الترميز
+                        part_name = str(row["قطع الغيار / الفلاتر"]).encode('latin-1', 'replace').decode('latin-1')
+                        status_name = str(row["حالة التنبيه"]).encode('latin-1', 'replace').decode('latin-1')
+                        pdf.cell(widths[0], 5, part_name[:35], border=1)
+                        pdf.cell(widths[1], 5, str(row["العمر الافتراضي (ساعة)"]), border=1, align="C")
+                        pdf.cell(widths[2], 5, str(row["الساعات المنقضية (ساعة)"]), border=1, align="C")
+                        pdf.cell(widths[3], 5, str(row["المدة المتبقية (ساعة)"]), border=1, align="C")
+                        pdf.cell(widths[4], 5, status_name, border=1, align="C")
+                        pdf.ln()
+                pdf.ln(5)
+
+                # 5. تحميل الصور والمخططات
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.set_text_color(255, 255, 255)
+                pdf.cell(0, 8, " 5. UPLOADED MEDIA / CHARTS", ln=True, fill=True)
+                pdf.set_text_color(0, 0, 0)
+                
+                y_img = pdf.get_y() + 5
+                import uuid, os
+                
+                if gen_img_file:
+                    try:
+                        t_name = f"gen_{uuid.uuid4().hex}.jpg"
+                        with open(t_name, "wb") as f: f.write(gen_img_file.getbuffer())
+                        pdf.image(t_name, x=15, y=y_img, w=80)
+                        os.remove(t_name)
+                    except: pass
+                    
+                if parts_img_file:
+                    try:
+                        p_name = f"part_{uuid.uuid4().hex}.jpg"
+                        with open(p_name, "wb") as f: f.write(parts_img_file.getbuffer())
+                        pdf.image(p_name, x=105, y=y_img, w=80)
+                        os.remove(p_name)
+                    except: pass
 
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
 
             st.download_button(
-                label=f"🖨️ Download Full Report for ({selected_gen})",
+                label=f"🖨️ تحميل التقرير الشامل PDF للمولد ({selected_gen})",
                 data=generate_full_pdf_bytes(),
-                file_name=f"Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                file_name=f"Comprehensive_Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
                 mime="application/pdf",
                 use_container_width=True
-            )
+            )         
 
     elif "2." in selected_app:
         st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
