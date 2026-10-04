@@ -54,7 +54,8 @@ def get_fuel_table_from_csv(uploaded_file):
             pass # في حال حدوث خطأ في القراءة، نعود للقيم الافتراضية
             
     return default_data
-def calculate_fuel_consumption_and_emissions(kw_load, hrs, model, rating_kw, fuel_table_live=None):
+
+def calculate_fuel_consumption_and_emissions_v6(kw_load, hrs, model, rating_kw, fuel_table_live=None):
     try:
         # تحويل القيم إلى أرقام لضمان عدم حدوث أخطاء رياضية
         kw_load = float(kw_load)
@@ -86,6 +87,7 @@ def calculate_fuel_consumption_and_emissions(kw_load, hrs, model, rating_kw, fue
     except Exception:
         # إرجاع قيم افتراضية آمنة في حال وجود أي نقص في البيانات لمنع توقف التطبيق
         return 0.0, 0.0, 0.25, 35
+
 
 # محاولة استيراد مكتبة Supabase
 try:
