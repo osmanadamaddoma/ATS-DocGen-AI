@@ -1372,4 +1372,298 @@ else:
             if st.button("💾 حفظ السجل الجديد", key="btn_add_gen"):
                 if new_main and new_sub and new_gen_id:
                     if new_main not in st.session_state.sites_data:
-           
+                        st.session_state.sites_data[new_main] = {}
+                        
+                    if new_sub not in st.session_state.sites_data[new_main]:
+                        st.session_state.sites_data[new_main][new_sub] = {
+                            "address": "تمت الإضافة حديثاً",
+                            "generators": {}
+                        }
+                    
+                    st.session_state.sites_data[new_main][new_sub]["generators"][new_gen_id] = {
+                        "model": new_model,
+                        "run_hours": 0.0,
+                        "target": 250.0,
+                        "kw": new_kw,
+                        "load": 0.0,
+                        "calib_elec": {"v_measured": 400.0, "pf": 0.8},
+                        "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0}
+                    }
+                    
+                    st.success(f"✅ تم إضافة المولد {new_gen_id} بنجاح! سيظهر الآن في كل القوائم المنسدلة.")
+                else:
+                    st.error("⚠️ الرجاء تعبئة الحقول الأساسية (القائمة، الموقع، والمعرف).")
+
+        with tab_delete:
+            st.subheader("حذف مولد من النظام")
+            
+            if st.session_state.sites_data:
+                del_main = st.selectbox("1. اختر القائمة الرئيسية", existing_mains, key="sel_del_main")
+                
+                if del_main:
+                    existing_subs = list(st.session_state.sites_data[del_main].keys())
+                    if existing_subs:
+                        del_sub = st.selectbox("2. اختر الموقع الفرعي", existing_subs, key="sel_del_sub")
+                        
+                        if del_sub:
+                            existing_gens = list(st.session_state.sites_data[del_main][del_sub]["generators"].keys())
+                            if existing_gens:
+                                del_gen = st.selectbox("3. اختر المولد المراد حذفه", existing_gens, key="sel_del_gen")
+                                
+                                st.warning(f"هل أنت متأكد من حذف {del_gen}؟")
+                                if st.button("🗑️ تأكيد الحذف", key="btn_del_gen"):
+                                    del st.session_state.sites_data[del_main][del_sub]["generators"][del_gen]
+                                    st.success(f"✅ تم حذف {del_gen} بنجاح.")
+                                    st.rerun()
+                            else:
+                                st.info("لا توجد مولدات في هذا الموقع.")
+                    else:
+                        st.info("لا توجد مواقع فرعية.")
+
+            # رسم بياني تنبؤي
+            sizes = [35, 50, 70, 95, 120, 150, 185, 240, 300]
+            drops = [calculate_cable_voltage_drop(i_amp, dist_m, s, cos_phi)[1] for s in sizes]
+            fig_drop = px.line(x=sizes, y=drops, markers=True, title="Predictive Voltage Drop vs Cable Size - تنبؤي", labels={"x":"mm²","y":"V Drop %"})
+            fig_drop.add_hline(y=4, line_dash="dash", line_color="red", annotation_text="IEC Limit 4%")
+            st.plotly_chart(fig_drop, use_container_width=True)
+
+            # حفظ في ذاكرة الجهاز + قاعدة البيانات
+            if st.button("💾 حفظ الحساب في السجل والتقرير", key="save_cable"):
+                log_entry = {
+                    "date": datetime.now().isoformat(),
+                    "type": "cable_calc",
+                    "i": i_amp,
+                    "dist": dist_m,
+                    "size": c_size,
+                    "v_drop": v_drop,
+                    "v_pct": v_drop_pct,
+                    "site": main_key
+                }
+                st.session_state.daily_logs.append(log_entry)
+                if supabase:
+                    try:
+                        supabase.table("daily_logs").insert([log_entry]).execute()
+                        st.success("✅ تم الحفظ في Supabase وذاكرة الجهاز")
+                    except:
+                        st.success("✅ تم الحفظ محليا في ذاكرة الجهاز")
+                
+                # تقرير PDF
+                pdf = ComprehensivePDF("Cable Voltage Drop Report")
+                pdf.add_page()
+                pdf.set_font("Helvetica", "", 10)
+                pdf.cell(0, 10, f"Current: {i_amp} A | Distance: {dist_m} m | Size: {c_size} mm2 | V Drop: {v_drop} V ({v_drop_pct}%)", ln=True)
+                pdf_bytes = pdf.output(dest='S').encode('latin-1', 'ignore')
+                st.download_button("📄 تحميل تقرير الكابل PDF", pdf_bytes, f"Cable_Report_{datetime.now().date()}.pdf", "application/pdf")
+
+        with tab_calc2:
+            st.subheader("🌱 Fuel & Carbon Footprint - AI Synced with Genset Data")
+            if gen_info:
+                st.success(f"✅ متزامن مع: {gen_key} - {gen_info['model']} | {gen_info['load']}kW / {gen_info['kw']}kW - {st.session_state.sites_data[main_key][sub_key].get('address','')}")
+            else:
+                st.warning("لا يوجد مولد مربوط - سيتم استخدام قيم افتراضية")
+
+            uploaded = st.file_uploader("📁 ارفع جدول SFC الخاص بك CSV (اختياري - متزامن)", type=["csv"], key="fuel_csv_upload")
+            fuel_table_live = get_fuel_table_from_csv(uploaded)
+
+            cf1, cf2 = st.columns(2)
+            with cf1:
+                kw_load = st.number_input("الحمل الفعلي kW (مزامن تلقائيا)", value=float(gen_info['load']) if gen_info else 200.0, key="ai_kw")
+                hrs = st.number_input("ساعات التشغيل يوميا", value=12.0, key="ai_hrs")
+                price = st.number_input("سعر اللتر SDG", value=2500.0, key="ai_price")
+                if gen_info:
+                    st.caption(f"نسبة التحميل: {(kw_load/gen_info['kw']*100):.1f}% - ساعات المولد الحالية: {gen_info['run_hours']}")
+            
+            with cf2:
+                liters, co2, sfc, eff = calculate_fuel_consumption_and_emissions_v6(kw_load, hrs, gen_info['model'] if gen_info else "Perkins", gen_info['kw'] if gen_info else 410, fuel_table_live)
+                st.metric("⛽ الديزل / يوم", f"{liters} L", f"{liters*30:.0f} L/شهر")
+                st.metric("🌍 CO2 / يوم", f"{co2} kg", f"{co2*0.001:.2f} Ton")
+                st.metric("📊 SFC", f"{sfc} L/kWh", f"كفاءة {eff}%")
+                st.metric("💰 التكلفة اليومية", f"{liters*price:,.0f} SDG")
+
+                # تنبيه مخاطر AI
+                if eff < 30:
+                    st.error("⚠️ AI تنبيه: الكفاءة منخفضة جدا (<30%) - خطر استهلاك وقود عالي وتآكل محرك. راجع الحمل - يفضل 75-85%")
+                    play_audio("تنبيه كفاءة منخفضة خطر استهلاك وقود عالي", lang=L)
+                if kw_load/gen_info['kw']*100 < 40 if gen_info else 0:
+                    st.warning("⚠️ حمل منخفض <40% - يسبب تراكم كربون وتقليل عمر المحرك")
+
+            # رسم بياني استهلاك تنبؤي 7 أيام
+            days = list(range(1, 8))
+            fuel_7d = [liters*d for d in days]
+            co2_7d = [co2*d for d in days]
+            fig_fuel = go.Figure()
+            fig_fuel.add_trace(go.Scatter(x=days, y=fuel_7d, mode='lines+markers', name='Diesel L'))
+            fig_fuel.add_trace(go.Scatter(x=days, y=co2_7d, mode='lines+markers', name='CO2 kg', yaxis='y2'))
+            fig_fuel.update_layout(title="AI Predictive 7-Day Fuel & CO2 Forecast - تنبؤي", xaxis_title="Day", yaxis=dict(title="Liters"), yaxis2=dict(title="CO2 kg", overlaying='y', side='right'))
+            st.plotly_chart(fig_fuel, use_container_width=True)
+
+            if st.button("💾 حفظ وتزامن مع ساعات المولد والتقرير", key="save_fuel"):
+                # تحديث ساعات التشغيل تلقائيا
+                if gen_info:
+                    st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["run_hours"] += hrs
+                    st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["load"] = kw_load
+                
+                log = {
+                    "date": datetime.now().isoformat(),
+                    "type": "fuel_calc",
+                    "gen": gen_key if gen_info else "G1",
+                    "kw": kw_load,
+                    "hrs": hrs,
+                    "liters": liters,
+                    "co2": co2,
+                    "sfc": sfc,
+                    "eff": eff
+                }
+                st.session_state.daily_logs.append(log)
+                
+                if supabase:
+                    try:
+                        supabase.table("fuel_logs").insert([log]).execute()
+                    except:
+                        pass
+                st.success(f"✅ تم الحفظ وتحديث ساعات {gen_key} - متزامن")
+                
+                # PDF
+                pdf = ComprehensivePDF("Fuel & Carbon Report - AI Synced")
+                pdf.add_page()
+                pdf.set_font("Helvetica", "", 10)
+                pdf.cell(0, 10, f"Gen: {gen_key} | Load: {kw_load} kW | Hours: {hrs} | Diesel: {liters} L | CO2: {co2} kg | SFC: {sfc} | Eff: {eff}%", ln=True)
+                pdf_bytes = pdf.output(dest='S').encode('latin-1', 'ignore')
+                st.download_button("📄 تحميل تقرير الوقود PDF", pdf_bytes, f"Fuel_Report_{datetime.now().date()}.pdf", "application/pdf")
+
+        with tab_calc3:
+            st.subheader("📈 SFC Curve - جدولك + AI Predictive Analytics")
+            rows = []
+            for l in sorted(fuel_table_live.keys()):
+                rows.append({
+                    "Load %": l,
+                    "CAT g/kWh": fuel_table_live[l].get("g_cat", 205),
+                    "Cummins": fuel_table_live[l].get("g_cummins", 208),
+                    "Perkins": fuel_table_live[l].get("g_perkins", 212),
+                    "SFC L/kWh": fuel_table_live[l]["AVG"],
+                    "Eff %": fuel_table_live[l]["eff"]
+                })
+            df = pd.DataFrame(rows)
+            st.dataframe(df, use_container_width=True)
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=df["Load %"], y=df["CAT g/kWh"], mode='lines+markers', name='CAT'))
+                fig.add_trace(go.Scatter(x=df["Load %"], y=df["Cummins"], mode='lines+markers', name='Cummins'))
+                fig.add_trace(go.Scatter(x=df["Load %"], y=df["Perkins"], mode='lines+markers', name='Perkins'))
+                fig.update_layout(title="SFC Curve - من جدولك (g/kWh)")
+                st.plotly_chart(fig, use_container_width=True)
+            with c2:
+                st.plotly_chart(px.line(df, x="Load %", y="Eff %", markers=True, title="Efficiency vs Load - تنبؤي"), use_container_width=True)
+
+            # AI تحليل تنبؤي
+            if client and st.button("🤖 تحليل AI تنبؤي للكفاءة والمخاطر"):
+                prompt = f"SFC Data: {df.to_json()} - Analyze efficiency, predict best load range, risks if low load, fuel saving tips in Arabic concise"
+                ai_analysis = analyze_fault_with_gemini("SFC Analysis", str(df.to_dict()), L)
+                st.info(f"🤖 AI تحليل تنبؤي: {ai_analysis}")
+                play_audio(ai_analysis[:200], lang=L)
+
+            st.download_button("📥 تحميل جدول SFC CSV متزامن", df.to_csv(index=False).encode('utf-8'), "SFC_Table_AI_Synced.csv", "text/csv")
+            st.success("✅ تم تفعيل المزامنة الكاملة: المولدات + الصيانة + Supabase + ذاكرة الجهاز + التقارير PDF + الرسوم البيانية + تنبيهات AI + تحليل مخاطر")
+
+                     # --- لوحة إدارة المواقع والمولدات (مزامنة شاملة) ---
+        st.markdown("---")
+        st.header("⚙️ إدارة بيانات المواقع والمولدات (مزامنة شاملة)")
+
+        tab_add, tab_delete = st.tabs(["➕ إضافة موقع ومولد جديد", "🗑️ حذف سجل"])
+
+        with tab_add:
+            st.subheader("إضافة قائمة، موقع، أو مولد جديد للنظام")
+            
+            existing_mains = list(st.session_state.sites_data.keys())
+            new_main = st.text_input("القائمة الرئيسية (مثال: الخرطوم، بورتسودان، إلخ):", key="add_main_v6")
+            new_sub = st.text_input("الموقع الفرعي (مثال: مصنع التعدين، مستشفى، إلخ):", key="add_sub_v6")
+            new_gen_id = st.text_input("معرف المولد (مثال: G3, G4):", key="add_gen_v6")
+            
+            c1, c2 = st.columns(2)
+            new_model = c1.text_input("موديل المولد (مثال: Cummins 250 kVA):", value="Perkins", key="add_model_v6")
+            new_kw = c2.number_input("القدرة الإجمالية kW:", min_value=10.0, value=250.0, key="add_kw_v6")
+            
+            if st.button("💾 حفظ السجل وتزامن شامل (Supabase & Reports)", key="btn_add_gen_sync"):
+                if new_main and new_sub and new_gen_id:
+                    # إضافة السجلات في الذاكرة
+                    if new_main not in st.session_state.sites_data:
+                        st.session_state.sites_data[new_main] = {}
+                        
+                    if new_sub not in st.session_state.sites_data[new_main]:
+                        st.session_state.sites_data[new_main][new_sub] = {
+                            "address": f"تمت الإضافة عبر الإدارة - {new_sub}",
+                            "generators": {}
+                        }
+                    
+                    st.session_state.sites_data[new_main][new_sub]["generators"][new_gen_id] = {
+                        "model": new_model,
+                        "run_hours": 0.0,
+                        "target": 250.0,
+                        "kw": new_kw,
+                        "load": 0.0,
+                        "calib_elec": {"v_measured": 400.0, "pf": 0.8},
+                        "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0}
+                    }
+                    
+                    if supabase:
+                        try:
+                            supabase.table("sites_registry").insert([{
+                                "main_site": new_main, "sub_site": new_sub, "gen_id": new_gen_id, "model": new_model, "kw": new_kw, "date_added": datetime.now().isoformat()
+                            }]).execute()
+                        except:
+                            pass
+                    
+                    st.success(f"✅ تم الحفظ بنجاح! يتم الآن تحديث النظام...")
+                    st.rerun() # هذا الأمر سيحدث الصفحة لكي يظهر الموقع الجديد فوراً في التطبيق 1
+                else:
+                    st.error("⚠️ الرجاء تعبئة الحقول الأساسية (القائمة، الموقع، والمعرف).")
+
+        with tab_delete:
+            st.subheader("حذف موقع أو مولد من النظام")
+            
+            if st.session_state.sites_data:
+                del_main = st.selectbox("1. اختر القائمة الرئيسية", existing_mains, key="sel_del_main_sync")
+                
+                if del_main:
+                    existing_subs = list(st.session_state.sites_data[del_main].keys())
+                    if existing_subs:
+                        del_sub = st.selectbox("2. اختر الموقع الفرعي", existing_subs, key="sel_del_sub_sync")
+                        
+                        if del_sub:
+                            existing_gens = list(st.session_state.sites_data[del_main][del_sub]["generators"].keys())
+                            if existing_gens:
+                                del_gen = st.selectbox("3. اختر المولد المراد حذفه", existing_gens, key="sel_del_gen_sync")
+                                
+                                st.warning(f"هل أنت متأكد من حذف {del_gen} نهائياً؟")
+                                if st.button("🗑️ تأكيد الحذف", key="btn_del_gen_sync"):
+                                    del st.session_state.sites_data[del_main][del_sub]["generators"][del_gen]
+                                    
+                                    if supabase:
+                                        try:
+                                            supabase.table("sites_registry").delete().eq("gen_id", del_gen).eq("sub_site", del_sub).execute()
+                                        except:
+                                            pass
+                                            
+                                    st.success(f"✅ تم حذف {del_gen} بنجاح. يتم التحديث...")
+                                    st.rerun()
+                            else:
+                                st.info("لا توجد مولدات في هذا الموقع.")
+                    else:
+                        st.info("لا توجد مواقع فرعية.")
+       # --- لوحة إدارة المواقع والمولدات (متزامنة مع التطبيق 1 وتقارير PDF و Supabase) ---
+        
+
+
+        with tab_calc2:
+            st.subheader("🌱 Fuel Consumption & CO2 Emission Estimator")
+            ec1, ec2 = st.columns(2)
+            load_kw = ec1.number_input("Running Load (kW):", value=200.0)
+            hours_run = ec2.number_input("Operating Hours:", value=24.0)
+
+            est_liters, est_co2 = calculate_fuel_consumption_and_emissions(load_kw, hours_run)
+
+            mc1, mc2 = st.columns(2)
+            mc1.metric("Estimated Diesel Used", f"{est_liters} Liters")
+            mc2.metric("Estimated CO2 Output", f"{est_co2} kg")
