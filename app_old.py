@@ -1522,13 +1522,92 @@ else:
                         pass
                 st.success(f"✅ تم الحفظ وتحديث ساعات {gen_key} - متزامن")
                 
-                # PDF
-                pdf = ComprehensivePDF("Fuel & Carbon Report - AI Synced")
+                #                # --- إنشاء التقرير الهندسي الشامل للمولد (PDF) ---
+                pdf = ComprehensivePDF("Full Genset Predictive & Performance Report")
                 pdf.add_page()
+                
+                # 1. بيانات الموقع والمولد
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.set_text_color(0, 51, 102) # لون أزرق غامق للعناوين
+                pdf.cell(0, 10, "1. Site & Genset Information:", ln=True)
                 pdf.set_font("Helvetica", "", 10)
-                pdf.cell(0, 10, f"Gen: {gen_key} | Load: {kw_load} kW | Hours: {hrs} | Diesel: {liters} L | CO2: {co2} kg | SFC: {sfc} | Eff: {eff}%", ln=True)
+                pdf.set_text_color(0, 0, 0)
+                pdf.cell(0, 8, f"Main Site (القائمة الرئيسية): {main_key}", ln=True)
+                pdf.cell(0, 8, f"Sub Site (الموقع): {sub_key} | Address: {st.session_state.sites_data[main_key][sub_key].get('address','')}", ln=True)
+                pdf.cell(0, 8, f"Genset ID: {gen_key} | Model: {gen_info['model']} | Capacity: {gen_info['kw']} kW", ln=True)
+                pdf.cell(0, 8, f"Current Load: {kw_load} kW | Run Hours: {gen_info['run_hours']} Hrs", ln=True)
+                pdf.ln(5)
+
+                # 2. البيانات الكهربائية والميكانيكية
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.set_text_color(0, 51, 102)
+                pdf.cell(0, 10, "2. Electrical & Mechanical Parameters:", ln=True)
+                pdf.set_font("Helvetica", "", 10)
+                pdf.set_text_color(0, 0, 0)
+                elec = gen_info.get('calib_elec', {})
+                mech = gen_info.get('calib_engine', {})
+                pdf.cell(0, 8, f"Voltage: {elec.get('v_measured', 0)} V | Power Factor (PF): {elec.get('pf', 0)}", ln=True)
+                pdf.cell(0, 8, f"Oil Pressure: {mech.get('oil_press_bar', 0)} Bar | Coolant Temp: {mech.get('coolant_temp_c', 0)} C", ln=True)
+                pdf.ln(5)
+
+                # 3. استهلاك الوقود والانبعاثات (مرتبط بالحمل)
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.set_text_color(0, 51, 102)
+                pdf.cell(0, 10, f"3. Fuel Consumption & Emissions (At {kw_load} kW Load):", ln=True)
+                pdf.set_font("Helvetica", "", 10)
+                pdf.set_text_color(0, 0, 0)
+                pdf.cell(0, 8, f"Daily Diesel Consumption: {liters} Liters (Operating {hrs} Hours/Day)", ln=True)
+                pdf.cell(0, 8, f"Carbon Footprint (CO2): {co2} kg | SFC: {sfc} L/kWh | Efficiency: {eff}%", ln=True)
+                pdf.ln(5)
+
+                # 4. جدول الوقود (SFC Curve Data)
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.set_text_color(0, 51, 102)
+                pdf.cell(0, 10, "4. Fuel SFC Table (Live Data):", ln=True)
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.set_text_color(0, 0, 0)
+                # رسم رأس الجدول
+                pdf.cell(30, 8, "Load %", border=1, align='C')
+                pdf.cell(45, 8, "SFC (L/kWh)", border=1, align='C')
+                pdf.cell(45, 8, "Efficiency %", border=1, align='C')
+                pdf.ln()
+                # تفريغ بيانات الجدول
+                pdf.set_font("Helvetica", "", 10)
+                for load_pct in sorted(fuel_table_live.keys()):
+                    sfc_val = fuel_table_live[load_pct].get("AVG", 0)
+                    eff_val = fuel_table_live[load_pct].get("eff", 0)
+                    pdf.cell(30, 8, f"{load_pct}%", border=1, align='C')
+                    pdf.cell(45, 8, str(sfc_val), border=1, align='C')
+                    pdf.cell(45, 8, f"{eff_val}%", border=1, align='C')
+                    pdf.ln()
+                pdf.ln(5)
+
+                # 5. طباعة الرسم البياني (تنبؤي الاستهلاك)
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.set_text_color(0, 51, 102)
+                pdf.cell(0, 10, "5. Predictive Analytics Chart:", ln=True)
+                try:
+                    import os
+                    chart_filename = "temp_predictive_chart.png"
+                    fig_fuel.write_image(chart_filename)
+                    pdf.image(chart_filename, x=10, w=170)
+                    os.remove(chart_filename)
+                except Exception as e:
+                    pdf.set_font("Helvetica", "I", 10)
+                    pdf.set_text_color(255, 0, 0)
+                    pdf.cell(0, 8, "* Chart could not be rendered. Please ensure 'kaleido' is installed.", ln=True)
+                    pdf.set_text_color(0, 0, 0)
+
+                # إنهاء وحفظ الـ PDF
                 pdf_bytes = pdf.output(dest='S').encode('latin-1', 'ignore')
-                st.download_button("📄 تحميل تقرير الوقود PDF", pdf_bytes, f"Fuel_Report_{datetime.now().date()}.pdf", "application/pdf")
+                st.download_button(
+                    label="📄 تحميل التقرير الهندسي الشامل PDF (Full Report)", 
+                    data=pdf_bytes, 
+                    file_name=f"Full_Genset_Report_{gen_key}_{datetime.now().date()}.pdf", 
+                    mime="application/pdf",
+                    key="download_full_pdf_sync"
+                )
+ 
 
         with tab_calc3:
             st.subheader("📈 SFC Curve - جدولك + AI Predictive Analytics")
