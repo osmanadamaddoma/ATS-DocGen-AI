@@ -1229,16 +1229,16 @@ else:
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
 
-st.download_button(
-                label=f"🖨️ تحميل التقرير الشامل PDF للمولد ({selected_gen})",
-                data=generate_full_pdf_bytes(),
-                file_name=f"Comprehensive_Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )         
+        st.download_button(
+            label=f"🖨️ تحميل التقرير الشامل PDF للمولد ({selected_gen})",
+            data=generate_full_pdf_bytes(),
+            file_name=f"Comprehensive_Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
 
 elif "2." in selected_app:
-        st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
+    st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
 
         df_iot = fetch_live_iot_data()
         if not df_iot.empty:
