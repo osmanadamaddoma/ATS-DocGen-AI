@@ -1350,6 +1350,75 @@ else:
             else:
                 st.success("✅ Cable size is acceptable under IEC standards. - تم الحفظ تلقائيا")
 
+                    # --- لوحة إدارة المواقع والمولدات ---
+        st.markdown("---")
+        st.header("⚙️ إدارة بيانات المواقع والمولدات (مزامنة حية)")
+
+        tab_add, tab_delete = st.tabs(["➕ إضافة سجل جديد", "🗑️ حذف سجل"])
+
+        with tab_add:
+            st.subheader("إضافة قائمة، موقع، أو مولد جديد")
+            
+            existing_mains = list(st.session_state.sites_data.keys())
+            new_main = st.text_input("القائمة الرئيسية (اكتب اسماً جديداً أو اختر اسماً موجوداً مثل: بحري):")
+            new_sub = st.text_input("الموقع الفرعي (مثال: مصنع التعدين):")
+            new_gen_id = st.text_input("معرف المولد (مثال: G3):")
+            
+            c1, c2 = st.columns(2)
+            new_model = c1.text_input("موديل المولد (مثال: Cummins 250 kVA):", value="Perkins")
+            new_kw = c2.number_input("القدرة الإجمالية kW:", min_value=10.0, value=250.0)
+            
+            if st.button("💾 حفظ السجل الجديد", key="btn_add_gen"):
+                if new_main and new_sub and new_gen_id:
+                    if new_main not in st.session_state.sites_data:
+                        st.session_state.sites_data[new_main] = {}
+                        
+                    if new_sub not in st.session_state.sites_data[new_main]:
+                        st.session_state.sites_data[new_main][new_sub] = {
+                            "address": "تمت الإضافة حديثاً",
+                            "generators": {}
+                        }
+                    
+                    st.session_state.sites_data[new_main][new_sub]["generators"][new_gen_id] = {
+                        "model": new_model,
+                        "run_hours": 0.0,
+                        "target": 250.0,
+                        "kw": new_kw,
+                        "load": 0.0,
+                        "calib_elec": {"v_measured": 400.0, "pf": 0.8},
+                        "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0}
+                    }
+                    
+                    st.success(f"✅ تم إضافة المولد {new_gen_id} بنجاح! سيظهر الآن في كل القوائم المنسدلة.")
+                else:
+                    st.error("⚠️ الرجاء تعبئة الحقول الأساسية (القائمة، الموقع، والمعرف).")
+
+        with tab_delete:
+            st.subheader("حذف مولد من النظام")
+            
+            if st.session_state.sites_data:
+                del_main = st.selectbox("1. اختر القائمة الرئيسية", existing_mains, key="sel_del_main")
+                
+                if del_main:
+                    existing_subs = list(st.session_state.sites_data[del_main].keys())
+                    if existing_subs:
+                        del_sub = st.selectbox("2. اختر الموقع الفرعي", existing_subs, key="sel_del_sub")
+                        
+                        if del_sub:
+                            existing_gens = list(st.session_state.sites_data[del_main][del_sub]["generators"].keys())
+                            if existing_gens:
+                                del_gen = st.selectbox("3. اختر المولد المراد حذفه", existing_gens, key="sel_del_gen")
+                                
+                                st.warning(f"هل أنت متأكد من حذف {del_gen}؟")
+                                if st.button("🗑️ تأكيد الحذف", key="btn_del_gen"):
+                                    del st.session_state.sites_data[del_main][del_sub]["generators"][del_gen]
+                                    st.success(f"✅ تم حذف {del_gen} بنجاح.")
+                                    st.rerun()
+                            else:
+                                st.info("لا توجد مولدات في هذا الموقع.")
+                    else:
+                        st.info("لا توجد مواقع فرعية.")
+
             # رسم بياني تنبؤي
             sizes = [35, 50, 70, 95, 120, 150, 185, 240, 300]
             drops = [calculate_cable_voltage_drop(i_amp, dist_m, s, cos_phi)[1] for s in sizes]
