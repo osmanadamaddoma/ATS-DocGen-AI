@@ -1237,7 +1237,7 @@ st.download_button(
                 use_container_width=True
             )         
 
-    elif "2." in selected_app:
+هelif "2." in selected_app:
         st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
 
         df_iot = fetch_live_iot_data()
