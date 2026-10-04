@@ -1229,16 +1229,17 @@ else:
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
 
-  st.download_button(
-            label=f"🖨️ تحميل التقرير الشامل PDF للمولد ({selected_gen})",
-            data=generate_full_pdf_bytes(),
-            file_name=f"Comprehensive_Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
-            mime="application/pdf",
+st.download_button(
+            label=f"🖨️ تحميل التقرير الهندسي المختصر ({selected_gen})",
+            data=f"Generator: {selected_gen} | Model: {gen_info.get('model', 'N/A')} | Run Hours: {gen_info.get('run_hours', 0)}",
+            file_name=f"Report_{selected_gen}.txt",
+            mime="text/plain",
             use_container_width=True
         )
 
 elif "2." in selected_app:
     st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
+
 
         df_iot = fetch_live_iot_data()
         if not df_iot.empty:
