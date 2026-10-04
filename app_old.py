@@ -1241,7 +1241,7 @@ if "2." in selected_app:
     st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
 
 
-        df_iot = fetch_live_iot_data()
+df_iot = fetch_live_iot_data()
         if not df_iot.empty:
             latest = df_iot.iloc[-1]
             col1, col2, col3 = st.columns(3)
