@@ -1404,7 +1404,7 @@ else:
                     st.caption(f"نسبة التحميل: {(kw_load/gen_info['kw']*100):.1f}% - ساعات المولد الحالية: {gen_info['run_hours']}")
             
             with cf2:
-                liters, co2, sfc, eff = calculate_fuel_consumption_and_emissions(kw_load, hrs, gen_info['model'] if gen_info else "Perkins", gen_info['kw'] if gen_info else 410, fuel_table_live)
+                liters, co2, sfc, eff = calculate_fuel_consumption_and_emissions_v6(kw_load, hrs, gen_info['model'] if gen_info else "Perkins", gen_info['kw'] if gen_info else 410, fuel_table_live)
                 st.metric("⛽ الديزل / يوم", f"{liters} L", f"{liters*30:.0f} L/شهر")
                 st.metric("🌍 CO2 / يوم", f"{co2} kg", f"{co2*0.001:.2f} Ton")
                 st.metric("📊 SFC", f"{sfc} L/kWh", f"كفاءة {eff}%")
