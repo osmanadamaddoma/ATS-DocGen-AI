@@ -1356,4 +1356,4 @@ else:
                         catalog_pages = []
                         with pdfplumber.open(manual_file) as pdf:
                             for i, page in enumerate(pdf.pages):
-                                catalog_pages.append({"page_num": i + 1, "content": page.extract_text() or "
+                                catalog_pages.append({"page_num": i + 1, "content": page.extract_text() or ""})
