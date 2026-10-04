@@ -1229,7 +1229,7 @@ else:
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
 
-            st.download_button(
+st.download_button(
                 label=f"🖨️ تحميل التقرير الشامل PDF للمولد ({selected_gen})",
                 data=generate_full_pdf_bytes(),
                 file_name=f"Comprehensive_Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
