@@ -1,3 +1,4 @@
+
 import os
 import re
 import json
@@ -966,24 +967,12 @@ else:
         if not gen_list:
             st.info("No generators in this sub-site. Add one from the manual entry form above.")
         else:
-                        # --- أزرار التحكم ومسح الذاكرة ---
-            if st.button("🚨 اضغط هنا لمسح السجلات القديمة المعلقة والبدء من جديد", type="primary", use_container_width=True):
-                st.session_state.sites_data = {}
-                st.rerun()
-
-            col_select_g, col_modal_btn, col_del_btn = st.columns([2, 1, 1])
+            col_select_g, col_modal_btn = st.columns([2, 1])
             with col_select_g:
-                selected_gen = st.selectbox("📌 اختر المولد:", gen_list)
+                selected_gen = st.selectbox("Select Generator:", gen_list)
             with col_modal_btn:
                 st.write("")
-                if st.button("📝 تعديل المعايرة", use_container_width=True):
-                    edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
-            with col_del_btn:
                 st.write("")
-                if st.button("🗑️ حذف المولد", use_container_width=True):
-                    del st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
-                    st.rerun()
-
                 if st.button("📝 Open Calibration Modal"):
                     edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
 
@@ -1129,118 +1118,87 @@ else:
             with col_up2:
                 parts_img_file = st.file_uploader("Upload Maintenance Photo", type=["png", "jpg", "jpeg"])
 
-    def generate_full_pdf_bytes():
-                pdf = ComprehensivePDF("FULL PREDICTIVE MAINTENANCE & PERFORMANCE REPORT")
-                pdf.add_page()
-                
-                # 1. بيانات الموقع والمولد
-                pdf.set_font("Helvetica", "B", 10)
-                pdf.set_fill_color(24, 43, 73)
-                pdf.set_text_color(255, 255, 255)
-                pdf.cell(0, 8, " 1. SITE & GENERATOR DETAILS", ln=True, fill=True)
-                pdf.set_font("Helvetica", "", 9)
-                pdf.set_text_color(0, 0, 0)
-                pdf.cell(0, 6, f"Main Site: {selected_main_site} | Sub Site: {selected_sub_site}", ln=True)
-                pdf.cell(0, 6, f"Generator ID: {selected_gen} | Model: {gen_info.get('model', 'N/A')} | Capacity: {gen_info.get('kw', 0)} kW", ln=True)
-                pdf.cell(0, 6, f"Run Hours: {gen_info.get('run_hours', 0)} Hrs | Target: {gen_info.get('target', 0)} Hrs", ln=True)
-                pdf.ln(3)
+            def generate_full_pdf_bytes():
+                temp_logo_path = None
+                if logo_file:
+                    temp_logo_path = f"temp_logo_{uuid.uuid4().hex}.png"
+                    with open(temp_logo_path, "wb") as f:
+                        f.write(logo_file.getbuffer())
 
-                # 2. القراءات الكهربائية والميكانيكية
-                pdf.set_font("Helvetica", "B", 10)
-                pdf.set_text_color(255, 255, 255)
-                pdf.cell(0, 8, " 2. ELECTRICAL & MECHANICAL PARAMETERS", ln=True, fill=True)
-                pdf.set_font("Helvetica", "", 9)
-                pdf.set_text_color(0, 0, 0)
-                pdf.cell(0, 6, f"Voltage: {calib_e.get('v_measured', 0)} V | Current: {calib_e.get('current_measured', 0)} A | PF: {calib_e.get('pf', 0)}", ln=True)
-                pdf.cell(0, 6, f"Oil Pressure: {calib_m.get('oil_press_bar', 0)} Bar | Coolant Temp: {calib_m.get('coolant_temp_c', 0)} C", ln=True)
-                
-                # توصية تغيير الزيت
-                amb = calib_m.get('ambient_temp', 43.0)
-                rec_oil = "20W50" if amb >= 45 else ("15W40" if amb >= 43 else "15W40 Standard")
+                pdf = ComprehensivePDF("GENERATOR PREDICTIVE MAINTENANCE REPORT", logo_path=temp_logo_path)
+                pdf.add_page()
+
+                pdf.set_fill_color(245, 247, 250)
+                pdf.rect(10, 35, 190, 45, "F")
+                pdf.set_xy(12, 37)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_text_color(24, 43, 73)
+
+                pdf.cell(0, 5, f"Generator Data Site Address: {sanitize_latin_only(current_site_address)}", ln=True)
+                pdf.set_x(12)
+                pdf.cell(0, 5, f"Main Site: {sanitize_latin_only(selected_main_site)} | Sub Site: {sanitize_latin_only(selected_sub_site)}", ln=True)
+                pdf.set_x(12)
+                pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | Capacity: {gen_info['kw']} kW", ln=True)
+                pdf.set_x(12)
+                pdf.cell(0, 5, f"Current Run Hours: {gen_info['run_hours']} hrs | Target Hours: {gen_info['target']} hrs", ln=True)
+
+                amb_temp_val = calib_m.get('ambient_temp', 43.0)
+
+                pdf.ln(2)
+                pdf.set_x(12)
                 pdf.set_font("Helvetica", "B", 9)
                 pdf.set_text_color(200, 30, 30)
-                pdf.cell(0, 6, f">> RECOMMENDED OIL BASED ON AMBIENT ({amb} C): {rec_oil}", ln=True)
-                pdf.ln(3)
-                
-                # 3. مزامنة استهلاك الوقود حسب الحمل
-                pdf.set_font("Helvetica", "B", 10)
-                pdf.set_text_color(255, 255, 255)
-                pdf.cell(0, 8, " 3. LOAD & FUEL CONSUMPTION (SYNCED)", ln=True, fill=True)
-                pdf.set_font("Helvetica", "", 9)
-                pdf.set_text_color(0, 0, 0)
-                load_kw = gen_info.get('load', 0)
-                hrs = 24.0 # حساب يومي افتراضي
-                sfc = 0.25 # متوسط الاستهلاك
-                daily_fuel = round(load_kw * sfc * hrs, 1)
-                pdf.cell(0, 6, f"Current Load: {load_kw} kW | Est. Daily Diesel: {daily_fuel} Liters (at 24 hrs)", ln=True)
-                pdf.ln(3)
+                pdf.cell(0, 5, "Engine Oil Recommendation based on Ambient Temperature:", ln=True)
 
-                # 4. جدول الصيانة التنبؤية
-                pdf.set_font("Helvetica", "B", 10)
+                pdf.set_x(12)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_text_color(24, 43, 73)
+                if amb_temp_val >= 45:
+                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 20W50", ln=True)
+                elif amb_temp_val >= 43:
+                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: YOU MUST USE OIL SIZE 15W40", ln=True)
+                else:
+                    pdf.cell(0, 5, f"[Ambient Temp: {amb_temp_val} C] -> ACTION: USE STANDARD OIL SIZE 15W40", ln=True)
+
+                pdf.ln(8)
+
+                headers_pdf = ["#", "Part / Service Name", "Lifespan", "Used", "Remain", "Status"]
+                widths = [10, 60, 25, 25, 25, 45]
+                pdf.set_font("Helvetica", "B", 8)
+                pdf.set_fill_color(24, 43, 73)
                 pdf.set_text_color(255, 255, 255)
-                pdf.cell(0, 8, " 4. PREDICTIVE MAINTENANCE SCHEDULE", ln=True, fill=True)
-                pdf.set_font("Helvetica", "B", 7)
-                pdf.set_text_color(0, 0, 0)
-                headers = ["Part Name", "Lifespan", "Used", "Remain", "Status"]
-                widths = [60, 30, 30, 30, 40]
-                for h, w in zip(headers, widths):
-                    pdf.cell(w, 6, h, border=1, align="C", fill=False)
+                for h, w in zip(headers_pdf, widths):
+                    pdf.cell(w, 6, h, border=1, fill=True, align="C")
                 pdf.ln()
-                pdf.set_font("Helvetica", "", 7)
-                
-                if 'df_result' in locals() or 'df_result' in globals():
-                    for _, row in df_result.iterrows():
-                        # تنظيف النص لمنع أخطاء الترميز
-                        part_name = str(row["قطع الغيار / الفلاتر"]).encode('latin-1', 'replace').decode('latin-1')
-                        status_name = str(row["حالة التنبيه"]).encode('latin-1', 'replace').decode('latin-1')
-                        pdf.cell(widths[0], 5, part_name[:35], border=1)
-                        pdf.cell(widths[1], 5, str(row["العمر الافتراضي (ساعة)"]), border=1, align="C")
-                        pdf.cell(widths[2], 5, str(row["الساعات المنقضية (ساعة)"]), border=1, align="C")
-                        pdf.cell(widths[3], 5, str(row["المدة المتبقية (ساعة)"]), border=1, align="C")
-                        pdf.cell(widths[4], 5, status_name, border=1, align="C")
-                        pdf.ln()
-                pdf.ln(5)
 
-                # 5. تحميل الصور والمخططات
-                pdf.set_font("Helvetica", "B", 10)
-                pdf.set_text_color(255, 255, 255)
-                pdf.cell(0, 8, " 5. UPLOADED MEDIA / CHARTS", ln=True, fill=True)
+                pdf.set_font("Helvetica", "", 7)
                 pdf.set_text_color(0, 0, 0)
-                
-                y_img = pdf.get_y() + 5
-                import uuid, os
-                
-                if gen_img_file:
-                    try:
-                        t_name = f"gen_{uuid.uuid4().hex}.jpg"
-                        with open(t_name, "wb") as f: f.write(gen_img_file.getbuffer())
-                        pdf.image(t_name, x=15, y=y_img, w=80)
-                        os.remove(t_name)
-                    except: pass
-                    
-                if parts_img_file:
-                    try:
-                        p_name = f"part_{uuid.uuid4().hex}.jpg"
-                        with open(p_name, "wb") as f: f.write(parts_img_file.getbuffer())
-                        pdf.image(p_name, x=105, y=y_img, w=80)
-                        os.remove(p_name)
-                    except: pass
+                for i, row in df_result.iterrows():
+                    fill = (i % 2 == 0)
+                    pdf.set_fill_color(240, 243, 246) if fill else pdf.set_fill_color(255, 255, 255)
+                    pdf.cell(widths[0], 5, str(row["الوحدة"]), border=1, align="C", fill=fill)
+                    pdf.cell(widths[1], 5, sanitize_latin_only(str(row["قطع الغيار / الفلاتر"]))[:32], border=1, fill=fill)
+                    pdf.cell(widths[2], 5, str(row["العمر الافتراضي (ساعة)"]), border=1, align="C", fill=fill)
+                    pdf.cell(widths[3], 5, str(row["الساعات المنقضية (ساعة)"]), border=1, align="C", fill=fill)
+                    pdf.cell(widths[4], 5, str(row["المدة المتبقية (ساعة)"]), border=1, align="C", fill=fill)
+                    pdf.cell(widths[5], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1, fill=fill)
+                    pdf.ln()
 
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
 
-st.download_button(
-            label=f"🖨️ تحميل التقرير الهندسي المختصر ({selected_gen})",
-            data=f"Generator: {selected_gen} | Model: {gen_info.get('model', 'N/A')} | Run Hours: {gen_info.get('run_hours', 0)}",
-            file_name=f"Report_{selected_gen}.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
+            st.download_button(
+                label=f"🖨️ Download Full Report for ({selected_gen})",
+                data=generate_full_pdf_bytes(),
+                file_name=f"Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
 
-if "2." in selected_app:
-    st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
+    elif "2." in selected_app:
+        st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
 
-df_iot = fetch_live_iot_data()
+        df_iot = fetch_live_iot_data()
         if not df_iot.empty:
             latest = df_iot.iloc[-1]
             col1, col2, col3 = st.columns(3)
@@ -1414,377 +1372,4 @@ df_iot = fetch_live_iot_data()
             if st.button("💾 حفظ السجل الجديد", key="btn_add_gen"):
                 if new_main and new_sub and new_gen_id:
                     if new_main not in st.session_state.sites_data:
-                        st.session_state.sites_data[new_main] = {}
-                        
-                    if new_sub not in st.session_state.sites_data[new_main]:
-                        st.session_state.sites_data[new_main][new_sub] = {
-                            "address": "تمت الإضافة حديثاً",
-                            "generators": {}
-                        }
-                    
-                    st.session_state.sites_data[new_main][new_sub]["generators"][new_gen_id] = {
-                        "model": new_model,
-                        "run_hours": 0.0,
-                        "target": 250.0,
-                        "kw": new_kw,
-                        "load": 0.0,
-                        "calib_elec": {"v_measured": 400.0, "pf": 0.8},
-                        "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0}
-                    }
-                    
-                    st.success(f"✅ تم إضافة المولد {new_gen_id} بنجاح! سيظهر الآن في كل القوائم المنسدلة.")
-                else:
-                    st.error("⚠️ الرجاء تعبئة الحقول الأساسية (القائمة، الموقع، والمعرف).")
-
-        with tab_delete:
-            st.subheader("حذف مولد من النظام")
-            
-            if st.session_state.sites_data:
-                del_main = st.selectbox("1. اختر القائمة الرئيسية", existing_mains, key="sel_del_main")
-                
-                if del_main:
-                    existing_subs = list(st.session_state.sites_data[del_main].keys())
-                    if existing_subs:
-                        del_sub = st.selectbox("2. اختر الموقع الفرعي", existing_subs, key="sel_del_sub")
-                        
-                        if del_sub:
-                            existing_gens = list(st.session_state.sites_data[del_main][del_sub]["generators"].keys())
-                            if existing_gens:
-                                del_gen = st.selectbox("3. اختر المولد المراد حذفه", existing_gens, key="sel_del_gen")
-                                
-                                st.warning(f"هل أنت متأكد من حذف {del_gen}؟")
-                                if st.button("🗑️ تأكيد الحذف", key="btn_del_gen"):
-                                    del st.session_state.sites_data[del_main][del_sub]["generators"][del_gen]
-                                    st.success(f"✅ تم حذف {del_gen} بنجاح.")
-                                    st.rerun()
-                            else:
-                                st.info("لا توجد مولدات في هذا الموقع.")
-                    else:
-                        st.info("لا توجد مواقع فرعية.")
-
-            # رسم بياني تنبؤي
-            sizes = [35, 50, 70, 95, 120, 150, 185, 240, 300]
-            drops = [calculate_cable_voltage_drop(i_amp, dist_m, s, cos_phi)[1] for s in sizes]
-            fig_drop = px.line(x=sizes, y=drops, markers=True, title="Predictive Voltage Drop vs Cable Size - تنبؤي", labels={"x":"mm²","y":"V Drop %"})
-            fig_drop.add_hline(y=4, line_dash="dash", line_color="red", annotation_text="IEC Limit 4%")
-            st.plotly_chart(fig_drop, use_container_width=True)
-
-            # حفظ في ذاكرة الجهاز + قاعدة البيانات
-            if st.button("💾 حفظ الحساب في السجل والتقرير", key="save_cable"):
-                log_entry = {
-                    "date": datetime.now().isoformat(),
-                    "type": "cable_calc",
-                    "i": i_amp,
-                    "dist": dist_m,
-                    "size": c_size,
-                    "v_drop": v_drop,
-                    "v_pct": v_drop_pct,
-                    "site": main_key
-                }
-                st.session_state.daily_logs.append(log_entry)
-                if supabase:
-                    try:
-                        supabase.table("daily_logs").insert([log_entry]).execute()
-                        st.success("✅ تم الحفظ في Supabase وذاكرة الجهاز")
-                    except:
-                        st.success("✅ تم الحفظ محليا في ذاكرة الجهاز")
-                
-                # تقرير PDF
-                pdf = ComprehensivePDF("Cable Voltage Drop Report")
-                pdf.add_page()
-                pdf.set_font("Helvetica", "", 10)
-                pdf.cell(0, 10, f"Current: {i_amp} A | Distance: {dist_m} m | Size: {c_size} mm2 | V Drop: {v_drop} V ({v_drop_pct}%)", ln=True)
-                pdf_bytes = pdf.output(dest='S').encode('latin-1', 'ignore')
-                st.download_button("📄 تحميل تقرير الكابل PDF", pdf_bytes, f"Cable_Report_{datetime.now().date()}.pdf", "application/pdf")
-
-        with tab_calc2:
-            st.subheader("🌱 Fuel & Carbon Footprint - AI Synced with Genset Data")
-            if gen_info:
-                st.success(f"✅ متزامن مع: {gen_key} - {gen_info['model']} | {gen_info['load']}kW / {gen_info['kw']}kW - {st.session_state.sites_data[main_key][sub_key].get('address','')}")
-            else:
-                st.warning("لا يوجد مولد مربوط - سيتم استخدام قيم افتراضية")
-
-            uploaded = st.file_uploader("📁 ارفع جدول SFC الخاص بك CSV (اختياري - متزامن)", type=["csv"], key="fuel_csv_upload")
-            fuel_table_live = get_fuel_table_from_csv(uploaded)
-
-            cf1, cf2 = st.columns(2)
-            with cf1:
-                kw_load = st.number_input("الحمل الفعلي kW (مزامن تلقائيا)", value=float(gen_info['load']) if gen_info else 200.0, key="ai_kw")
-                hrs = st.number_input("ساعات التشغيل يوميا", value=12.0, key="ai_hrs")
-                price = st.number_input("سعر اللتر SDG", value=2500.0, key="ai_price")
-                if gen_info:
-                    st.caption(f"نسبة التحميل: {(kw_load/gen_info['kw']*100):.1f}% - ساعات المولد الحالية: {gen_info['run_hours']}")
-            
-            with cf2:
-                liters, co2, sfc, eff = calculate_fuel_consumption_and_emissions_v6(kw_load, hrs, gen_info['model'] if gen_info else "Perkins", gen_info['kw'] if gen_info else 410, fuel_table_live)
-                st.metric("⛽ الديزل / يوم", f"{liters} L", f"{liters*30:.0f} L/شهر")
-                st.metric("🌍 CO2 / يوم", f"{co2} kg", f"{co2*0.001:.2f} Ton")
-                st.metric("📊 SFC", f"{sfc} L/kWh", f"كفاءة {eff}%")
-                st.metric("💰 التكلفة اليومية", f"{liters*price:,.0f} SDG")
-
-                # تنبيه مخاطر AI
-                if eff < 30:
-                    st.error("⚠️ AI تنبيه: الكفاءة منخفضة جدا (<30%) - خطر استهلاك وقود عالي وتآكل محرك. راجع الحمل - يفضل 75-85%")
-                    play_audio("تنبيه كفاءة منخفضة خطر استهلاك وقود عالي", lang=L)
-                if kw_load/gen_info['kw']*100 < 40 if gen_info else 0:
-                    st.warning("⚠️ حمل منخفض <40% - يسبب تراكم كربون وتقليل عمر المحرك")
-
-            # رسم بياني استهلاك تنبؤي 7 أيام
-            days = list(range(1, 8))
-            fuel_7d = [liters*d for d in days]
-            co2_7d = [co2*d for d in days]
-            fig_fuel = go.Figure()
-            fig_fuel.add_trace(go.Scatter(x=days, y=fuel_7d, mode='lines+markers', name='Diesel L'))
-            fig_fuel.add_trace(go.Scatter(x=days, y=co2_7d, mode='lines+markers', name='CO2 kg', yaxis='y2'))
-            fig_fuel.update_layout(title="AI Predictive 7-Day Fuel & CO2 Forecast - تنبؤي", xaxis_title="Day", yaxis=dict(title="Liters"), yaxis2=dict(title="CO2 kg", overlaying='y', side='right'))
-            st.plotly_chart(fig_fuel, use_container_width=True)
-
-            if st.button("💾 حفظ وتزامن مع ساعات المولد والتقرير", key="save_fuel"):
-                # تحديث ساعات التشغيل تلقائيا
-                if gen_info:
-                    st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["run_hours"] += hrs
-                    st.session_state.sites_data[main_key][sub_key]["generators"][gen_key]["load"] = kw_load
-                
-                log = {
-                    "date": datetime.now().isoformat(),
-                    "type": "fuel_calc",
-                    "gen": gen_key if gen_info else "G1",
-                    "kw": kw_load,
-                    "hrs": hrs,
-                    "liters": liters,
-                    "co2": co2,
-                    "sfc": sfc,
-                    "eff": eff
-                }
-                st.session_state.daily_logs.append(log)
-                
-                if supabase:
-                    try:
-                        supabase.table("fuel_logs").insert([log]).execute()
-                    except:
-                        pass
-                st.success(f"✅ تم الحفظ وتحديث ساعات {gen_key} - متزامن")
-                
-                #                # --- إنشاء التقرير الهندسي الشامل للمولد (PDF) ---
-                pdf = ComprehensivePDF("Full Genset Predictive & Performance Report")
-                pdf.add_page()
-                
-                # 1. بيانات الموقع والمولد
-                pdf.set_font("Helvetica", "B", 12)
-                pdf.set_text_color(0, 51, 102) # لون أزرق غامق للعناوين
-                pdf.cell(0, 10, "1. Site & Genset Information:", ln=True)
-                pdf.set_font("Helvetica", "", 10)
-                pdf.set_text_color(0, 0, 0)
-                pdf.cell(0, 8, f"Main Site (القائمة الرئيسية): {main_key}", ln=True)
-                pdf.cell(0, 8, f"Sub Site (الموقع): {sub_key} | Address: {st.session_state.sites_data[main_key][sub_key].get('address','')}", ln=True)
-                pdf.cell(0, 8, f"Genset ID: {gen_key} | Model: {gen_info['model']} | Capacity: {gen_info['kw']} kW", ln=True)
-                pdf.cell(0, 8, f"Current Load: {kw_load} kW | Run Hours: {gen_info['run_hours']} Hrs", ln=True)
-                pdf.ln(5)
-
-                # 2. البيانات الكهربائية والميكانيكية
-                pdf.set_font("Helvetica", "B", 12)
-                pdf.set_text_color(0, 51, 102)
-                pdf.cell(0, 10, "2. Electrical & Mechanical Parameters:", ln=True)
-                pdf.set_font("Helvetica", "", 10)
-                pdf.set_text_color(0, 0, 0)
-                elec = gen_info.get('calib_elec', {})
-                mech = gen_info.get('calib_engine', {})
-                pdf.cell(0, 8, f"Voltage: {elec.get('v_measured', 0)} V | Power Factor (PF): {elec.get('pf', 0)}", ln=True)
-                pdf.cell(0, 8, f"Oil Pressure: {mech.get('oil_press_bar', 0)} Bar | Coolant Temp: {mech.get('coolant_temp_c', 0)} C", ln=True)
-                pdf.ln(5)
-
-                # 3. استهلاك الوقود والانبعاثات (مرتبط بالحمل)
-                pdf.set_font("Helvetica", "B", 12)
-                pdf.set_text_color(0, 51, 102)
-                pdf.cell(0, 10, f"3. Fuel Consumption & Emissions (At {kw_load} kW Load):", ln=True)
-                pdf.set_font("Helvetica", "", 10)
-                pdf.set_text_color(0, 0, 0)
-                pdf.cell(0, 8, f"Daily Diesel Consumption: {liters} Liters (Operating {hrs} Hours/Day)", ln=True)
-                pdf.cell(0, 8, f"Carbon Footprint (CO2): {co2} kg | SFC: {sfc} L/kWh | Efficiency: {eff}%", ln=True)
-                pdf.ln(5)
-
-                # 4. جدول الوقود (SFC Curve Data)
-                pdf.set_font("Helvetica", "B", 12)
-                pdf.set_text_color(0, 51, 102)
-                pdf.cell(0, 10, "4. Fuel SFC Table (Live Data):", ln=True)
-                pdf.set_font("Helvetica", "B", 10)
-                pdf.set_text_color(0, 0, 0)
-                # رسم رأس الجدول
-                pdf.cell(30, 8, "Load %", border=1, align='C')
-                pdf.cell(45, 8, "SFC (L/kWh)", border=1, align='C')
-                pdf.cell(45, 8, "Efficiency %", border=1, align='C')
-                pdf.ln()
-                # تفريغ بيانات الجدول
-                pdf.set_font("Helvetica", "", 10)
-                for load_pct in sorted(fuel_table_live.keys()):
-                    sfc_val = fuel_table_live[load_pct].get("AVG", 0)
-                    eff_val = fuel_table_live[load_pct].get("eff", 0)
-                    pdf.cell(30, 8, f"{load_pct}%", border=1, align='C')
-                    pdf.cell(45, 8, str(sfc_val), border=1, align='C')
-                    pdf.cell(45, 8, f"{eff_val}%", border=1, align='C')
-                    pdf.ln()
-                pdf.ln(5)
-
-                # 5. طباعة الرسم البياني (تنبؤي الاستهلاك)
-                pdf.set_font("Helvetica", "B", 12)
-                pdf.set_text_color(0, 51, 102)
-                pdf.cell(0, 10, "5. Predictive Analytics Chart:", ln=True)
-                try:
-                    import os
-                    chart_filename = "temp_predictive_chart.png"
-                    fig_fuel.write_image(chart_filename)
-                    pdf.image(chart_filename, x=10, w=170)
-                    os.remove(chart_filename)
-                except Exception as e:
-                    pdf.set_font("Helvetica", "I", 10)
-                    pdf.set_text_color(255, 0, 0)
-                    pdf.cell(0, 8, "* Chart could not be rendered. Please ensure 'kaleido' is installed.", ln=True)
-                    pdf.set_text_color(0, 0, 0)
-
-                # إنهاء وحفظ الـ PDF
-                pdf_bytes = pdf.output(dest='S').encode('latin-1', 'ignore')
-                st.download_button(
-                    label="📄 تحميل التقرير الهندسي الشامل PDF (Full Report)", 
-                    data=pdf_bytes, 
-                    file_name=f"Full_Genset_Report_{gen_key}_{datetime.now().date()}.pdf", 
-                    mime="application/pdf",
-                    key="download_full_pdf_sync"
-                )
- 
-
-        with tab_calc3:
-            st.subheader("📈 SFC Curve - جدولك + AI Predictive Analytics")
-            rows = []
-            for l in sorted(fuel_table_live.keys()):
-                rows.append({
-                    "Load %": l,
-                    "CAT g/kWh": fuel_table_live[l].get("g_cat", 205),
-                    "Cummins": fuel_table_live[l].get("g_cummins", 208),
-                    "Perkins": fuel_table_live[l].get("g_perkins", 212),
-                    "SFC L/kWh": fuel_table_live[l]["AVG"],
-                    "Eff %": fuel_table_live[l]["eff"]
-                })
-            df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True)
-            
-            c1, c2 = st.columns(2)
-            with c1:
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=df["Load %"], y=df["CAT g/kWh"], mode='lines+markers', name='CAT'))
-                fig.add_trace(go.Scatter(x=df["Load %"], y=df["Cummins"], mode='lines+markers', name='Cummins'))
-                fig.add_trace(go.Scatter(x=df["Load %"], y=df["Perkins"], mode='lines+markers', name='Perkins'))
-                fig.update_layout(title="SFC Curve - من جدولك (g/kWh)")
-                st.plotly_chart(fig, use_container_width=True)
-            with c2:
-                st.plotly_chart(px.line(df, x="Load %", y="Eff %", markers=True, title="Efficiency vs Load - تنبؤي"), use_container_width=True)
-
-            # AI تحليل تنبؤي
-            if client and st.button("🤖 تحليل AI تنبؤي للكفاءة والمخاطر"):
-                prompt = f"SFC Data: {df.to_json()} - Analyze efficiency, predict best load range, risks if low load, fuel saving tips in Arabic concise"
-                ai_analysis = analyze_fault_with_gemini("SFC Analysis", str(df.to_dict()), L)
-                st.info(f"🤖 AI تحليل تنبؤي: {ai_analysis}")
-                play_audio(ai_analysis[:200], lang=L)
-
-            st.download_button("📥 تحميل جدول SFC CSV متزامن", df.to_csv(index=False).encode('utf-8'), "SFC_Table_AI_Synced.csv", "text/csv")
-            st.success("✅ تم تفعيل المزامنة الكاملة: المولدات + الصيانة + Supabase + ذاكرة الجهاز + التقارير PDF + الرسوم البيانية + تنبيهات AI + تحليل مخاطر")
-
-                     # --- لوحة إدارة المواقع والمولدات (مزامنة شاملة) ---
-        st.markdown("---")
-        st.header("⚙️ إدارة بيانات المواقع والمولدات (مزامنة شاملة)")
-
-        tab_add, tab_delete = st.tabs(["➕ إضافة موقع ومولد جديد", "🗑️ حذف سجل"])
-
-        with tab_add:
-            st.subheader("إضافة قائمة، موقع، أو مولد جديد للنظام")
-            
-            existing_mains = list(st.session_state.sites_data.keys())
-            new_main = st.text_input("القائمة الرئيسية (مثال: الخرطوم، بورتسودان، إلخ):", key="add_main_v6")
-            new_sub = st.text_input("الموقع الفرعي (مثال: مصنع التعدين، مستشفى، إلخ):", key="add_sub_v6")
-            new_gen_id = st.text_input("معرف المولد (مثال: G3, G4):", key="add_gen_v6")
-            
-            c1, c2 = st.columns(2)
-            new_model = c1.text_input("موديل المولد (مثال: Cummins 250 kVA):", value="Perkins", key="add_model_v6")
-            new_kw = c2.number_input("القدرة الإجمالية kW:", min_value=10.0, value=250.0, key="add_kw_v6")
-            
-            if st.button("💾 حفظ السجل وتزامن شامل (Supabase & Reports)", key="btn_add_gen_sync"):
-                if new_main and new_sub and new_gen_id:
-                    # إضافة السجلات في الذاكرة
-                    if new_main not in st.session_state.sites_data:
-                        st.session_state.sites_data[new_main] = {}
-                        
-                    if new_sub not in st.session_state.sites_data[new_main]:
-                        st.session_state.sites_data[new_main][new_sub] = {
-                            "address": f"تمت الإضافة عبر الإدارة - {new_sub}",
-                            "generators": {}
-                        }
-                    
-                    st.session_state.sites_data[new_main][new_sub]["generators"][new_gen_id] = {
-                        "model": new_model,
-                        "run_hours": 0.0,
-                        "target": 250.0,
-                        "kw": new_kw,
-                        "load": 0.0,
-                        "calib_elec": {"v_measured": 400.0, "pf": 0.8},
-                        "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0}
-                    }
-                    
-                    if supabase:
-                        try:
-                            supabase.table("sites_registry").insert([{
-                                "main_site": new_main, "sub_site": new_sub, "gen_id": new_gen_id, "model": new_model, "kw": new_kw, "date_added": datetime.now().isoformat()
-                            }]).execute()
-                        except:
-                            pass
-                    
-                    st.success(f"✅ تم الحفظ بنجاح! يتم الآن تحديث النظام...")
-                    st.rerun() # هذا الأمر سيحدث الصفحة لكي يظهر الموقع الجديد فوراً في التطبيق 1
-                else:
-                    st.error("⚠️ الرجاء تعبئة الحقول الأساسية (القائمة، الموقع، والمعرف).")
-
-        with tab_delete:
-            st.subheader("حذف موقع أو مولد من النظام")
-            
-            if st.session_state.sites_data:
-                del_main = st.selectbox("1. اختر القائمة الرئيسية", existing_mains, key="sel_del_main_sync")
-                
-                if del_main:
-                    existing_subs = list(st.session_state.sites_data[del_main].keys())
-                    if existing_subs:
-                        del_sub = st.selectbox("2. اختر الموقع الفرعي", existing_subs, key="sel_del_sub_sync")
-                        
-                        if del_sub:
-                            existing_gens = list(st.session_state.sites_data[del_main][del_sub]["generators"].keys())
-                            if existing_gens:
-                                del_gen = st.selectbox("3. اختر المولد المراد حذفه", existing_gens, key="sel_del_gen_sync")
-                                
-                                st.warning(f"هل أنت متأكد من حذف {del_gen} نهائياً؟")
-                                if st.button("🗑️ تأكيد الحذف", key="btn_del_gen_sync"):
-                                    del st.session_state.sites_data[del_main][del_sub]["generators"][del_gen]
-                                    
-                                    if supabase:
-                                        try:
-                                            supabase.table("sites_registry").delete().eq("gen_id", del_gen).eq("sub_site", del_sub).execute()
-                                        except:
-                                            pass
-                                            
-                                    st.success(f"✅ تم حذف {del_gen} بنجاح. يتم التحديث...")
-                                    st.rerun()
-                            else:
-                                st.info("لا توجد مولدات في هذا الموقع.")
-                    else:
-                        st.info("لا توجد مواقع فرعية.")
-       # --- لوحة إدارة المواقع والمولدات (متزامنة مع التطبيق 1 وتقارير PDF و Supabase) ---
-        
-
-
-        with tab_calc2:
-            st.subheader("🌱 Fuel Consumption & CO2 Emission Estimator")
-            ec1, ec2 = st.columns(2)
-            load_kw = ec1.number_input("Running Load (kW):", value=200.0)
-            hours_run = ec2.number_input("Operating Hours:", value=24.0)
-
-            est_liters, est_co2 = calculate_fuel_consumption_and_emissions(load_kw, hours_run)
-
-            mc1, mc2 = st.columns(2)
-            mc1.metric("Estimated Diesel Used", f"{est_liters} Liters")
-            mc2.metric("Estimated CO2 Output", f"{est_co2} kg")
+           
