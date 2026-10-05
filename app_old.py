@@ -60,6 +60,14 @@ if "lang" not in st.session_state:
 if "current_page" not in st.session_state:
     st.session_state.current_page = "chat"
 
+# --- إضافة قائمة بيانات الفنيين والمهندسين المسجلين لإدارة الطوارئ والإنذارات ---
+if "technicians_directory" not in st.session_state:
+    st.session_state.technicians_directory = [
+        {"name": "م. عثمان آدم أدومة", "role": "الاستشاري العام / مدير الصيانة", "phone": "249912345678"},
+        {"name": "أحمد فني الصيانة", "role": "فني مناوب - كافوري", "phone": "249920000000"},
+        {"name": "محمد الحسن", "role": "فني كهرباء ولحات توازي", "phone": "249910000000"}
+    ]
+
 # تحديث هيكل قاعدة البيانات المصغرة ليدعم القوائم الرئيسية والفرعية
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
@@ -186,7 +194,7 @@ def play_audio(text, lang='ar', loop=False):
 def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
     """دالة استدعاء الذكاء الاصطناعي مع معالجة حزمة الضغط العالي (503) وإعادة المحاولة ودعم ثنائية اللغة"""
     if not client:
-        return "⚠️ GEMINI_API_KEY not found." if language == "en" else "⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY."
+        return "⚠️ GEMINI_API_KEY not found." if language == "en" else "⚠️️ لم يتم العثور على مفتاح GEMINI_API_KEY."
     lang_instr = "Respond in English." if language == "en" else "اكتب الإجابة بلغة عربية تقنية واضحة ومباشرة."
     prompt = f"""
     You are an expert industrial consulting engineer specializing in generators, DSE control panels (DSE 7320, DSE 8610 MKII), Perkins & Cummins engines, and cooling systems.
@@ -956,7 +964,7 @@ else:
                             except Exception as e:
                                 st.error(f"حدث خطأ أثناء الحفظ في Supabase: {e}")
                         else:
-                            st.warning("⚠️ اتصال Supabase غير متوفر حالياً.")
+                            st.warning("⚠️️ اتصال Supabase غير متوفر حالياً.")
                         st.rerun()
                 with col_b3:
                     if st.button("🗑️ مسح بيانات المولد", use_container_width=True, type="primary"):
@@ -980,6 +988,7 @@ else:
             m_c2.metric("Run Hours / Target", f"{gen_info['run_hours']} hrs", f"Target: {gen_info['target']} hrs")
             m_c3.metric("Measured Voltage", f"{calib_e.get('v_measured', 0)} V", f"Nominal: {calib_e.get('v_nominal', 0)} V")
             m_c4.metric("Coolant / Ambient Temp", f"{calib_m.get('coolant_temp_c', 0)} °C", f"Ambient: {calib_m.get('ambient_temp', 0)} °C")
+            
             alarm_messages = []
             if abs(calib_e.get("v_measured", 400) - calib_e.get("v_nominal", 400)) > 20:
                 alarm_messages.append(f"Voltage Deviation on {selected_gen}: Measured {calib_e.get('v_measured')} V!")
@@ -989,10 +998,34 @@ else:
                 alarm_messages.append(f"High Coolant Temp on {selected_gen}: {calib_m.get('coolant_temp_c')} °C!")
             if calib_m.get("oil_press_bar", 5) <= 1.8:
                 alarm_messages.append(f"Low Oil Pressure on {selected_gen}!")
+            
             if alarm_messages:
                 for msg in alarm_messages:
                     st.error(f"🚨 {msg}")
                 play_audio(". ".join(alarm_messages), loop=True)
+                
+                # --- تفعيل إشعار الواتساب التلقائي للطوارئ والإنذارات متزامن مع الجرس ---
+                st.markdown("---")
+                st.error("🚨 **حالة طوارئ نشطة! اختر الفني المناوب لإرسال رسالة إنذار عبر الواتساب فوراً:**")
+                tech_options = {f"{t['name']} ({t['role']}) - {t['phone']}": t for t in st.session_state.technicians_directory}
+                selected_tech_key = st.selectbox("اختر الفني / المهندس المداوم للإخطار:", list(tech_options.keys()))
+                selected_tech_obj = tech_options[selected_tech_key]
+                
+                emergency_details = " | ".join(alarm_messages)
+                emergency_msg = f"🚨 *إخطار طوارئ وصيانة - Addoma Trading Services*\n\nتنبيه عاجل إلى المهندس/الفني: *{selected_tech_obj['name']}*\n- الموقع: {selected_main_site} - {selected_sub_site}\n- معرف المولد: *{selected_gen}* (موديل: {gen_info['model']})\n- تفاصيل العطل / الإنذار: {emergency_details}\n\nيرجى التدخل السريع للتعامل مع العطل."
+                
+                encoded_emergency = urllib.parse.quote(emergency_msg)
+                emergency_wa_link = f"https://wa.me/{selected_tech_obj['phone']}?text={encoded_emergency}"
+                
+                st.markdown(f'''
+                    <a href="{emergency_wa_link}" target="_blank">
+                        <button style="background-color:#dc3545; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;">
+                            🚨 إرسال إخطار طوارئ واتساب عاجل إلى الفني ({selected_tech_obj['name']})
+                        </button>
+                    </a>
+                ''', unsafe_allow_html=True)
+                st.markdown("---")
+
             parts_key = f"parts_{selected_main_site}_{selected_sub_site}_{selected_gen}"
             if parts_key not in st.session_state:
                 st.session_state[parts_key] = [
@@ -1317,8 +1350,8 @@ else:
         st.title("📊 " + ("المتابعة اليومية وتقارير الإدارة" if L == "ar" else "Daily Monitoring & Tech Reminders"))
         today_str = datetime.now().strftime("%Y-%m-%d")
         
-        # التبويبات المحدثة للنظام 3 مع جدول الصيانة التنبؤية ورسائل واتساب التلقائية الذكية
-        tab_mgr1, tab_mgr2, tab_mgr3 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders", "🔔 جدول الصيانة التنبؤية وإنذارات واتساب"])
+        # التبويبات المحدثة للنظام 3 مع جدول الصيانة التنبؤية ورسائل واتساب التلقائية الذكية وإدارة قائمة الفنيين
+        tab_mgr1, tab_mgr2, tab_mgr3, tab_mgr4 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders", "🔔 الصيانة التنبؤية وإنذارات واتساب", "👷 إدارة الفنيين والمهندسين"])
         
         with tab_mgr1:
             today_logs = [log for log in st.session_state.daily_logs if log.get("date") == today_str]
@@ -1342,9 +1375,13 @@ else:
             
         with tab_mgr3:
             st.subheader("⚙️ ربط الصيانة التنبؤية للمولدات والآليات وإنذارات واتساب الذكية")
-            st.markdown("متابعة عدد الساعات الافتراضية وتوليد رسالة واتساب نصية ذكية تلقائياً:")
+            st.markdown("متابعة عدد الساعات الافتراضية وتوليد رسالة واتساب نصية ذكية تلقائية:")
             
-            target_whatsapp_num = st.text_input("رقم الواتساب المستهدف (مع مفتاح الدولة بدون رموز):", value="249912345678")
+            # اختيار الفني من القائمة المسجلة لتوجيه الإنذار التنبؤي
+            tech_target_options = {f"{t['name']} - {t['phone']}": t for t in st.session_state.technicians_directory}
+            selected_target_tech_key = st.selectbox("اختر الفني المستهدف للإخطار:", list(tech_target_options.keys()))
+            selected_target_tech = tech_target_options[selected_target_tech_key]
+            target_whatsapp_num = selected_target_tech["phone"]
             
             # جدول الصيانة التنبؤية وساعات التشغيل الافتراضية
             predictive_maintenance_data = [
@@ -1356,8 +1393,8 @@ else:
             df_pm = pd.DataFrame(predictive_maintenance_data)
             st.dataframe(df_pm, use_container_width=True)
             
-            # تكوين رسالة واتساب ذكية تلقائية بناءً على الحالة
-            default_smart_msg = f"🚨 *إنذار صيانة تنبؤية - Addoma Trading Services*\n\nمرحباً، تم رصد معدلات استهلاك ساعات التشغيل الافتراضية التالية للمولدات والآليات:\n- اقتراب موعد استبدال فلاتر G1 (متبقي ساعات قليلة).\n- الحاجة لجدولة صيانة عاجلة.\n\nيرجى اتخاذ الإجراء اللازم في أقرب وقت."
+            # تكوين رسالة واتساب ذكية تلقائية بناءً على الحالة واسم الفني
+            default_smart_msg = f"🚨 *إنذار صيانة تنبؤية - Addoma Trading Services*\n\nمرحباً المهندس/الفني: *{selected_target_tech['name']}*\nتم رصد معدلات استهلاك ساعات التشغيل الافتراضية للمولدات والآليات وتحتاج لتدخل صيانة:\n- اقتراب موعد استبدال فلاتر G1 (متبقي ساعات قليلة).\n- الحاجة لجدولة صيانة عاجلة.\n\nيرجى اتخاذ الإجراء اللازم."
             
             smart_message_input = st.text_area("نص رسالة الواتساب الذكية التلقائية (قابلة للتعديل):", value=default_smart_msg)
             
@@ -1367,10 +1404,36 @@ else:
             st.markdown(f'''
                 <a href="{smart_whatsapp_url}" target="_blank">
                     <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;">
-                        💬 إرسال رسالة واتساب الذكية التلقائية للتنبيه والإنذار
+                        💬 إرسال رسالة واتساب الذكية التلقائية إلى ({selected_target_tech['name']})
                     </button>
                 </a>
             ''', unsafe_allow_html=True)
+
+        with tab_mgr4:
+            st.subheader("👷 إدارة قائمة الفنيين والمهندسين وأرقام الواتساب للطوارئ")
+            st.markdown("إضافة أو تعديل بيانات الفنيين والمهندسين المسؤولين عن تلقي تنبيهات وعمليات الصيانة:")
+            
+            with st.form("add_technician_form"):
+                new_t_name = st.text_input("اسم الفني / المهندس:")
+                new_t_role = st.text_input("التخصص / الوظيفة:", value="فني صيانة ميدانية")
+                new_t_phone = st.text_input("رقم الواتساب (مع مفتاح الدولة بدون رموز، مثال: 249912345678):")
+                submitted_t = st.form_submit_button("💾 إضافة الفني إلى القائمة")
+                if submitted_t:
+                    if new_t_name and new_t_phone:
+                        st.session_state.technicians_directory.append({
+                            "name": new_t_name,
+                            "role": new_t_role,
+                            "phone": new_t_phone
+                        })
+                        st.success(f"✅ تم إضافة الفني {new_t_name} بنجاح إلى القائمة!")
+                        st.rerun()
+                    else:
+                        st.error("يرجى إدخال اسم الفني ورقم الهاتف كحد أدنى.")
+            
+            st.markdown("---")
+            st.markdown("##### قائمة الفنيين المسجلين حالياً:")
+            df_techs = pd.DataFrame(st.session_state.technicians_directory)
+            st.dataframe(df_techs, use_container_width=True)
 
     elif "4." in selected_app:
         st.title("🤖 " + ("المساعد الذكي والكتالوجات وقراءة الأكواد" if L == "ar" else "AI Diagnostics & Fault Code Reader"))
@@ -1480,4 +1543,4 @@ else:
                 if load_percentage < 50:
                     st.warning(f"⚠️ تحذير: المولد يعمل بحمل منخفض جداً ({load_percentage:.1f}%). هذا يؤدي إلى احتراق غير مكتمل في محركات {gen_model_calc} وتراكم الزيت غير المحترق (Wet Stacking).")
                 elif load_percentage > 90:
-                    st.warning(f"⚠️️ تنبيه: المولد يعمل بحمل مرتفع جداً يقترب من الحد الأقصى ({load_percentage:.1f}%). يرجى المراقبة المستمرة لحرارة المحرك.")
+                    st.warning(f"⚠ تنبيه: المولد يعمل بحمل مرتفع جداً يقترب من الحد الأقصى ({load_percentage:.1f}%). يرجى المراقبة المستمرة لحرارة المحرك.")
