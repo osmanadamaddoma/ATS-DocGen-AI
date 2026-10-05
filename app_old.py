@@ -1153,25 +1153,55 @@ else:
                 f_widths = [18, 25, 25, 18, 25]
                 for h,w in zip(f_headers, f_widths):
                     pdf.cell(w, 6, h, border=1, fill=True, align="C")
+                                # تعيين عرض الأعمدة السبعة بدقة لترويسة وجسم الجدول (الإجمالي 190mm)
+                f_widths = [15, 30, 30, 30, 25, 25, 35]
+
                 pdf.ln()
                 pdf.set_font("Helvetica", "", 8)
-                pdf.set_text_color(0,0,0)
+                pdf.set_text_color(0, 0, 0)
+                
                 for load in sorted(ft.keys(), reverse=True):
+                    # 1. نسبة الحمل
                     pdf.cell(f_widths[0], 5, f"{load}%", border=1, align="C")
-                    pdf.cell(f_widths[1], 5, str(ft[load].get("g_cat", int(ft[load]["CAT C32"]*850))), border=1, align="C")
-                    pdf.cell(f_widths[2], 5, str(ft[load].get("g_cummins", int(ft[load]["Cummins KTA50"]*850))), border=1, align="C")
-                    pdf.cell(f_widths[3], 5, str(ft[load].get("g_perkins", int(ft[load]["Perkins 2506"]*850))), border=1, align="C")
-                    pdf.cell(f_widths[4], 5, str(ft[load]["AVG"]), border=1, align="C")
-                    pdf.cell(f_widths[5], 5, str(ft[load]["eff"])+"%", border=1, align="C")
+                    
+                    # 2. استهلاك CAT C32
+                    cat_val = ft[load].get("g_cat")
+                    if cat_val is None and "CAT C32" in ft[load]:
+                        cat_val = int(ft[load]["CAT C32"] * 850)
+                    pdf.cell(f_widths[1], 5, str(cat_val if cat_val is not None else "-"), border=1, align="C")
+                    
+                    # 3. استهلاك Cummins KTA50
+                    cum_val = ft[load].get("g_cummins")
+                    if cum_val is None and "Cummins KTA50" in ft[load]:
+                        cum_val = int(ft[load]["Cummins KTA50"] * 850)
+                    pdf.cell(f_widths[2], 5, str(cum_val if cum_val is not None else "-"), border=1, align="C")
+                    
+                    # 4. استهلاك Perkins 2506
+                    per_val = ft[load].get("g_perkins")
+                    if per_val is None and "Perkins 2506" in ft[load]:
+                        per_val = int(ft[load]["Perkins 2506"] * 850)
+                    pdf.cell(f_widths[3], 5, str(per_val if per_val is not None else "-"), border=1, align="C")
+                    
+                    # 5. المتوسط AVG
+                    avg_val = ft[load].get("AVG", "-")
+                    pdf.cell(f_widths[4], 5, str(avg_val), border=1, align="C")
+                    
+                    # 6. الكفاءة eff
+                    eff_val = ft[load].get("eff", "-")
+                    pdf.cell(f_widths[5], 5, f"{eff_val}%" if eff_val != "-" else "-", border=1, align="C")
+                    
+                    # 7. معامل الانبعاثات الثابت
                     pdf.cell(f_widths[6], 5, "2.68", border=1, align="C")
                     pdf.ln()
+
                 # تنظيف الملفات المؤقتة
                 for p in temp_charts:
                     try:
                         if os.path.exists(p):
                             os.remove(p)
-                    except:
+                    except Exception:
                         pass
+                        
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
             st.download_button(
