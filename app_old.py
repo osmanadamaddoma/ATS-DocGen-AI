@@ -22,16 +22,19 @@ import streamlit as st
 import extra_streamlit_components as stx # مكتبة إدارة الكوكيز المضافة
 from google import genai
 from gtts import gTTS
+
 # محاولة استيراد مكتبة Supabase
 try:
     from supabase import create_client, Client
 except ImportError:
     create_client = None
+
 # استيراد مكتبة قاعدة بيانات إنترنت الأشياء الحية (IoT Database)
 try:
     from influxdb_client import InfluxDBClient
 except ImportError:
     InfluxDBClient = None
+
 # محاولة استيراد مكتبة قراءة الباركود
 try:
     from pyzbar.pyzbar import decode as decode_qr
@@ -46,14 +49,17 @@ st.set_page_config(
     page_icon="🔐",
     layout="wide",
 )
+
 # التهيئة المبدئية لمتغيرات الجلسة (Session State)
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
 if "lang" not in st.session_state:
     st.session_state.lang = "ar" # 'ar' or 'en'
+
 # تحديد الصفحة الافتراضية عند الدخول
 if "current_page" not in st.session_state:
     st.session_state.current_page = "chat"
+
 # تحديث هيكل قاعدة البيانات المصغرة ليدعم القوائم الرئيسية والفرعية
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
@@ -101,6 +107,7 @@ if "sites_data" not in st.session_state:
             }
         }
     }
+
 # سجل الإدخالات اليومية وتتبع القراءات
 if "daily_logs" not in st.session_state:
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -118,12 +125,14 @@ if "daily_logs" not in st.session_state:
             "status": "طبيعي"
         }
     ]
+
 # جلب مفتاح Gemini بأمان من الإعدادات
 gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not gemini_key and "supabase" in st.secrets:
     gemini_key = st.secrets["supabase"].get("GEMINI_API_KEY")
 if not gemini_key:
     st.warning("⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY. يرجى إضافته في st.secrets.")
+
 # تهيئة عميل Gemini API
 client = genai.Client(api_key=gemini_key) if gemini_key else None
 
@@ -647,7 +656,7 @@ def on_app_change():
 
 apps_list_ar = [
     "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
-    "🎛️ 2. غرفة التحكم والتشغيل عن بُعد (Remote Control Center)",
+    "🎛️️ 2. غرفة التحكم والتشغيل عن بُعد (Remote Control Center)",
     "📊 3. المتابعة اليومية وتقارير الإدارة والتذكيرات",
     "🤖 4. المساعد الذكي والكتالوجات وقراءة الأكواد",
     "🔍 5. نظام فحص المعدات (WIC وغيرها)",
@@ -864,7 +873,7 @@ else:
                 if st.button("📝 Open Calibration Modal"):
                     edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
             
-            # === بداية التعديل المضاف: قائمة تحرير عناوين وبيانات المولدات ===
+            # === قائمة تحرير عناوين وبيانات المولدات (محدثة بالكامل مع الحفظ والمسح) ===
             with st.expander("🛠️ قائمة تحرير عناوين بيانات المولدات", expanded=False):
                 st.markdown(f"**تسجيل وتحرير بيانات المولد: {selected_gen}**")
                 gen_info_edit = st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
@@ -872,19 +881,37 @@ else:
                 new_gen_id = st.text_input("تعديل معرف المولد (ID):", value=selected_gen, key="edit_gen_id")
                 new_gen_model = st.text_input("تعديل طراز المولد (Model):", value=gen_info_edit['model'], key="edit_gen_model")
                 new_gen_kw = st.number_input("تعديل السعة (kW):", value=float(gen_info_edit['kw']), key="edit_gen_kw")
+                new_gen_load = st.number_input("تعديل الحمل (kW):", value=float(gen_info_edit.get('load', 0.0)), key="edit_gen_load")
+                new_gen_run_hours = st.number_input("تعديل ساعات التشغيل الحالي:", value=float(gen_info_edit.get('run_hours', 0.0)), key="edit_gen_rh")
                 
                 col_b1, col_b2, col_b3 = st.columns(3)
                 with col_b1:
                     if st.button("💾 الحفظ في ذاكرة الصفحة", use_container_width=True):
+                        # تحديث بيانات المولد الحالي في Session State
+                        gen_info_edit['model'] = new_gen_model
+                        gen_info_edit['kw'] = new_gen_kw
+                        gen_info_edit['load'] = new_gen_load
+                        gen_info_edit['run_hours'] = new_gen_run_hours
+                        
                         if new_gen_id != selected_gen:
                             st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][new_gen_id] = gen_info_edit
                             del st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
-                        st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][new_gen_id]['model'] = new_gen_model
-                        st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][new_gen_id]['kw'] = new_gen_kw
-                        st.success("تم حفظ بيانات المولد في ذاكرة الصفحة بنجاح!")
+                        else:
+                            st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen] = gen_info_edit
+                        
+                        st.success("✅ تم حفظ بيانات المولد في ذاكرة الصفحة بنجاح!")
                         st.rerun()
                 with col_b2:
                     if st.button("☁️ الحفظ في قاعدة بيانات Supabase", use_container_width=True):
+                        # حفظ التعديلات محلياً أولاً
+                        gen_info_edit['model'] = new_gen_model
+                        gen_info_edit['kw'] = new_gen_kw
+                        gen_info_edit['load'] = new_gen_load
+                        gen_info_edit['run_hours'] = new_gen_run_hours
+                        if new_gen_id != selected_gen:
+                            st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][new_gen_id] = gen_info_edit
+                            del st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
+                        
                         if supabase:
                             try:
                                 data_to_insert = {
@@ -892,20 +919,25 @@ else:
                                     "generator_id": new_gen_id,
                                     "model": new_gen_model,
                                     "capacity_kw": new_gen_kw,
+                                    "load_kw": new_gen_load,
+                                    "run_hours": new_gen_run_hours,
                                     "last_updated": datetime.now().isoformat()
                                 }
                                 supabase.table("generators_data").upsert(data_to_insert).execute()
-                                st.success("تم حفظ البيانات في Supabase بنجاح!")
+                                st.success("✅ تم حفظ البيانات المحدثة في Supabase بنجاح!")
                             except Exception as e:
                                 st.error(f"حدث خطأ أثناء الحفظ في Supabase: {e}")
                         else:
-                            st.warning("اتصال Supabase غير متوفر حالياً.")
+                            st.warning("⚠️ اتصال Supabase غير متوفر حالياً.")
+                        st.rerun()
                 with col_b3:
                     if st.button("🗑️ مسح بيانات المولد", use_container_width=True, type="primary"):
-                        del st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
-                        st.success(f"تم مسح بيانات المولد {selected_gen} نهائياً!")
-                        st.rerun()
+                        if selected_gen in st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"]:
+                            del st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
+                            st.success(f"🗑️ تم مسح بيانات المولد {selected_gen} نهائياً!")
+                            st.rerun()
             # === نهاية التعديل المضاف ===
+            
             gen_info = st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
             calib_e = gen_info.get("calib_elec", {})
             calib_m = gen_info.get("calib_engine", {})
@@ -1029,6 +1061,7 @@ else:
                 gen_img_file = st.file_uploader("Upload Generator Photo", type=["png", "jpg", "jpeg"])
             with col_up2:
                 parts_img_file = st.file_uploader("Upload Maintenance Photo", type=["png", "jpg", "jpeg"])
+            
             # === دالة التقرير الشامل المحدثة ===
             def generate_full_pdf_bytes():
                 import matplotlib.pyplot as plt
@@ -1078,7 +1111,8 @@ else:
                 ax4.set_title("Efficiency vs Load")
                 ax4.grid(True, alpha=0.3)
                 chart4_path = save_temp_chart(fig4)
-                # === بناء PDF 4 صفحات ===
+                
+                # === بناء PDF 3 صفحات ===
                 pdf = ComprehensivePDF(
                     "COMPREHENSIVE GENERATOR REPORT - WITH FUEL CURVE & MAINTENANCE",
                     logo_path=temp_logo_path,
@@ -1143,6 +1177,7 @@ else:
                     pdf.cell(widths[4], 5, str(row["المدة المتبقية (ساعة)"]), border=1, align="C", fill=fill)
                     pdf.cell(widths[5], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1, fill=fill)
                     pdf.ln()
+                
                 # صفحة 2: كل الرسوم البيانية
                 pdf.add_page()
                 pdf.set_font("Helvetica", "B", 11)
@@ -1158,6 +1193,7 @@ else:
                 pdf.set_xy(10, 165)
                 pdf.set_font("Helvetica", "", 7)
                 pdf.multi_cell(0, 4, f"Site Address in Header Footer: {sanitize_latin_only(current_site_address)} | Analysis: Low load (<50%) increases SFC from {ft[100]['AVG']} to {ft[25]['AVG']} L/kWh (+29% waste). Recommendation: Keep load >70% for {ft[75]['eff']}% efficiency.")
+                
                 # صفحة 3: جدول الوقود التفصيلي
                 pdf.add_page()
                 pdf.set_font("Helvetica", "B", 11)
@@ -1167,48 +1203,42 @@ else:
                 pdf.set_fill_color(24,43,73)
                 pdf.set_text_color(255,255,255)
                 f_headers = ["Load %", "CAT g/kWh", "Cummins", "Perkins", "SFC L/kWh", "Eff %", "CO2 kg/L"]
-                f_widths = [18, 25, 25, 18, 25]
-                for h,w in zip(f_headers, f_widths):
-                    pdf.cell(w, 6, h, border=1, fill=True, align="C")
-                                # تعيين عرض الأعمدة السبعة بدقة لترويسة وجسم الجدول (الإجمالي 190mm)
+                
+                # تعيين عرض الأعمدة السبعة بدقة لترويسة وجسم الجدول (الإجمالي 190mm)
                 f_widths = [15, 30, 30, 30, 25, 25, 35]
+                for h, w in zip(f_headers, f_widths):
+                    pdf.cell(w, 6, h, border=1, fill=True, align="C")
                 pdf.ln()
                 pdf.set_font("Helvetica", "", 8)
                 pdf.set_text_color(0, 0, 0)
                 
                 for load in sorted(ft.keys(), reverse=True):
-                    # 1. نسبة الحمل
                     pdf.cell(f_widths[0], 5, f"{load}%", border=1, align="C")
                     
-                    # 2. استهلاك CAT C32
                     cat_val = ft[load].get("g_cat")
                     if cat_val is None and "CAT C32" in ft[load]:
                         cat_val = int(ft[load]["CAT C32"] * 850)
                     pdf.cell(f_widths[1], 5, str(cat_val if cat_val is not None else "-"), border=1, align="C")
                     
-                    # 3. استهلاك Cummins KTA50
                     cum_val = ft[load].get("g_cummins")
                     if cum_val is None and "Cummins KTA50" in ft[load]:
                         cum_val = int(ft[load]["Cummins KTA50"] * 850)
                     pdf.cell(f_widths[2], 5, str(cum_val if cum_val is not None else "-"), border=1, align="C")
                     
-                    # 4. استهلاك Perkins 2506
                     per_val = ft[load].get("g_perkins")
                     if per_val is None and "Perkins 2506" in ft[load]:
                         per_val = int(ft[load]["Perkins 2506"] * 850)
                     pdf.cell(f_widths[3], 5, str(per_val if per_val is not None else "-"), border=1, align="C")
                     
-                    # 5. المتوسط AVG
                     avg_val = ft[load].get("AVG", "-")
                     pdf.cell(f_widths[4], 5, str(avg_val), border=1, align="C")
                     
-                    # 6. الكفاءة eff
                     eff_val = ft[load].get("eff", "-")
                     pdf.cell(f_widths[5], 5, f"{eff_val}%" if eff_val != "-" else "-", border=1, align="C")
                     
-                    # 7. معامل الانبعاثات الثابت
                     pdf.cell(f_widths[6], 5, "2.68", border=1, align="C")
                     pdf.ln()
+                    
                 # تنظيف الملفات المؤقتة
                 for p in temp_charts:
                     try:
@@ -1219,6 +1249,7 @@ else:
                         
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
+
             st.download_button(
                 label=f"🖨️ Download COMPREHENSIVE Report ({selected_gen}) - 3 Pages With Fuel Curve & Site Address",
                 data=generate_full_pdf_bytes(),
@@ -1233,7 +1264,7 @@ else:
         if not df_iot.empty:
             latest = df_iot.iloc[-1]
             col1, col2, col3 = st.columns(3)
-            col1.metric("🌡️ Temp (°C)", f"{latest['temperature']:.1f}")
+            col1.metric("🌡️️ Temp (°C)", f"{latest['temperature']:.1f}")
             col2.metric("〰️ Vibration (mm/s)", f"{latest['vibration']:.2f}")
             col3.metric("🗜️ Oil Press (Bar)", f"{latest['pressure']:.1f}")
             fig_temp = px.line(df_iot, x='_time', y='temperature', title="Live Sensor Trend")
@@ -1287,7 +1318,7 @@ else:
             if qr_file:
                 st.info("قارئ الباركود قيد المعالجة...")
     
-    # ================== النظام 5 المضاف ==================
+    # ================== النظام 5: نظام فحص المعدات و غرف التبريد WIC ==================
     elif "5." in selected_app:
         st.title("🔍 " + ("نظام فحص معدات التبريد (WIC 10 & WIC 40)" if L == "ar" else "Cold Room Inspection (WIC 10 & WIC 40)"))
         st.markdown("### ❄️ نظام قراءة بيانات غرف التبريد والتجميد")
@@ -1295,7 +1326,6 @@ else:
         col_wic1, col_wic2 = st.columns(2)
         wic_unit = col_wic1.radio("اختر وحدة التبريد لفحصها:", ["غرفة التبريد نموذج WIC 10", "غرفة التبريد نموذج WIC 40"])
         controller_type = col_wic2.selectbox("نوع المتحكم المستخدم (Controller):", ["Emerson", "Dixell"])
-
         st.divider()
         col_w1, col_w2, col_w3 = st.columns(3)
         with col_w1:
@@ -1314,49 +1344,74 @@ else:
             if alarm_code:
                 st.error(f"🚨 تم تسجيل إنذار في النظام: {alarm_code}. سيتم تحويله للمساعد الذكي للتحليل.")
 
-    # ================== النظام 6 المضاف ==================
+    # ================== النظام 6 المفعل بالكامل: الحاسبة الهندسية للكهرباء والانبعاثات ==================
     elif "6." in selected_app:
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
-        st.markdown("### ⛽ حساب استهلاك الوقود اللحظي المرتبط ببيانات الحمل والمولد")
         
-        # ربط إعدادات الحمل بصرف الوقود وقراءة الحساسات
-        col_c1, col_c2 = st.columns(2)
-        gen_model_calc = col_c1.selectbox("طراز المولد:", ["Perkins", "Cummins", "CAT"])
-        pump_type = col_c2.selectbox("نوع نظام طلمبة الوقود:", [
-            "طلمبة ديزل قلب عادية (ميكانيكية)", 
-            "حقن إلكتروني (MEUI/ECM)"
-        ])
+        tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop (هبوط الجهد الكهربائي)", "⛽ Fuel & Emissions (استهلاك الوقود والحمل)"])
         
-        col_c3, col_c4, col_c5 = st.columns(3)
-        kw_capacity = col_c3.number_input("السعة الكلية للمولد (kW):", value=150.0, step=10.0)
-        current_load_kw = col_c4.number_input("إدخال وتحرير حمل المولد الحالي (kW):", value=100.0)
-        run_hours_calc = col_c5.number_input("ساعات التشغيل المراد تقديرها:", value=10.0)
+        # 1. مفعل: حاسبة هبوط الجهد ثلاثي الأوجه
+        with tab_calc1:
+            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
+            c1, c2, c3 = st.columns(3)
+            i_amp = c1.number_input("التيار المطلوب (Amperes / أمبير):", value=250.0)
+            dist_m = c2.number_input("طول الكابل (Meters / متر):", value=120.0)
+            c_size = c3.selectbox("مقطع الكابل (mm² / Cable Size):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4)
+            
+            v_drop, v_drop_pct = calculate_cable_voltage_drop(i_amp, dist_m, c_size)
+            
+            m_col1, m_col2 = st.columns(2)
+            m_col1.metric("فقد الجهد المحسوب (Voltage Drop)", f"{v_drop} V")
+            m_col2.metric("نسبة الهبوط (Voltage Drop %)", f"{v_drop_pct} %")
+            
+            if v_drop_pct > 4.0:
+                st.error("⚠️ تحذير: نسبة هبوط الجهد تتجاوز المسموح به معيارياً (4%)! يرجى زيادة مقطع الكابل.")
+            else:
+                st.success("✅ مقطع الكابل ممتاز وضمن الحدود الهندسية الآمنة.")
 
-        if st.button("📊 ربط بيانات الحمل وحساب الاستهلاك", type="primary"):
-            # استدعاء دالة الحساب التي بنيناها مسبقا
-            liters, co2, sfc, eff = calculate_fuel_consumption_and_emissions(
-                kw_load=current_load_kw,
-                run_hours=run_hours_calc,
-                gen_model=gen_model_calc,
-                kw_capacity=kw_capacity
-            )
+        # 2. مفعل: حساب استهلاك الوقود اللحظي المرتبط بالحمل
+        with tab_calc2:
+            st.subheader("⛽ ربط بيانات الحمل بصرف الوقود والانبعاثات")
             
-            # في حال الطلمبة الميكانيكية العادية، قد يزيد الاستهلاك الفعلي قليلاً بسبب دقة الحقن مقارنة بالإلكتروني
-            if "قلب عادية" in pump_type:
-                liters = round(liters * 1.05, 1)  # افتراض زيادة طفيفة للاستهلاك الميكانيكي
-                co2 = round(co2 * 1.05, 1)
-                st.info("💡 ملاحظة: تم تعديل قراءة الاستهلاك نظراً لاستخدام نظام طلمبة وقود ميكانيكية (قلب عادية) بدلاً من الحقن الإلكتروني.")
+            uploaded_csv_calc = st.file_uploader("رفع جدول الوقود الخاص بك (اختياري - CSV):", type=["csv"], key="fuel_csv_calc")
+            fuel_table_loaded = get_fuel_table_from_csv(uploaded_csv_calc)
             
-            st.success("تم ربط البيانات وحساب الاستهلاك بناءً على الحمل اللحظي بنجاح!")
+            col_c1, col_c2 = st.columns(2)
+            gen_model_calc = col_c1.selectbox("طراز المولد:", ["Perkins", "Cummins", "CAT"])
+            pump_type = col_c2.selectbox("نوع نظام طلمبة الوقود:", [
+                "طلمبة ديزل قلب عادية (ميكانيكية)", 
+                "حقن إلكتروني (MEUI/ECM)"
+            ])
             
-            calc_res1, calc_res2, calc_res3, calc_res4 = st.columns(4)
-            calc_res1.metric("الوقود المستهلك الإجمالي", f"{liters} لتر")
-            calc_res2.metric("انبعاثات الكربون CO2", f"{co2} كجم")
-            calc_res3.metric("معدل الاستهلاك النوعي (SFC)", f"{sfc} L/kWh")
-            calc_res4.metric("كفاءة المولد عند هذا الحمل", f"{eff} %")
+            col_c3, col_c4, col_c5 = st.columns(3)
+            kw_capacity = col_c3.number_input("السعة الكلية للمولد (kW):", value=150.0, step=10.0)
+            current_load_kw = col_c4.number_input("إدخال وتحرير حمل المولد الحالي (kW):", value=100.0)
+            run_hours_calc = col_c5.number_input("ساعات التشغيل المراد تقديرها:", value=10.0)
             
-            load_percentage = (current_load_kw / kw_capacity) * 100 if kw_capacity > 0 else 0
-            if load_percentage < 50:
-                st.warning(f"⚠️ تحذير: المولد يعمل بحمل منخفض جداً ({load_percentage:.1f}%). هذا يؤدي إلى احتراق غير مكتمل في محركات {gen_model_calc} وتراكم الزيت غير المحترق (Wet Stacking).")
-            elif load_percentage > 90:
-                st.warning(f"⚠️ تنبيه: المولد يعمل بحمل مرتفع جداً يقترب من الحد الأقصى ({load_percentage:.1f}%). يرجى المراقبة المستمرة لحرارة المحرك.")
+            if st.button("📊 ربط بيانات الحمل وحساب الاستهلاك", type="primary"):
+                liters, co2, sfc, eff = calculate_fuel_consumption_and_emissions(
+                    kw_load=current_load_kw,
+                    run_hours=run_hours_calc,
+                    gen_model=gen_model_calc,
+                    kw_capacity=kw_capacity,
+                    fuel_table=fuel_table_loaded
+                )
+                
+                if "قلب عادية" in pump_type:
+                    liters = round(liters * 1.05, 1)
+                    co2 = round(co2 * 1.05, 1)
+                    st.info("💡 ملاحظة: تم تعديل قراءة الاستهلاك نظراً لاستخدام نظام طلمبة وقود ميكانيكية (قلب عادية).")
+                
+                st.success("تم ربط البيانات وحساب الاستهلاك بناءً على الحمل اللحظي بنجاح!")
+                
+                calc_res1, calc_res2, calc_res3, calc_res4 = st.columns(4)
+                calc_res1.metric("الوقود المستهلك الإجمالي", f"{liters} لتر")
+                calc_res2.metric("انبعاثات الكربون CO2", f"{co2} كجم")
+                calc_res3.metric("معدل الاستهلاك النوعي (SFC)", f"{sfc} L/kWh")
+                calc_res4.metric("كفاءة المولد عند هذا الحمل", f"{eff} %")
+                
+                load_percentage = (current_load_kw / kw_capacity) * 100 if kw_capacity > 0 else 0
+                if load_percentage < 50:
+                    st.warning(f"⚠️ تحذير: المولد يعمل بحمل منخفض جداً ({load_percentage:.1f}%). هذا يؤدي إلى احتراق غير مكتمل في محركات {gen_model_calc} وتراكم الزيت غير المحترق (Wet Stacking).")
+                elif load_percentage > 90:
+                    st.warning(f"⚠️ تنبيه: المولد يعمل بحمل مرتفع جداً يقترب من الحد الأقصى ({load_percentage:.1f}%). يرجى المراقبة المستمرة لحرارة المحرك.")
