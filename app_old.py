@@ -684,7 +684,7 @@ def edit_generator_modal(main_site, sub_site, gen_key):
     eng = gen_data.get("calib_engine", {})
     st.markdown(f"### ⚙️ {gen_key} - Site: {sub_site}")
     tech_name = st.text_input("اسم الفني / Technician Name:", value="فني الصيانة المناوب")
-    tab1, tab2, tab3 = st.tabs(["🏷️️ Basic Data", "⚡ Electrical", "🔧 Engine"])
+    tab1, tab2, tab3 = st.tabs(["🏷️ Basic Data", "⚡ Electrical", "🔧 Engine"])
     with tab1:
         new_model = st.text_input("Model / الطراز", value=gen_data.get("model", ""))
         new_run_hours = st.number_input("Run Hours / ساعات التشغيل", min_value=0.0, value=float(gen_data.get("run_hours", 0.0)))
@@ -820,6 +820,13 @@ else:
             geo_region = st.text_input("عنوان المنطقة الجغرافية (رقمها/اسمها) [مثال: الخرطوم - المنطقة 1]:", key="geo_reg_input")
             site_name = st.text_input("اسم الموقع [مثال: مصنع كافوري]:", key="site_name_input")
             site_address = st.text_input("عنوان الموقع التفصيلي:", key="site_add_input")
+            
+            # === التعديل المطلوب: إضافة اسم الفني أو المهندس ورقم واتساب في نموذج إضافة الموقع ===
+            st.markdown("### بيانات الفني أو مهندس الصيانة المسؤول عن الموقع")
+            col_tech_f1, col_tech_f2 = st.columns(2)
+            assigned_technician_name = col_tech_f1.text_input("اسم الفني أو المهندس المسؤول:", value="م. عثمان آدم أدومة", key="new_site_tech_name")
+            assigned_technician_whatsapp = col_tech_f2.text_input("رقم واتساب الفني/المهندس (مع مفتاح الدولة):", value="249912345678", key="new_site_tech_whatsapp")
+            
             st.markdown("### بيانات المولدات")
             num_gens = st.number_input("عدد المولدات في الموقع:", min_value=1, max_value=20, value=1, step=1, key="num_gens_input")
             st.write("تخصيص بيانات كل مولد:")
@@ -837,6 +844,8 @@ else:
                         st.session_state.sites_data[geo_region] = {}
                     st.session_state.sites_data[geo_region][site_name] = {
                         "address": site_address if site_address else "N/A",
+                        "technician_name": assigned_technician_name,
+                        "technician_whatsapp": assigned_technician_whatsapp,
                         "generators": {}
                     }
                     for gen in gen_inputs:
@@ -1315,8 +1324,8 @@ else:
         st.title("📊 " + ("المتابعة اليومية وتقارير الإدارة" if L == "ar" else "Daily Monitoring & Tech Reminders"))
         today_str = datetime.now().strftime("%Y-%m-%d")
         
-        # التبويبات المحدثة للنظام 3 مع إدخال الفني وصيانة التنبؤات وواتساب
-        tab_mgr1, tab_mgr2, tab_mgr3 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders", "🔔 جدول الصيانة التنبؤية وإنذارات واتساب للفني"])
+        # التبويبات المحدثة للنظام 3 مع جدول الصيانة التنبؤية ورسائل واتساب التلقائية الذكية
+        tab_mgr1, tab_mgr2, tab_mgr3 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders", "🔔 جدول الصيانة التنبؤية وإنذارات واتساب"])
         
         with tab_mgr1:
             today_logs = [log for log in st.session_state.daily_logs if log.get("date") == today_str]
@@ -1339,14 +1348,22 @@ else:
             ''', unsafe_allow_html=True)
             
         with tab_mgr3:
-            st.subheader("⚙️ إدارة وفد وطاقم الصيانة وتنبيهات واتساب التلقائية الذكية")
-            st.markdown("إدخال بيانات الفني/مهندس الصيانة المسؤول لتلقي التقارير الفنية وإنذارات الصيانة التنبؤية:")
+            st.subheader("⚙️ ربط الصيانة التنبؤية للمولدات والآليات وإنذارات واتساب الذكية")
+            st.markdown("متابعة عدد الساعات الافتراضية وتوليد رسالة واتساب نصية ذكية تلقائياً:")
             
-            col_tech_in1, col_tech_in2 = st.columns(2)
-            technician_name = col_tech_in1.text_input("اسم الفني أو مهندس الصيانة المسؤول:", value="م. عثمان آدم أدومة")
-            technician_whatsapp = col_tech_in2.text_input("رقم واتساب الفني (مع مفتاح الدولة بدون رموز):", value="249912345678")
+            # جلب بيانات الفني ورقم الواتساب المسجل في الموقع الحالي تلقائياً إن وجد
+            default_tech_name = "م. عثمان آدم أدومة"
+            default_whatsapp_num = "249912345678"
+            if 'selected_main_site' in locals() and 'selected_sub_site' in locals() and selected_main_site and selected_sub_site:
+                site_info = st.session_state.sites_data.get(selected_main_site, {}).get(selected_sub_site, {})
+                default_tech_name = site_info.get("technician_name", default_tech_name)
+                default_whatsapp_num = site_info.get("technician_whatsapp", default_whatsapp_num)
+
+            col_w_in1, col_w_in2 = st.columns(2)
+            assigned_tech_display = col_w_in1.text_input("اسم الفني أو المهندس المسؤول:", value=default_tech_name)
+            target_whatsapp_num = col_w_in2.text_input("رقم الواتساب المستهدف (مع مفتاح الدولة بدون رموز):", value=default_whatsapp_num)
             
-            # جدول الصيانة التنبؤية وساعات التشغيل الافتراضية للمولدات والآليات
+            # جدول الصيانة التنبؤية وساعات التشغيل الافتراضية
             predictive_maintenance_data = [
                 {"المعدة / المولد": "G1 - Perkins 410kVA", "القطعة / الخدمة": "فلتر الزيت (Oil Filter)", "الساعات الافتراضية": 250, "الساعات المنقضية": 240, "المتبقي": 10, "الحالة": "قريب جداً من موعد الصيانة"},
                 {"المعدة / المولد": "G1 - Perkins 410kVA", "القطعة / الخدمة": "فلتر الوقود الأساسي", "الساعات الافتراضية": 500, "الساعات المنقضية": 485, "المتبقي": 15, "الحالة": "حرج / إنذار مبكر"},
@@ -1356,29 +1373,21 @@ else:
             df_pm = pd.DataFrame(predictive_maintenance_data)
             st.dataframe(df_pm, use_container_width=True)
             
-            # محاكاة الإنذار الصوتي بالتزامن مع التقرير
-            col_al_s1, col_al_s2 = st.columns([1, 2])
-            with col_al_s1:
-                if st.button("🔔 تشغيل جرس الإنذار الصوتي والتنبيه"):
-                    play_audio("تنبيه صيانة عاجل. يرجى مراجعة الجدول وتحويل التقرير الفني.", loop=False)
-                    st.warning("🚨 تم إطلاق جرس الإنذار الصوتي وتوليد التقرير الفني بالتزامن!")
+            # تكوين رسالة واتساب ذكية تلقائية بناءً على الحالة واسم الفني
+            default_smart_msg = f"🚨 *إنذار صيانة تنبؤية وتنبيه تلقائي - Addoma Trading Services*\n\nإلى الزميل الفني / المهندس: {assigned_tech_display}\nمرحباً، تم رصد معدلات استهلاك ساعات التشغيل الافتراضية التالية للمولدات والآليات:\n- اقتراب موعد استبدال فلاتر G1 (متبقي ساعات قليلة).\n- الحاجة لجدولة صيانة عاجلة.\n\nيرجى اتخاذ الإجراء اللازم في أقرب وقت."
             
-            # تكوين رسالة واتساب ذكية تلقائية مخصصة للفني
-            default_smart_msg = f"🚨 *تقرير فني وإنذار صيانة تنبؤية*\n\nإلى الزميل العزيز: {technician_name}\nتم رصد حالات استهلاك حرجة لساعات التشغيل الافتراضية للمولدات والآليات:\n- اقتراب موعد صيانة فلاتر G1.\n- مطلوب فحص جرس الإنذار والتقرير المرفق.\n\nيرجى المباشرة فوراً."
-            
-            smart_message_input = st.text_area("نص رسالة الواتساب التلقائية الموجهة للفني:", value=default_smart_msg)
+            smart_message_input = st.text_area("نص رسالة الواتساب الذكية التلقائية (قابلة للتعديل):", value=default_smart_msg)
             
             encoded_smart_msg = urllib.parse.quote(smart_message_input)
-            smart_whatsapp_url = f"https://wa.me/{technician_whatsapp}?text={encoded_smart_msg}"
+            smart_whatsapp_url = f"https://wa.me/{target_whatsapp_num}?text={encoded_smart_msg}"
             
             st.markdown(f'''
                 <a href="{smart_whatsapp_url}" target="_blank">
                     <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;">
-                        💬 إرسال التقرير الفني والإنذار التلقائي عبر واتساب إلى الفني ({technician_name})
+                        💬 إرسال رسالة واتساب الذكية التلقائية للتنبيه والإنذار للفني ({assigned_tech_display})
                     </button>
                 </a>
             ''', unsafe_allow_html=True)
-
     elif "4." in selected_app:
         st.title("🤖 " + ("المساعد الذكي والكتالوجات وقراءة الأكواد" if L == "ar" else "AI Diagnostics & Fault Code Reader"))
         col_files1, col_files2 = st.columns(2)
@@ -1418,7 +1427,6 @@ else:
                 st.warning(f"⚠️ تحذير: درجة الحرارة الحالية أعلى من المعدل الطبيعي بشكل ملحوظ. يرجى مراجعة حالة وسيط التبريد أو متحكم {controller_type}.")
             if alarm_code:
                 st.error(f"🚨 تم تسجيل إنذار في النظام: {alarm_code}. سيتم تحويله للمساعد الذكي للتحليل.")
-
     # ================== النظام 6 المفعل بالكامل: الحاسبة الهندسية للكهرباء والانبعاثات ==================
     elif "6." in selected_app:
         st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
@@ -1442,7 +1450,6 @@ else:
                 st.error("⚠️ تحذير: نسبة هبوط الجهد تتجاوز المسموح به معيارياً (4%)! يرجى زيادة مقطع الكابل.")
             else:
                 st.success("✅ مقطع الكابل ممتاز وضمن الحدود الهندسية الآمنة.")
-
         with tab_calc2:
             st.subheader("⛽ ربط بيانات الحمل بصرف الوقود والانبعاثات")
             
