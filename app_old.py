@@ -188,7 +188,7 @@ def play_audio(text, lang='ar', loop=False):
 def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
     """دالة استدعاء الذكاء الاصطناعي مع معالجة حزمة الضغط العالي (503) وإعادة المحاولة ودعم ثنائية اللغة"""
     if not client:
-        return "⚠️ GEMINI_API_KEY not found." if language == "en" else "⚠️️ لم يتم العثور على مفتاح GEMINI_API_KEY."
+        return "⚠️ GEMINI_API_KEY not found." if language == "en" else "⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY."
     lang_instr = "Respond in English." if language == "en" else "اكتب الإجابة بلغة عربية تقنية واضحة ومباشرة."
     prompt = f"""
     You are an expert industrial consulting engineer specializing in generators, DSE control panels (DSE 7320, DSE 8610 MKII), Perkins & Cummins engines, and cooling systems.
@@ -666,7 +666,7 @@ apps_list_ar = [
 ]
 apps_list_en = [
     "⚙️ 1. Predictive Maintenance & Gensets",
-    "🎛️️ 2. Remote Operations & Control Center",
+    "🎛️ 2. Remote Operations & Control Center",
     "📊 3. Daily Monitoring & Reminders",
     "🤖 4. AI Diagnostics & Catalog Reader",
     "🔍 5. Equipment Inspection (WIC & Heavy Duty)",
@@ -807,7 +807,7 @@ elif st.session_state.current_page == "dashboard":
     st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
 else:
     if "1." in selected_app:
-        st.title("⚙️ " + ("نظام الصيانة التنبؤية ومراقبة المولدات" if L == "ar" else "Predictive Maintenance & Genset Monitoring"))
+        st.title("⚙️️ " + ("نظام الصيانة التنبؤية ومراقبة المولدات" if L == "ar" else "Predictive Maintenance & Genset Monitoring"))
         col_top_audio1, col_top_audio2 = st.columns([3, 1])
         with col_top_audio2:
             mute_label = "🔇 Mute" if not st.session_state.audio_muted else "🔊 Unmute"
@@ -965,7 +965,7 @@ else:
                             except Exception as e:
                                 st.error(f"حدث خطأ أثناء الحفظ في Supabase: {e}")
                         else:
-                            st.warning("⚠️️ اتصال Supabase غير متوفر حالياً.")
+                            st.warning("⚠️ اتصال Supabase غير متوفر حالياً.")
                         st.rerun()
                 with col_b3:
                     if st.button("🗑️ مسح بيانات المولد", use_container_width=True, type="primary"):
@@ -1006,7 +1006,7 @@ else:
                 
                 # ربط جرس الإنذار مباشرة برقم واتساب الفني المسؤول عن الموقع الحالي لإنشاء واتساب ذكي فوري
                 site_meta = st.session_state.sites_data[selected_main_site][selected_sub_site]
-                tech_w_num = site_meta.get("technician_whatsapp", "249912345678")
+                tech_w_num = site_meta.get("technician_whatsapp", "")
                 tech_w_name = site_meta.get("technician_name", "الفني المسؤول")
                 
                 active_alarm_text = f"🚨 *إنذار طارئ للمولد - Addoma Trading Services*\n\nالعزيز المهندس/الفني: {tech_w_name}\n📍 الموقع: {selected_sub_site} - {selected_main_site}\n⚙️ المولد: {selected_gen}\n⚠️ تفاصيل الإنذار: {', '.join(alarm_messages)}\n\nيرجى التوجه الفوري لفحص الوحدة وإجراء الصيانة اللازمة."
@@ -1020,7 +1020,6 @@ else:
                         </button>
                     </a>
                 ''', unsafe_allow_html=True)
-
             parts_key = f"parts_{selected_main_site}_{selected_sub_site}_{selected_gen}"
             if parts_key not in st.session_state:
                 st.session_state[parts_key] = [
@@ -1346,7 +1345,7 @@ else:
             else:
                 st.warning("No logs registered today.")
         with tab_mgr2:
-            tech_phone = st.text_input("Technician Phone Number:", value="249912345678")
+            tech_phone = st.text_input("Technician Phone Number:", value="")
             reminder_msg = f"Addoma Maintenance Reminder: Please register daily genset logs for ({today_str})."
             encoded_msg = urllib.parse.quote(reminder_msg)
             whatsapp_url = f"https://wa.me/{tech_phone}?text={encoded_msg}"
@@ -1362,16 +1361,17 @@ else:
             st.subheader("⚙️ ربط الصيانة التنبؤية للمولدات والآليات وإنذارات واتساب الذكية")
             st.markdown("متابعة عدد الساعات الافتراضية وتوليد رسالة واتساب نصية ذكية تلقائياً:")
             
+            # جلب بيانات الفني ورقم الواتساب من الموقع المحدد وتعيين خانة الإدخال الإلزامية لتكون فارغة تماماً (مسح الرقم الافتراضي)
             default_tech_name = "م. عثمان آدم أدومة"
-            default_whatsapp_num = "249912345678"
+            default_whatsapp_num = ""
             if 'selected_main_site' in locals() and 'selected_sub_site' in locals() and selected_main_site and selected_sub_site:
                 site_info = st.session_state.sites_data.get(selected_main_site, {}).get(selected_sub_site, {})
                 default_tech_name = site_info.get("technician_name", default_tech_name)
-                default_whatsapp_num = site_info.get("technician_whatsapp", default_whatsapp_num)
+                default_whatsapp_num = site_info.get("technician_whatsapp", "")
 
             col_w_in1, col_w_in2 = st.columns(2)
             assigned_tech_display = col_w_in1.text_input("اسم الفني أو المهندس المسؤول:", value=default_tech_name)
-            target_whatsapp_num = col_w_in2.text_input("رقم الواتساب المستهدف (مع مفتاح الدولة بدون رموز):", value=default_whatsapp_num)
+            target_whatsapp_num = col_w_in2.text_input("رقم الواتساب المستهدف (مع مفتاح الدولة بدون رموز):", value=default_whatsapp_num, placeholder="أدخل رقم الواتساب هنا...")
             
             predictive_maintenance_data = [
                 {"المعدة / المولد": "G1 - Perkins 410kVA", "القطعة / الخدمة": "فلتر الزيت (Oil Filter)", "الساعات الافتراضية": 250, "الساعات المنقضية": 240, "المتبقي": 10, "الحالة": "قريب جداً من موعد الصيانة"},
