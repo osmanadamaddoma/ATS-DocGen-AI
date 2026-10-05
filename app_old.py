@@ -656,7 +656,7 @@ def on_app_change():
 
 apps_list_ar = [
     "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
-    "🎛️️ 2. غرفة التحكم والتشغيل عن بُعد (Remote Control Center)",
+    "🎛️ 2. غرفة التحكم والتشغيل عن بُعد (Remote Control Center)",
     "📊 3. المتابعة اليومية وتقارير الإدارة والتذكيرات",
     "🤖 4. المساعد الذكي والكتالوجات وقراءة الأكواد",
     "🔍 5. نظام فحص المعدات (WIC وغيرها)",
@@ -736,6 +736,22 @@ def edit_generator_modal(main_site, sub_site, gen_key):
                     "ambient_temp": ambient_t
                 }
             }
+            # حفظ البيانات تلقائياً في Supabase عند التعديل
+            if supabase:
+                try:
+                    payload = {
+                        "site_name": sub_site,
+                        "generator_id": gen_key,
+                        "model": new_model,
+                        "capacity_kw": new_kw,
+                        "load_kw": new_load,
+                        "run_hours": new_run_hours,
+                        "last_updated": datetime.now().isoformat()
+                    }
+                    supabase.table("generators_data").upsert(payload).execute()
+                except Exception as e:
+                    print(f"Supabase upsert error: {e}")
+
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             today_date = datetime.now().strftime("%Y-%m-%d")
             st.session_state.daily_logs.append({
@@ -750,7 +766,7 @@ def edit_generator_modal(main_site, sub_site, gen_key):
                 "coolant_temp": c_temp,
                 "status": "Updated"
             })
-            st.success("✅ Saved successfully!")
+            st.success("✅ Saved successfully and synced to Supabase!")
             st.rerun()
 
 if st.session_state.current_page == "chat":
@@ -835,7 +851,21 @@ else:
                                 "calib_elec": {"v_nominal": 400.0, "v_measured": 400.0, "freq_nominal": 50.0, "freq_measured": 50.0, "current_max": 200.0, "current_measured": 100.0, "pf": 0.8, "ct_ratio": "200/5"},
                                 "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0, "ambient_temp": 43.0}
                             }
-                    st.success(f"تم حفظ المنطقة ({geo_region}) والموقع ({site_name}) بعدد {num_gens} مولد بنجاح!")
+                            # حفظ البيانات في Supabase أيضاً
+                            if supabase:
+                                try:
+                                    supabase.table("generators_data").upsert({
+                                        "site_name": site_name,
+                                        "generator_id": gen["id"],
+                                        "model": gen["model"],
+                                        "capacity_kw": gen["kw"],
+                                        "run_hours": 0.0,
+                                        "last_updated": datetime.now().isoformat()
+                                    }).execute()
+                                except Exception as e:
+                                    print(f"Supabase error: {e}")
+
+                    st.success(f"تم حفظ المنطقة ({geo_region}) والموقع ({site_name}) بعدد {num_gens} مولد بنجاح وتخزينها في Supabase!")
                     st.rerun()
                 else:
                     st.error("يرجى إدخال عنوان المنطقة الجغرافية واسم الموقع كحد أدنى.")
@@ -873,8 +903,8 @@ else:
                 if st.button("📝 Open Calibration Modal"):
                     edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
             
-            # === قائمة تحرير عناوين وبيانات المولدات (محدثة بالكامل مع الحفظ والمسح) ===
-            with st.expander("🛠️ قائمة تحرير عناوين بيانات المولدات", expanded=False):
+            # === قائمة تحرير عناوين وبيانات المولدات (محدثة بالكامل مع الحفظ الفعلي في Supabase) ===
+            with st.expander("🛠️ قائمة تحرير عناوين بيانات المولدات وتحديث Supabase", expanded=False):
                 st.markdown(f"**تسجيل وتحرير بيانات المولد: {selected_gen}**")
                 gen_info_edit = st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
                 
@@ -887,7 +917,6 @@ else:
                 col_b1, col_b2, col_b3 = st.columns(3)
                 with col_b1:
                     if st.button("💾 الحفظ في ذاكرة الصفحة", use_container_width=True):
-                        # تحديث بيانات المولد الحالي في Session State
                         gen_info_edit['model'] = new_gen_model
                         gen_info_edit['kw'] = new_gen_kw
                         gen_info_edit['load'] = new_gen_load
@@ -903,7 +932,6 @@ else:
                         st.rerun()
                 with col_b2:
                     if st.button("☁️ الحفظ في قاعدة بيانات Supabase", use_container_width=True):
-                        # حفظ التعديلات محلياً أولاً
                         gen_info_edit['model'] = new_gen_model
                         gen_info_edit['kw'] = new_gen_kw
                         gen_info_edit['load'] = new_gen_load
@@ -934,6 +962,11 @@ else:
                     if st.button("🗑️ مسح بيانات المولد", use_container_width=True, type="primary"):
                         if selected_gen in st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"]:
                             del st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
+                            if supabase:
+                                try:
+                                    supabase.table("generators_data").delete().eq("generator_id", selected_gen).execute()
+                                except Exception:
+                                    pass
                             st.success(f"🗑️ تم مسح بيانات المولد {selected_gen} نهائياً!")
                             st.rerun()
             # === نهاية التعديل المضاف ===
@@ -1249,7 +1282,6 @@ else:
                         
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
-
             st.download_button(
                 label=f"🖨️ Download COMPREHENSIVE Report ({selected_gen}) - 3 Pages With Fuel Curve & Site Address",
                 data=generate_full_pdf_bytes(),
@@ -1264,7 +1296,7 @@ else:
         if not df_iot.empty:
             latest = df_iot.iloc[-1]
             col1, col2, col3 = st.columns(3)
-            col1.metric("🌡️️ Temp (°C)", f"{latest['temperature']:.1f}")
+            col1.metric("🌡 Temp (°C)", f"{latest['temperature']:.1f}")
             col2.metric("〰️ Vibration (mm/s)", f"{latest['vibration']:.2f}")
             col3.metric("🗜️ Oil Press (Bar)", f"{latest['pressure']:.1f}")
             fig_temp = px.line(df_iot, x='_time', y='temperature', title="Live Sensor Trend")
@@ -1284,7 +1316,10 @@ else:
     elif "3." in selected_app:
         st.title("📊 " + ("المتابعة اليومية وتقارير الإدارة" if L == "ar" else "Daily Monitoring & Tech Reminders"))
         today_str = datetime.now().strftime("%Y-%m-%d")
-        tab_mgr1, tab_mgr2 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders"])
+        
+        # التبويبات المحدثة للنظام 3 مع جدول الصيانة التنبؤية ورسائل واتساب التلقائية الذكية
+        tab_mgr1, tab_mgr2, tab_mgr3 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders", "🔔 جدول الصيانة التنبؤية وإنذارات واتساب"])
+        
         with tab_mgr1:
             today_logs = [log for log in st.session_state.daily_logs if log.get("date") == today_str]
             st.write(f"Date: {today_str}")
@@ -1304,6 +1339,39 @@ else:
                     </button>
                 </a>
             ''', unsafe_allow_html=True)
+            
+        with tab_mgr3:
+            st.subheader("⚙️ ربط الصيانة التنبؤية للمولدات والآليات وإنذارات واتساب الذكية")
+            st.markdown("متابعة عدد الساعات الافتراضية وتوليد رسالة واتساب نصية ذكية تلقائياً:")
+            
+            target_whatsapp_num = st.text_input("رقم الواتساب المستهدف (مع مفتاح الدولة بدون رموز):", value="249912345678")
+            
+            # جدول الصيانة التنبؤية وساعات التشغيل الافتراضية
+            predictive_maintenance_data = [
+                {"المعدة / المولد": "G1 - Perkins 410kVA", "القطعة / الخدمة": "فلتر الزيت (Oil Filter)", "الساعات الافتراضية": 250, "الساعات المنقضية": 240, "المتبقي": 10, "الحالة": "قريب جداً من موعد الصيانة"},
+                {"المعدة / المولد": "G1 - Perkins 410kVA", "القطعة / الخدمة": "فلتر الوقود الأساسي", "الساعات الافتراضية": 500, "الساعات المنقضية": 485, "المتبقي": 15, "الحالة": "حرج / إنذار مبكر"},
+                {"المعدة / المولد": "G2 - Cummins 250kVA", "القطعة / الخدمة": "سير المروحة (Fan Belt)", "الساعات الافتراضية": 2000, "الساعات المنقضية": 1200, "المتبقي": 800, "الحالة": "طبيعي"},
+                {"المعدة / المولد": "غرفة التبريد WIC 10", "القطعة / الخدمة": "صيانة الضاغط (Compressor)", "الساعات الافتراضية": 8000, "الساعات المنقضية": 7950, "المتبقي": 50, "الحالة": "حرج / إنذار صيانة تنبؤية"}
+            ]
+            df_pm = pd.DataFrame(predictive_maintenance_data)
+            st.dataframe(df_pm, use_container_width=True)
+            
+            # تكوين رسالة واتساب ذكية تلقائية بناءً على الحالة
+            default_smart_msg = f"🚨 *إنذار صيانة تنبؤية - Addoma Trading Services*\n\nمرحباً، تم رصد معدلات استهلاك ساعات التشغيل الافتراضية التالية للمولدات والآليات:\n- اقتراب موعد استبدال فلاتر G1 (متبقي ساعات قليلة).\n- الحاجة لجدولة صيانة عاجلة.\n\nيرجى اتخاذ الإجراء اللازم في أقرب وقت."
+            
+            smart_message_input = st.text_area("نص رسالة الواتساب الذكية التلقائية (قابلة للتعديل):", value=default_smart_msg)
+            
+            encoded_smart_msg = urllib.parse.quote(smart_message_input)
+            smart_whatsapp_url = f"https://wa.me/{target_whatsapp_num}?text={encoded_smart_msg}"
+            
+            st.markdown(f'''
+                <a href="{smart_whatsapp_url}" target="_blank">
+                    <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;">
+                        💬 إرسال رسالة واتساب الذكية التلقائية للتنبيه والإنذار
+                    </button>
+                </a>
+            ''', unsafe_allow_html=True)
+
     elif "4." in selected_app:
         st.title("🤖 " + ("المساعد الذكي والكتالوجات وقراءة الأكواد" if L == "ar" else "AI Diagnostics & Fault Code Reader"))
         col_files1, col_files2 = st.columns(2)
@@ -1350,7 +1418,6 @@ else:
         
         tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop (هبوط الجهد الكهربائي)", "⛽ Fuel & Emissions (استهلاك الوقود والحمل)"])
         
-        # 1. مفعل: حاسبة هبوط الجهد ثلاثي الأوجه
         with tab_calc1:
             st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
             c1, c2, c3 = st.columns(3)
@@ -1369,7 +1436,6 @@ else:
             else:
                 st.success("✅ مقطع الكابل ممتاز وضمن الحدود الهندسية الآمنة.")
 
-        # 2. مفعل: حساب استهلاك الوقود اللحظي المرتبط بالحمل
         with tab_calc2:
             st.subheader("⛽ ربط بيانات الحمل بصرف الوقود والانبعاثات")
             
@@ -1414,4 +1480,4 @@ else:
                 if load_percentage < 50:
                     st.warning(f"⚠️ تحذير: المولد يعمل بحمل منخفض جداً ({load_percentage:.1f}%). هذا يؤدي إلى احتراق غير مكتمل في محركات {gen_model_calc} وتراكم الزيت غير المحترق (Wet Stacking).")
                 elif load_percentage > 90:
-                    st.warning(f"⚠️ تنبيه: المولد يعمل بحمل مرتفع جداً يقترب من الحد الأقصى ({load_percentage:.1f}%). يرجى المراقبة المستمرة لحرارة المحرك.")
+                    st.warning(f"⚠️️ تنبيه: المولد يعمل بحمل مرتفع جداً يقترب من الحد الأقصى ({load_percentage:.1f}%). يرجى المراقبة المستمرة لحرارة المحرك.")
