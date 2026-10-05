@@ -684,7 +684,7 @@ def edit_generator_modal(main_site, sub_site, gen_key):
     eng = gen_data.get("calib_engine", {})
     st.markdown(f"### ⚙️ {gen_key} - Site: {sub_site}")
     tech_name = st.text_input("اسم الفني / Technician Name:", value="فني الصيانة المناوب")
-    tab1, tab2, tab3 = st.tabs(["🏷️ Basic Data", "⚡ Electrical", "🔧 Engine"])
+    tab1, tab2, tab3 = st.tabs(["🏷️️ Basic Data", "⚡ Electrical", "🔧 Engine"])
     with tab1:
         new_model = st.text_input("Model / الطراز", value=gen_data.get("model", ""))
         new_run_hours = st.number_input("Run Hours / ساعات التشغيل", min_value=0.0, value=float(gen_data.get("run_hours", 0.0)))
@@ -736,6 +736,7 @@ def edit_generator_modal(main_site, sub_site, gen_key):
                     "ambient_temp": ambient_t
                 }
             }
+            # حفظ البيانات تلقائياً في Supabase عند التعديل
             if supabase:
                 try:
                     payload = {
@@ -849,6 +850,7 @@ else:
                                 "calib_elec": {"v_nominal": 400.0, "v_measured": 400.0, "freq_nominal": 50.0, "freq_measured": 50.0, "current_max": 200.0, "current_measured": 100.0, "pf": 0.8, "ct_ratio": "200/5"},
                                 "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0, "ambient_temp": 43.0}
                             }
+                            # حفظ البيانات في Supabase أيضاً
                             if supabase:
                                 try:
                                     supabase.table("generators_data").upsert({
@@ -899,6 +901,7 @@ else:
                 if st.button("📝 Open Calibration Modal"):
                     edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
             
+            # === قائمة تحرير عناوين وبيانات المولدات (محدثة بالكامل مع الحفظ الفعلي في Supabase) ===
             with st.expander("🛠️ قائمة تحرير عناوين بيانات المولدات وتحديث Supabase", expanded=False):
                 st.markdown(f"**تسجيل وتحرير بيانات المولد: {selected_gen}**")
                 gen_info_edit = st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
@@ -964,6 +967,7 @@ else:
                                     pass
                             st.success(f"🗑️ تم مسح بيانات المولد {selected_gen} نهائياً!")
                             st.rerun()
+            # === نهاية التعديل المضاف ===
             
             gen_info = st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
             calib_e = gen_info.get("calib_elec", {})
@@ -974,7 +978,6 @@ else:
             m_c2.metric("Run Hours / Target", f"{gen_info['run_hours']} hrs", f"Target: {gen_info['target']} hrs")
             m_c3.metric("Measured Voltage", f"{calib_e.get('v_measured', 0)} V", f"Nominal: {calib_e.get('v_nominal', 0)} V")
             m_c4.metric("Coolant / Ambient Temp", f"{calib_m.get('coolant_temp_c', 0)} °C", f"Ambient: {calib_m.get('ambient_temp', 0)} °C")
-            
             alarm_messages = []
             if abs(calib_e.get("v_measured", 400) - calib_e.get("v_nominal", 400)) > 20:
                 alarm_messages.append(f"Voltage Deviation on {selected_gen}: Measured {calib_e.get('v_measured')} V!")
@@ -984,12 +987,10 @@ else:
                 alarm_messages.append(f"High Coolant Temp on {selected_gen}: {calib_m.get('coolant_temp_c')} °C!")
             if calib_m.get("oil_press_bar", 5) <= 1.8:
                 alarm_messages.append(f"Low Oil Pressure on {selected_gen}!")
-            
             if alarm_messages:
                 for msg in alarm_messages:
                     st.error(f"🚨 {msg}")
                 play_audio(". ".join(alarm_messages), loop=True)
-                
             parts_key = f"parts_{selected_main_site}_{selected_sub_site}_{selected_gen}"
             if parts_key not in st.session_state:
                 st.session_state[parts_key] = [
@@ -1092,6 +1093,7 @@ else:
             with col_up2:
                 parts_img_file = st.file_uploader("Upload Maintenance Photo", type=["png", "jpg", "jpeg"])
             
+            # === دالة التقرير الشامل المحدثة ===
             def generate_full_pdf_bytes():
                 import matplotlib.pyplot as plt
                 temp_logo_path = None
@@ -1106,6 +1108,7 @@ else:
                     plt.close(fig)
                     temp_charts.append(p)
                     return p
+                # --- رسم 1: استهلاك القطع ---
                 fig1, ax1 = plt.subplots(figsize=(6,3.5))
                 colors_mpl = ['green' if x<70 else 'orange' if x<90 else 'red' for x in df_result["نسبة الاستهلاك (%)"]]
                 ax1.barh(df_result["قطع الغيار / الفلاتر"], df_result["نسبة الاستهلاك (%)"], color=colors_mpl)
@@ -1113,12 +1116,12 @@ else:
                 ax1.set_title(f"Parts Usage - {selected_gen}")
                 ax1.invert_yaxis()
                 chart1_path = save_temp_chart(fig1)
-                
+                # --- رسم 2: ساعات التشغيل ---
                 fig2, ax2 = plt.subplots(figsize=(3.5,3.5))
                 ax2.pie([current_h, rem_h], labels=['Elapsed', 'Remaining'], autopct='%1.1f%%', colors=["#182b49", "#28a745"])
                 ax2.set_title("Run Hours Ratio")
                 chart2_path = save_temp_chart(fig2)
-                
+                # --- رسم 3 و 4: منحنى الوقود من جدول CSV ---
                 ft = get_fuel_table_from_csv(st.session_state.get("fuel_csv_upload", None) if "fuel_csv_upload" in st.session_state and st.session_state.fuel_csv_upload else None)
                 loads = sorted(ft.keys())
                 fig3, ax3 = plt.subplots(figsize=(6,3.2))
@@ -1128,11 +1131,10 @@ else:
                 ax3.plot(loads, [ft[l]["AVG"] for l in loads], marker='d', linestyle='--', label='AVG')
                 ax3.set_xlabel("Load %")
                 ax3.set_ylabel("SFC L/kWh")
-                ax3.set_title("Fuel SFC Curve")
+                ax3.set_title("Fuel SFC Curve - From Your CSV")
                 ax3.legend(fontsize=7)
                 ax3.grid(True, alpha=0.3)
                 chart3_path = save_temp_chart(fig3)
-                
                 fig4, ax4 = plt.subplots(figsize=(6,2.5))
                 ax4.plot(loads, [ft[l]["eff"] for l in loads], marker='o', color='green')
                 ax4.set_xlabel("Load %")
@@ -1141,6 +1143,7 @@ else:
                 ax4.grid(True, alpha=0.3)
                 chart4_path = save_temp_chart(fig4)
                 
+                # === بناء PDF 3 صفحات ===
                 pdf = ComprehensivePDF(
                     "COMPREHENSIVE GENERATOR REPORT - WITH FUEL CURVE & MAINTENANCE",
                     logo_path=temp_logo_path,
@@ -1149,26 +1152,42 @@ else:
                     sub_site=selected_sub_site
                 )
                 pdf.add_page()
+                # صفحة 1: بيانات المولد والموقع في الترويسة
                 pdf.set_fill_color(245, 247, 250)
                 pdf.rect(10, 35, 190, 60, "F")
                 pdf.set_xy(12, 37)
                 pdf.set_font("Helvetica", "B", 10)
                 pdf.set_text_color(24, 43, 73)
                 pdf.cell(0, 6, f"Site Address (In Header): {sanitize_latin_only(current_site_address)}", ln=True)
+                
+                # إضافة Site Name بشكل صريح
                 pdf.set_x(12)
                 pdf.set_font("Helvetica", "B", 9)
                 pdf.cell(0, 5, f"Site Name: {sanitize_latin_only(selected_sub_site)} | Main Region: {sanitize_latin_only(selected_main_site)}", ln=True)
+                
                 pdf.set_x(12)
                 pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | {gen_info['kw']} kW | Load: {gen_info['load']} kW", ln=True)
                 pdf.set_x(12)
                 pdf.cell(0, 5, f"Run Hours: {gen_info['run_hours']} hrs | Target: {gen_info['target']} hrs", ln=True)
+                # إضافة قراءات الحساسات الكهربائية والميكانيكية مفصلة
                 pdf.set_x(12)
                 pdf.set_font("Helvetica", "B", 8)
                 pdf.cell(0, 5, f"Electrical Sensors: Voltage: {calib_e.get('v_measured', 0)}V | Freq: {calib_e.get('freq_measured', 0)}Hz | Current: {calib_e.get('current_measured', 0)}A | PF: {calib_e.get('pf', 0)}", ln=True)
                 pdf.set_x(12)
                 pdf.cell(0, 5, f"Mechanical Sensors: Oil Press: {calib_m.get('oil_press_bar', 0)}Bar | Coolant Temp: {calib_m.get('coolant_temp_c', 0)}C | RPM: {calib_m.get('rpm', 0)} | Battery: {calib_m.get('battery_v', 0)}V", ln=True)
+                pdf.set_x(12)
+                pdf.cell(0, 5, f"Fuel SFC Now: {ft[75]['AVG'] if gen_info['load']/max(gen_info['kw'],1)*100>60 else ft[50]['AVG']} L/kWh | Efficiency: {ft[75]['eff'] if gen_info['load']/max(gen_info['kw'],1)*100>60 else ft[50]['eff']}% | CO2 Factor: 2.68 kg/L", ln=True)
+                
+                # إبراز توصيات تغيير الزيت
+                amb_temp_val = calib_m.get('ambient_temp', 43.0)
+                pdf.ln(1)
+                pdf.set_x(12)
+                pdf.set_font("Helvetica", "B", 8)
+                pdf.set_text_color(200, 30, 30)
+                pdf.cell(0, 5, f"Oil Change & Recommendation [Ambient {amb_temp_val} C]: {'20W50' if amb_temp_val>=45 else '15W40'}", ln=True)
                 pdf.ln(4)
                 
+                # جدول الصيانة الـ 14 وحدة
                 headers_pdf = ["#", "Part / Service Name", "Lifespan", "Used", "Remain", "Status"]
                 widths = [10, 60, 25, 25, 25, 45]
                 pdf.set_font("Helvetica", "B", 8)
@@ -1190,9 +1209,10 @@ else:
                     pdf.cell(widths[5], 5, sanitize_latin_only(str(row["حالة التنبيه"])), border=1, fill=fill)
                     pdf.ln()
                 
+                # صفحة 2: كل الرسوم البيانية
                 pdf.add_page()
                 pdf.set_font("Helvetica", "B", 11)
-                pdf.cell(0, 8, "Page 2: Performance Charts & Diagnostics", ln=True, align="C")
+                pdf.cell(0, 8, "Page 2: Performance Charts - Parts Usage, Run Hours, Fuel & Efficiency", ln=True, align="C")
                 if os.path.exists(chart1_path):
                     pdf.image(chart1_path, x=10, y=20, w=90)
                 if os.path.exists(chart2_path):
@@ -1201,10 +1221,65 @@ else:
                     pdf.image(chart3_path, x=10, y=95, w=90)
                 if os.path.exists(chart4_path):
                     pdf.image(chart4_path, x=110, y=95, w=90)
+                pdf.set_xy(10, 165)
+                pdf.set_font("Helvetica", "", 7)
+                pdf.multi_cell(0, 4, f"Site Address in Header Footer: {sanitize_latin_only(current_site_address)} | Analysis: Low load (<50%) increases SFC from {ft[100]['AVG']} to {ft[25]['AVG']} L/kWh (+29% waste). Recommendation: Keep load >70% for {ft[75]['eff']}% efficiency.")
                 
+                # صفحة 3: جدول الوقود التفصيلي
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 11)
+                pdf.cell(0, 8, "Page 3: Detailed Fuel Table From Your CSV - Predictive Maintenance", ln=True, align="C")
+                pdf.ln(2)
+                pdf.set_font("Helvetica", "B", 8)
+                pdf.set_fill_color(24,43,73)
+                pdf.set_text_color(255,255,255)
+                f_headers = ["Load %", "CAT g/kWh", "Cummins", "Perkins", "SFC L/kWh", "Eff %", "CO2 kg/L"]
+                
+                # تعيين عرض الأعمدة السبعة بدقة لترويسة وجسم الجدول (الإجمالي 190mm)
+                f_widths = [15, 30, 30, 30, 25, 25, 35]
+                for h, w in zip(f_headers, f_widths):
+                    pdf.cell(w, 6, h, border=1, fill=True, align="C")
+                pdf.ln()
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_text_color(0, 0, 0)
+                
+                for load in sorted(ft.keys(), reverse=True):
+                    pdf.cell(f_widths[0], 5, f"{load}%", border=1, align="C")
+                    
+                    cat_val = ft[load].get("g_cat")
+                    if cat_val is None and "CAT C32" in ft[load]:
+                        cat_val = int(ft[load]["CAT C32"] * 850)
+                    pdf.cell(f_widths[1], 5, str(cat_val if cat_val is not None else "-"), border=1, align="C")
+                    
+                    cum_val = ft[load].get("g_cummins")
+                    if cum_val is None and "Cummins KTA50" in ft[load]:
+                        cum_val = int(ft[load]["Cummins KTA50"] * 850)
+                    pdf.cell(f_widths[2], 5, str(cum_val if cum_val is not None else "-"), border=1, align="C")
+                    
+                    per_val = ft[load].get("g_perkins")
+                    if per_val is None and "Perkins 2506" in ft[load]:
+                        per_val = int(ft[load]["Perkins 2506"] * 850)
+                    pdf.cell(f_widths[3], 5, str(per_val if per_val is not None else "-"), border=1, align="C")
+                    
+                    avg_val = ft[load].get("AVG", "-")
+                    pdf.cell(f_widths[4], 5, str(avg_val), border=1, align="C")
+                    
+                    eff_val = ft[load].get("eff", "-")
+                    pdf.cell(f_widths[5], 5, f"{eff_val}%" if eff_val != "-" else "-", border=1, align="C")
+                    
+                    pdf.cell(f_widths[6], 5, "2.68", border=1, align="C")
+                    pdf.ln()
+                    
+                # تنظيف الملفات المؤقتة
+                for p in temp_charts:
+                    try:
+                        if os.path.exists(p):
+                            os.remove(p)
+                    except Exception:
+                        pass
+                        
                 pdf_out = pdf.output(dest="S")
                 return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
-
             st.download_button(
                 label=f"🖨️ Download COMPREHENSIVE Report ({selected_gen}) - 3 Pages With Fuel Curve & Site Address",
                 data=generate_full_pdf_bytes(),
@@ -1240,8 +1315,8 @@ else:
         st.title("📊 " + ("المتابعة اليومية وتقارير الإدارة" if L == "ar" else "Daily Monitoring & Tech Reminders"))
         today_str = datetime.now().strftime("%Y-%m-%d")
         
-        # التبويبات المحدثة للنظام 3 مع إضافة قائمة الفني وتوليد رسائل الواتساب الذكية التلقائية للإنذارات
-        tab_mgr1, tab_mgr2, tab_mgr3 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders", "🔔 جدول الصيانة التنبؤية وإنذارات واتساب الذكية"])
+        # التبويبات المحدثة للنظام 3 مع إدخال الفني وصيانة التنبؤات وواتساب
+        tab_mgr1, tab_mgr2, tab_mgr3 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders", "🔔 جدول الصيانة التنبؤية وإنذارات واتساب للفني"])
         
         with tab_mgr1:
             today_logs = [log for log in st.session_state.daily_logs if log.get("date") == today_str]
@@ -1264,42 +1339,42 @@ else:
             ''', unsafe_allow_html=True)
             
         with tab_mgr3:
-            st.subheader("⚙️ إدخال بيانات الفني وربط إنذارات الصيانة التنبؤية برسائل واتساب التلقائية الذكية")
-            st.markdown("تخصيص بيانات مهندس أو فني الصيانة وربطها برقم الواتساب لإرسال إخطار طوارئ فوري مع معلومات المولد والموقع:")
+            st.subheader("⚙️ إدارة وفد وطاقم الصيانة وتنبيهات واتساب التلقائية الذكية")
+            st.markdown("إدخال بيانات الفني/مهندس الصيانة المسؤول لتلقي التقارير الفنية وإنذارات الصيانة التنبؤية:")
             
-            col_tech1, col_tech2 = st.columns(2)
-            technician_name_input = col_tech1.text_input("اسم الفني أو مهندس الصيانة المسؤول:", value="م. أحمد فضل الله")
-            technician_whatsapp_num = col_tech2.text_input("رقم واتساب الفني للتنبيهات (مع مفتاح الدولة):", value="249912345678")
+            col_tech_in1, col_tech_in2 = st.columns(2)
+            technician_name = col_tech_in1.text_input("اسم الفني أو مهندس الصيانة المسؤول:", value="م. عثمان آدم أدومة")
+            technician_whatsapp = col_tech_in2.text_input("رقم واتساب الفني (مع مفتاح الدولة بدون رموز):", value="249912345678")
             
-            st.write("---")
-            st.markdown("##### 📋 جدول رصد الأخطاء والتنبيهات النشطة للمولدات والآليات:")
-            
-            # جدول تنبؤي تفصيلي يوضح المولد، الموقع، والعطل/التنبيه
-            active_alarms_data = [
-                {"معرف المولد": "G1", "الموقع": "الخرطوم - كافوري", "العطل / الإنذار الوارد": "ارتفاع حرارة مياه التبريد (Coolant Temp >= 95°C)", "الحالة": "إنذار طوارئ نشط"},
-                {"معرف المولد": "G2", "الموقع": "الخرطوم - كافوري", "العطل / الإنذار الوارد": "اقتراب موعد صيانة فلتر الزيت (ساعات التشغيل قاربت الهدف)", "الحالة": "صيانة تنبؤية"},
-                {"معرف المولد": "WIC 10", "الموقع": "غرفة التبريد الرئيسية", "العطل / الإنذار الوارد": "انحراف درجة الحرارة عن نقطة الضبط", "الحالة": "تحذير تشغيلي"}
+            # جدول الصيانة التنبؤية وساعات التشغيل الافتراضية للمولدات والآليات
+            predictive_maintenance_data = [
+                {"المعدة / المولد": "G1 - Perkins 410kVA", "القطعة / الخدمة": "فلتر الزيت (Oil Filter)", "الساعات الافتراضية": 250, "الساعات المنقضية": 240, "المتبقي": 10, "الحالة": "قريب جداً من موعد الصيانة"},
+                {"المعدة / المولد": "G1 - Perkins 410kVA", "القطعة / الخدمة": "فلتر الوقود الأساسي", "الساعات الافتراضية": 500, "الساعات المنقضية": 485, "المتبقي": 15, "الحالة": "حرج / إنذار مبكر"},
+                {"المعدة / المولد": "G2 - Cummins 250kVA", "القطعة / الخدمة": "سير المروحة (Fan Belt)", "الساعات الافتراضية": 2000, "الساعات المنقضية": 1200, "المتبقي": 800, "الحالة": "طبيعي"},
+                {"المعدة / المولد": "غرفة التبريد WIC 10", "القطعة / الخدمة": "صيانة الضاغط (Compressor)", "الساعات الافتراضية": 8000, "الساعات المنقضية": 7950, "المتبقي": 50, "الحالة": "حرج / إنذار صيانة تنبؤية"}
             ]
-            df_active_alarms = pd.DataFrame(active_alarms_data)
-            st.dataframe(df_active_alarms, use_container_width=True)
+            df_pm = pd.DataFrame(predictive_maintenance_data)
+            st.dataframe(df_pm, use_container_width=True)
             
-            # صياغة رسالة واتساب نصية ذكية تلقائية دقيقة تتضمن بيانات الفني، المولد، الموقع، والعطل
-            selected_alarm_gen = st.selectbox("اختر المولد أو المعدة المراد إرسال إخطار طوارئ بشأنها:", [row["معرف المولد"] + " (" + row["الموقع"] + ")" for index, row in df_active_alarms.iterrows()])
+            # محاكاة الإنذار الصوتي بالتزامن مع التقرير
+            col_al_s1, col_al_s2 = st.columns([1, 2])
+            with col_al_s1:
+                if st.button("🔔 تشغيل جرس الإنذار الصوتي والتنبيه"):
+                    play_audio("تنبيه صيانة عاجل. يرجى مراجعة الجدول وتحويل التقرير الفني.", loop=False)
+                    st.warning("🚨 تم إطلاق جرس الإنذار الصوتي وتوليد التقرير الفني بالتزامن!")
             
-            # استخراج تفاصيل العنصر المختار لتضمينه في الرسالة التلقائية الذكية
-            matching_row = next((item for item in active_alarms_data if item["معرف المولد"] in selected_alarm_gen), active_alarms_data[0])
+            # تكوين رسالة واتساب ذكية تلقائية مخصصة للفني
+            default_smart_msg = f"🚨 *تقرير فني وإنذار صيانة تنبؤية*\n\nإلى الزميل العزيز: {technician_name}\nتم رصد حالات استهلاك حرجة لساعات التشغيل الافتراضية للمولدات والآليات:\n- اقتراب موعد صيانة فلاتر G1.\n- مطلوب فحص جرس الإنذار والتقرير المرفق.\n\nيرجى المباشرة فوراً."
             
-            default_auto_alarm_msg = f"🚨 *إخطار طوارئ صيانة ذكي - Addoma Trading Services*\n\nعجالة موجهة إلى الفني: *{technician_name_input}*\n\n- *معرف المولد/المعدة:* {matching_row['معرف المولد']}\n- *موقع العمل:* {matching_row['الموقع']}\n- *تفاصيل العطل/التنبيه:* {matching_row['العطل / الإنذار الوارد']}\n- *الوقت:* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\nيرجى التوجه الفوري للموقع لاتخاذ الإجراء الهندسي اللازم."
+            smart_message_input = st.text_area("نص رسالة الواتساب التلقائية الموجهة للفني:", value=default_smart_msg)
             
-            smart_alarm_msg_input = st.text_area("نص رسالة إخطار الطوارئ الذكية التلقائية (قابلة للتعديل):", value=default_auto_alarm_msg)
-            
-            encoded_alarm_msg = urllib.parse.quote(smart_alarm_msg_input)
-            smart_alarm_whatsapp_url = f"https://wa.me/{technician_whatsapp_num}?text={encoded_alarm_msg}"
+            encoded_smart_msg = urllib.parse.quote(smart_message_input)
+            smart_whatsapp_url = f"https://wa.me/{technician_whatsapp}?text={encoded_smart_msg}"
             
             st.markdown(f'''
-                <a href="{smart_alarm_whatsapp_url}" target="_blank">
-                    <button style="background-color:#25D366; color:white; border:none; padding:14px 24px; border-radius:6px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;">
-                        🚨 إرسال إخطار طوارئ واتساب ذكي وتلقائي للفني ({technician_name_input})
+                <a href="{smart_whatsapp_url}" target="_blank">
+                    <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;">
+                        💬 إرسال التقرير الفني والإنذار التلقائي عبر واتساب إلى الفني ({technician_name})
                     </button>
                 </a>
             ''', unsafe_allow_html=True)
