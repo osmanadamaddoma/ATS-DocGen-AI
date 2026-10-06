@@ -56,11 +56,11 @@ if "current_page" not in st.session_state:
 # تحديث هيكل قاعدة البيانات المصغرة ليدعم القوائم الرئيسية والفرعية
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
-        "الخرطوم (القائمة الرئيسية)": {
-            "الموقع الرئيسي - كافوري (موقع فرعي)": {
-                "address": "الخرطوم - المنطقة الصناعية - كافوري",
-                "technician_name": "م. عثمان آدم أدومة",
-                "technician_whatsapp": "249912345678",
+        "(القائمة الرئيسية)": {
+            "(موقع فرعي)": {
+                "address": " ",
+                "technician_name": "                ",
+                "technician_whatsapp": "           ",
                 "generators": {
                     "G1": {
                         "model": "Perkins 410 kVA",
