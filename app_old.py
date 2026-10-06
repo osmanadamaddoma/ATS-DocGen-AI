@@ -22,7 +22,6 @@ import streamlit as st
 import extra_streamlit_components as stx # مكتبة إدارة الكوكيز المضافة
 from google import genai
 from gtts import gTTS
-import pywhatkit as kit # <-- تم إضافة المكتبة هنا
 
 # محاولة استيراد مكتبة Supabase
 try:
