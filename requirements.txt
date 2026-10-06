@@ -21,3 +21,4 @@ PyGithub
 pytz
 python-dotenv
 PyGithub
+pywhatkit
