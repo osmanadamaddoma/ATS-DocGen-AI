@@ -1,3 +1,6 @@
+![ATS ENG Promo Banner](banner.jpg)
+
+📱 **Scan QR to try Demo:** https://qrco.de/bh2wH9 | 🎬 [Watch Promo Video](promo.mp4)
 # Industrial Generator Predictive Maintenance AI
 
 An AI-driven predictive maintenance application designed to monitor industrial generators and forecast mechanical or electrical failures before they occur.
