@@ -22,19 +22,18 @@ import streamlit as st
 import extra_streamlit_components as stx # مكتبة إدارة الكوكيز المضافة
 from google import genai
 from gtts import gTTS
+import pywhatkit as kit # <-- تم إضافة المكتبة هنا
 
 # محاولة استيراد مكتبة Supabase
 try:
     from supabase import create_client, Client
 except ImportError:
     create_client = None
-
 # استيراد مكتبة قاعدة بيانات إنترنت الأشياء الحية (IoT Database)
 try:
     from influxdb_client import InfluxDBClient
 except ImportError:
     InfluxDBClient = None
-
 # محاولة استيراد مكتبة قراءة الباركود
 try:
     from pyzbar.pyzbar import decode as decode_qr
@@ -56,7 +55,6 @@ st.set_page_config(
     page_icon="🔐",
     layout="wide",
 )
-
 # التهيئة المبدئية لمتغيرات الجلسة (Session State)
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
@@ -65,7 +63,6 @@ if "lang" not in st.session_state:
 # تحديد الصفحة الافتراضية عند الدخول
 if "current_page" not in st.session_state:
     st.session_state.current_page = "chat"
-
 # تحديث هيكل قاعدة البيانات المصغرة ليدعم القوائم الرئيسية والفرعية
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
@@ -115,7 +112,6 @@ if "sites_data" not in st.session_state:
             }
         }
     }
-
 # سجل الإدخالات اليومية وتتبع القراءات
 if "daily_logs" not in st.session_state:
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -133,17 +129,14 @@ if "daily_logs" not in st.session_state:
             "status": "طبيعي"
         }
     ]
-
 # جلب مفتاح Gemini بأمان من الإعدادات
 gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not gemini_key and "supabase" in st.secrets:
     gemini_key = st.secrets["supabase"].get("GEMINI_API_KEY")
 if not gemini_key:
     st.warning("⚠️ لم يتم العثور على مفتاح GEMINI_API_KEY. يرجى إضافته في st.secrets.")
-
 # تهيئة عميل Gemini API
 client = genai.Client(api_key=gemini_key) if gemini_key else None
-
 # إعدادات قاعدة بيانات Supabase للاتصال بتطبيقاتي
 supabase = None
 if create_client:
@@ -163,7 +156,6 @@ if create_client:
         st.info("💡 لم يتم العثور على مفاتيح Supabase. يرجى إضافتها (SUPABASE_URL و SUPABASE_KEY) في ملف st.secrets.")
 else:
     st.warning("⚠️ مكتبة supabase غير مثبتة. يرجى تثبيتها باستخدام pip install supabase")
-
 # دالة تشغيل الصوت المحدثة مع دعم اللغتين خيار الكتم والتكرار المستمر للانذارات
 def play_audio(text, lang='ar', loop=False):
     """تحويل النص إلى صوت باستخدام gTTS وتشغيله إن لم يتم تفعيل Mute مع دعم التكرار"""
@@ -189,7 +181,6 @@ def play_audio(text, lang='ar', loop=False):
             st.audio(audio_data, format='audio/mp3', autoplay=True)
     except Exception as e:
         st.error(f"حدث خطأ في تشغيل الصوت: {e}")
-
 @st.cache_data(ttl=3600)
 def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
     """دالة استدعاء الذكاء الاصطناعي مع معالجة حزمة الضغط العالي (503) وإعادة المحاولة ودعم ثنائية اللغة"""
@@ -226,7 +217,6 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="ar"):
                 else:
                     return "⚠️ High server load (503). Please retry in a few seconds." if language == "en" else "⚠️ الخادم يمر بضغط عالٍ حالياً (503). يرجى المحاولة مرة أخرى."
             return f"❌ Error: {err_msg}"
-
 # =========================================================
 # 1. دوال النظام المساعدة وتصميم تقرير الـ PDF المطور الشامل
 # =========================================================
@@ -235,7 +225,6 @@ def sanitize_latin_only(text):
         text = str(text)
     clean_text = re.sub(r"[^\x00-\x7F]+", "", text).strip()
     return clean_text if clean_text else "N/A"
-
 class ComprehensivePDF(FPDF):
     def __init__(
         self,
@@ -251,7 +240,6 @@ class ComprehensivePDF(FPDF):
         self.site_address = site_address
         self.main_site = main_site
         self.sub_site = sub_site
-
     def header(self):
         self.set_fill_color(24, 43, 73)
         self.rect(0, 0, 210, 8, "F")
@@ -285,7 +273,6 @@ class ComprehensivePDF(FPDF):
         self.set_line_width(0.5)
         self.line(10, 30, 200, 30)
         self.ln(10)
-
     def footer(self):
         self.set_y(-15)
         self.set_draw_color(200, 200, 200)
@@ -306,7 +293,6 @@ class ComprehensivePDF(FPDF):
             f"Page {self.page_no()} | Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Site: {sanitize_latin_only(self.site_address)}",
             align="C",
         )
-
 # =========================================================
 # 1.5 دوال الربط بقاعدة البيانات الحية وإنترنت الأشياء (IoT)
 # =========================================================
@@ -343,7 +329,6 @@ def fetch_live_iot_data():
         return pd.DataFrame()
     except Exception:
         return pd.DataFrame()
-
 # =========================================================
 # 1.8 أدوات وحاسبات هندسية مستحدثة (Engineering Smart Tools)
 # =========================================================
@@ -353,7 +338,6 @@ def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85)
     v_drop = (math.sqrt(3) * current_a * distance_m * rho_copper * cos_phi) / cable_mm2
     v_drop_pct = (v_drop / 400.0) * 100
     return round(v_drop, 2), round(v_drop_pct, 2)
-
 def get_fuel_table_from_csv(uploaded_csv=None):
     """قراءة جدول الوقود من ملف CSV المرفوع او استخدام الجدول الداخلي"""
     default_table = {
@@ -392,7 +376,6 @@ def get_fuel_table_from_csv(uploaded_csv=None):
             print(f"CSV parse error: {e}")
             return default_table
     return default_table
-
 def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perkins", kw_capacity=None, fuel_table=None):
     """تقدير استهلاك الديزل والانبعاثات - نسخة ذكية تقرأ من جدول CSV حسب نسبة التحميل ونوع المحرك"""
     if fuel_table is None:
@@ -430,7 +413,6 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perk
     liters = kw_load * sfc * run_hours
     co2_kg = liters * 2.68
     return round(liters, 1), round(co2_kg, 1), round(sfc, 3), round(eff, 1)
-
 # =========================================================
 # 2. نظام الاشتراكات الموحد والباقات (مع إدارة الكوكيز)
 # =========================================================
@@ -469,12 +451,10 @@ if supabase:
                 }
     except Exception as e:
         print(f"Load subscriptions error: {e}")
-
 def get_cookie_manager():
     if "cookie_manager" not in st.session_state:
         st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager_persistent_final_v3")
     return st.session_state["cookie_manager"]
-
 cookie_manager = get_cookie_manager()
 query_params = st.query_params
 code_from_url = query_params.get("code", None)
@@ -485,11 +465,9 @@ try:
         saved_code = cookie_manager.get(cookie="activation_code")
 except:
     saved_code = None
-
 final_saved = code_from_url if code_from_url else saved_code
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-
 if final_saved and not st.session_state.authenticated:
     clean_saved = str(final_saved).strip().upper()
     if clean_saved in CLIENTS_DATABASE:
@@ -517,13 +495,11 @@ if final_saved and not st.session_state.authenticated:
                         break
             except:
                 pass
-
 # --- خيار تحديد اللغة في الشريط الجانبي ---
 st.sidebar.subheader("🌐 Language / اللغة")
 selected_lang = st.sidebar.radio("Select Language:", ["العربية (Arabic)", "English"], index=0 if st.session_state.lang == "ar" else 1)
 st.session_state.lang = "ar" if "العربية" in selected_lang else "en"
 L = st.session_state.lang
-
 TXT = {
     "ar": {
         "title": "🔐 بوابة تفعيل النظام الموحد",
@@ -535,7 +511,7 @@ TXT = {
         "nav_status": "🟢 النظام متصل ومفعل",
         "btn_chat": "💬 المساعد الذكي الهندسي",
         "btn_dashboard": "📊 لوحة تحكم الأنظمة",
-        "btn_apps": "🛠️ التطبيقات الهندسية الشاملة",
+        "btn_apps": "🛠️️ التطبيقات الهندسية الشاملة",
         "btn_logout": "🚪 تسجيل الخروج / مسح التفعيل",
         "client": "👤 العميل:",
         "plan": "📦 الباقة:",
@@ -564,7 +540,6 @@ TXT = {
         "choose_app": "Select System Module:"
     }
 }[L]
-
 if not st.session_state.authenticated:
     st.title(TXT["title"])
     user_code = st.sidebar.text_input(TXT["code_input"], type="password")
@@ -625,13 +600,11 @@ else:
             if "active_code" in st.session_state:
                 del st.session_state["active_code"]
             st.rerun()
-
 input_code = st.session_state.get("active_code", "")
 is_pro = False
 client_name = "Visitor"
 plan_type = "N/A"
 days_left = 0
-
 if input_code in CLIENTS_DATABASE:
     data = CLIENTS_DATABASE[input_code]
     client_name = data["name"]
@@ -657,17 +630,13 @@ if input_code in CLIENTS_DATABASE:
         if "code" in st.query_params:
             del st.query_params["code"]
         st.stop()
-
 if not is_pro:
     st.warning(TXT["warning_auth"])
     st.stop()
-
 st.sidebar.divider()
 st.sidebar.markdown(TXT["app_selection"])
-
 def on_app_change():
     st.session_state.current_page = "main_apps"
-
 apps_list_ar = [
     "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
     "🎛️ 2. غرفة التحكم والتشغيل عن بُعد (Remote Control Center)",
@@ -684,14 +653,12 @@ apps_list_en = [
     "🔍 5. Equipment Inspection (WIC & Heavy Duty)",
     "🧮 6. Smart Electrical & Carbon Calculator"
 ]
-
 selected_app = st.sidebar.radio(
     TXT["choose_app"],
     apps_list_ar if L == "ar" else apps_list_en,
     on_change=on_app_change
 )
 st.sidebar.divider()
-
 @st.dialog("📝 إدخال وتعديل بيانات المولد والمعايرة" if L == "ar" else "📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
     gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
@@ -699,7 +666,7 @@ def edit_generator_modal(main_site, sub_site, gen_key):
     eng = gen_data.get("calib_engine", {})
     st.markdown(f"### ⚙️ {gen_key} - Site: {sub_site}")
     tech_name = st.text_input("اسم الفني / Technician Name:", value="فني الصيانة المناوب")
-    tab1, tab2, tab3 = st.tabs(["🏷️️ Basic Data", "⚡ Electrical", "🔧 Engine"])
+    tab1, tab2, tab3 = st.tabs(["🏷 Basic Data", "⚡ Electrical", "🔧 Engine"])
     with tab1:
         new_model = st.text_input("Model / الطراز", value=gen_data.get("model", ""))
         new_run_hours = st.number_input("Run Hours / ساعات التشغيل", min_value=0.0, value=float(gen_data.get("run_hours", 0.0)))
@@ -782,7 +749,6 @@ def edit_generator_modal(main_site, sub_site, gen_key):
             })
             st.success("✅ Saved successfully and synced to Supabase!")
             st.rerun()
-
 if st.session_state.current_page == "chat":
     st.title("🤖 " + ("المساعد الذكي الهندسي" if L == "ar" else "Smart AI Assistant"))
     st.caption("Addoma Trading Services - Industrial AI Engine")
@@ -809,7 +775,6 @@ if st.session_state.current_page == "chat":
                 response_text = f"Received query: '{user_query}'. Gemini API Key is missing in secrets."
             message_placeholder.markdown(response_text)
         st.session_state.messages.append({"role": "assistant", "content": response_text})
-
 elif st.session_state.current_page == "dashboard":
     st.title("📊 " + ("لوحة تحكم الأنظمة والمتابعة" if L == "ar" else "Systems Control Dashboard"))
     col1, col2, col3 = st.columns(3)
@@ -819,7 +784,6 @@ elif st.session_state.current_page == "dashboard":
     st.divider()
     st.subheader("Live Telemetry & Diagnostics Overview")
     st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
-
 else:
     if "1." in selected_app:
         st.title("⚙️ " + ("نظام الصيانة التنبؤية ومراقبة المولدات" if L == "ar" else "Predictive Maintenance & Genset Monitoring"))
@@ -1339,7 +1303,6 @@ else:
                 use_container_width=True,
                 type="primary"
             )
-
     elif "2." in selected_app:
         st.title("🎛️ " + ("غرفة التحكم والتشغيل عن بُعد" if L == "ar" else "Remote Control Center (IoT & Telemetry)"))
         df_iot = fetch_live_iot_data()
@@ -1363,7 +1326,6 @@ else:
         with rc3:
             if st.button("🔄 Reset Alarms", use_container_width=True):
                 st.info("DSE Panel Reset!")
-
     elif "3." in selected_app:
         st.title("📊 " + ("المتابعة اليومية وتقارير الإدارة" if L == "ar" else "Daily Monitoring & Tech Reminders"))
         today_str = datetime.now().strftime("%Y-%m-%d")
@@ -1392,135 +1354,63 @@ else:
             ''', unsafe_allow_html=True)
             
         with tab_mgr3:
-            st.subheader("⚙️ ربط الصيانة التنبؤية للمولدات والآليات وإنذارات واتساب الذكية")
-            st.markdown("متابعة عدد الساعات الافتراضية وتوليد رسالة واتساب نصية ذكية تلقائياً:")
-            
-            default_tech_name = "م. عثمان آدم أدومة"
-            default_whatsapp_num = "249912345678"
-            if 'selected_main_site' in locals() and 'selected_sub_site' in locals() and selected_main_site and selected_sub_site:
-                site_info = st.session_state.sites_data.get(selected_main_site, {}).get(selected_sub_site, {})
-                default_tech_name = site_info.get("technician_name", default_tech_name)
-                default_whatsapp_num = site_info.get("technician_whatsapp", default_whatsapp_num)
-            col_w_in1, col_w_in2 = st.columns(2)
-            assigned_tech_display = col_w_in1.text_input("اسم الفني أو المهندس المسؤول:", value=default_tech_name)
-            target_whatsapp_num = col_w_in2.text_input("رقم الواتساب المستهدف (مع مفتاح الدولة بدون رموز):", value=default_whatsapp_num)
-            clean_target_num = clean_phone_number(target_whatsapp_num)
-            
-            predictive_maintenance_data = [
-                {"المعدة / المولد": "G1 - Perkins 410kVA", "القطعة / الخدمة": "فلتر الزيت (Oil Filter)", "الساعات الافتراضية": 250, "الساعات المنقضية": 240, "المتبقي": 10, "الحالة": "قريب جداً من موعد الصيانة"},
-                {"المعدة / المولد": "G1 - Perkins 410kVA", "القطعة / الخدمة": "فلتر الوقود الأساسي", "الساعات الافتراضية": 500, "الساعات المنقضية": 485, "المتبقي": 15, "الحالة": "حرج / إنذار مبكر"},
-                {"المعدة / المولد": "G2 - Cummins 250kVA", "القطعة / الخدمة": "سير المروحة (Fan Belt)", "الساعات الافتراضية": 2000, "الساعات المنقضية": 1200, "المتبقي": 800, "الحالة": "طبيعي"},
-                {"المعدة / المولد": "غرفة التبريد WIC 10", "القطعة / الخدمة": "صيانة الضاغط (Compressor)", "الساعات الافتراضية": 8000, "الساعات المنقضية": 7950, "المتبقي": 50, "الحالة": "حرج / إنذار صيانة تنبؤية"}
-            ]
-            df_pm = pd.DataFrame(predictive_maintenance_data)
-            st.dataframe(df_pm, use_container_width=True)
-            
-            default_smart_msg = f"🚨 *إنذار صيانة تنبؤية وتنبيه تلقائي - Addoma Trading Services*\n\nإلى الزميل الفني / المهندس: {assigned_tech_display}\nمرحباً، تم رصد معدلات استهلاك ساعات التشغيل الافتراضية التالية للمولدات والآليات:\n- اقتراب موعد استبدال فلاتر G1 (متبقي ساعات قليلة).\n- الحاجة لجدولة صيانة عاجلة.\n\nيرجى اتخاذ الإجراء اللازم في أقرب وقت."
-            
-            smart_message_input = st.text_area("نص رسالة الواتساب الذكية التلقائية (قابلة للتعديل):", value=default_smart_msg)
-            
-            encoded_smart_msg = urllib.parse.quote(smart_message_input)
-            smart_whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_target_num}&text={encoded_smart_msg}"
-            
-            st.markdown(f'''
-                <a href="{smart_whatsapp_url}" target="_blank">
-                    <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;">
-                        💬 إرسال رسالة واتساب الذكية التلقائية للتنبيه والإنذار للفني ({assigned_tech_display})
-                    </button>
-                </a>
-            ''', unsafe_allow_html=True)
+            st.title("⚡ لوحة مراقبة المولدات - Addoma Trading Services")
 
-    elif "4." in selected_app:
-        st.title("🤖 " + ("المساعد الذكي والكتالوجات وقراءة الأكواد" if L == "ar" else "AI Diagnostics & Fault Code Reader"))
-        col_files1, col_files2 = st.columns(2)
-        with col_files1:
-            st.subheader("📚 Catalog Upload (PDF)")
-            manual_file = st.file_uploader("Upload Equipment Catalog", type=["pdf"])
-            if manual_file:
-                st.success("تم تحميل الكتالوج بنجاح.")
-        with col_files2:
-            st.subheader("📷 Barcode/QR Reader")
-            qr_file = st.file_uploader("Upload QR Code Image", type=["png", "jpg", "jpeg"])
-            if qr_file:
-                st.info("قارئ الباركود قيد المعالجة...")
-    
-    elif "5." in selected_app:
-        st.title("🔍 " + ("نظام فحص معدات التبريد (WIC 10 & WIC 40)" if L == "ar" else "Cold Room Inspection (WIC 10 & WIC 40)"))
-        st.markdown("### ❄️ نظام قراءة بيانات غرف التبريد والتجميد")
-        
-        col_wic1, col_wic2 = st.columns(2)
-        wic_unit = col_wic1.radio("اختر وحدة التبريد لفحصها:", ["غرفة التبريد نموذج WIC 10", "غرفة التبريد نموذج WIC 40"])
-        controller_type = col_wic2.selectbox("نوع المتحكم المستخدم (Controller):", ["Emerson", "Dixell"])
-        st.divider()
-        col_w1, col_w2, col_w3 = st.columns(3)
-        with col_w1:
-            current_temp = st.number_input("درجة الحرارة الحالية (°C):", value=-18.0)
-            set_point = st.number_input("نقطة الضبط (Set Point °C):", value=-20.0)
-        with col_w2:
-            refrigerant_press = st.number_input("ضغط وسيط التبريد (Bar):", value=2.5)
-            defrost_status = st.selectbox("حالة دورة الإذابة (Defrost):", ["إيقاف (Off)", "تعمل (On)", "خطأ/إنذار"])
-        with col_w3:
-            alarm_code = st.text_input("كود الإنذار (إن وجد):", placeholder="مثال: E1 أو HA")
-            
-        if st.button("💾 تسجيل وقراءة بيانات الفحص", type="primary"):
-            st.success(f"تم تسجيل قراءات الوحدة ({wic_unit}) ذات المتحكم ({controller_type}) بنجاح!")
-            if current_temp > set_point + 5:
-                st.warning(f"⚠️ تحذير: درجة الحرارة الحالية أعلى من المعدل الطبيعي بشكل ملحوظ. يرجى مراجعة حالة وسيط التبريد أو متحكم {controller_type}.")
-            if alarm_code:
-                st.error(f"🚨 تم تسجيل إنذار في النظام: {alarm_code}. سيتم تحويله للمساعد الذكي للتحليل.")
+            # بيانات تجريبية لمحاكاة حالة مولد
+            site_name = "مصنع التعدين"
+            gen_model = "Perkins 130 KVA"
+            controller = "DSE 7320 MKII"
+            status = "Alarm - Low Oil Pressure"
+            tech_name = "أحمد"
+            tech_phone = "+249912544637"
 
-    elif "6." in selected_app:
-        st.title("🧮 " + ("الحاسبة الهندسية للكهرباء والانبعاثات" if L == "ar" else "Smart Electrical & Carbon Calculator"))
-        
-        tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop (هبوط الجهد الكهربائي)", "⛽ Fuel & Emissions (استهلاك الوقود والحمل)"])
-        
-        with tab_calc1:
-            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
-            c1, c2, c3 = st.columns(3)
-            i_amp = c1.number_input("التيار المطلوب (Amperes / أمبير):", value=250.0)
-            dist_m = c2.number_input("طول الكابل (Meters / متر):", value=120.0)
-            c_size = c3.selectbox("مقطع الكابل (mm² / Cable Size):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4)
-            
-            v_drop, v_drop_pct = calculate_cable_voltage_drop(i_amp, dist_m, c_size)
-            
-            m_col1, m_col2 = st.columns(2)
-            m_col1.metric("فقد الجهد المحسوب (Voltage Drop)", f"{v_drop} V")
-            m_col2.metric("نسبة الهبوط (Voltage Drop %)", f"{v_drop_pct} %")
-            
-            if v_drop_pct > 4.0:
-                st.error("⚠️ تحذير: نسبة هبوط الجهد تتجاوز المسموح به معيارياً (4%)! يرجى زيادة مقطع الكابل.")
-            else:
-                st.success("✅ مقطع الكابل ممتاز وضمن الحدود الهندسية الآمنة.")
+            # عرض حالة المولد في الواجهة
+            st.subheader("حالة الموقع الحالي")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.info(f"**الموقع:** {site_name}\n\n**المولد:** {gen_model}")
+            with col2:
+                st.error(f"**حالة التحكم:** {controller}\n\n**الإنذار:** {status}")
 
-        with tab_calc2:
-            st.subheader("⛽ ربط بيانات الحمل بصرف الوقود والانبعاثات")
-            
-            uploaded_csv_calc = st.file_uploader("رفع جدول الوقود الخاص بك (اختياري - CSV):", type=["csv"], key="fuel_csv_calc")
-            fuel_table_loaded = get_fuel_table_from_csv(uploaded_csv_calc)
-            
-            col_c1, col_c2 = st.columns(2)
-            gen_model_calc = col_c1.selectbox("طراز المولد:", ["Perkins", "Cummins", "CAT"])
-            pump_type = col_c2.selectbox("نوع نظام طلمبة الوقود:", [
-                "طلمبة ديزل قلب عادية (ميكانيكية)", 
-                "حقن إلكتروني (MEUI/ECM)"
-            ])
-            
-            col_c3, col_c4, col_c5 = st.columns(3)
-            kw_capacity = col_c3.number_input("السعة الكلية للمولد (kW):", value=150.0, step=10.0)
-            current_load_kw = col_c4.number_input("إدخال وتحرير حمل المولد الحالي (kW):", value=100.0)
-            run_hours_calc = col_c5.number_input("ساعات التشغيل المراد تقديرها:", value=10.0)
-            
-            if st.button("📊 ربط بيانات الحمل وحساب الاستهلاك", type="primary"):
-                liters, co2, sfc, eff = calculate_fuel_consumption_and_emissions(
-                    kw_load=current_load_kw,
-                    run_hours=run_hours_calc,
-                    gen_model=gen_model_calc,
-                    kw_capacity=kw_capacity,
-                    fuel_table=fuel_table_loaded
-                )
-                st.success("✅ تم حساب الاستهلاك والانبعاثات بنجاح!")
-                res_c1, res_c2, res_c3, res_c4 = st.columns(4)
-                res_c1.metric("الاستهلاك الكلي (Liters)", f"{liters} L")
-                res_c2.metric("الانبعاثات (CO₂)", f"{co2} kg")
-                res_c3.metric("معدل الاستهلاك النوعي (SFC)", f"{sfc} L/kWh")
-                res_c4.metric("الكفاءة الحرارية (Efficiency)", f"{eff} %")
+            st.divider()
+
+            # تجهيز نص الرسالة
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            message_text = (
+                f"*إنذار طارئ للمولد - Addoma Trading Services*\n"
+                f"مرحباً مهندس {tech_name}،\n"
+                f"تم تسجيل إنذار يتطلب تدخلك الفوري:\n\n"
+                f"📍 *الموقع:* {site_name}\n"
+                f"⚙️ *المولد:* {gen_model}\n"
+                f"⚠️ *الإنذار:* {status}\n"
+                f"🕒 *الوقت:* {timestamp}\n\n"
+                f"يرجى التوجه للموقع للمعاينة."
+            )
+
+            st.write("### خيارات إرسال التنبيه")
+
+            # الخيار الأول: رابط مباشر (الأفضل إذا كان التطبيق مرفوعاً على السحابة)
+            # نقوم بتشفير النص ليتوافق مع الروابط (URL Encoding)
+            encoded_message = urllib.parse.quote(message_text)
+            whatsapp_url_alarm = f"https://api.whatsapp.com/send?phone={tech_phone}&text={encoded_message}"
+
+            st.write("**الخيار 1: فتح عبر واجهة واتساب (موثوق للسحابة)**")
+            st.link_button("📲 إرسال رسالة واتساب (فتح التطبيق)", whatsapp_url_alarm, type="primary")
+
+            st.write("---")
+
+            # الخيار الثاني: إرسال تلقائي في الخلفية (يعمل فقط إذا كان Streamlit يعمل محلياً Localhost)
+            st.write("**الخيار 2: إرسال تلقائي في الخلفية (يتطلب تشغيل محلي)**")
+            if st.button("🚀 إرسال التنبيه تلقائياً الآن"):
+                with st.spinner("جاري فتح متصفح واتساب وإرسال الرسالة..."):
+                    try:
+                        kit.sendwhatmsg_instantly(
+                            phone_no=tech_phone, 
+                            message=message_text, 
+                            wait_time=15, 
+                            tab_close=True,
+                            close_time=4
+                        )
+                        st.success(f"تم إرسال الرسالة بنجاح إلى المهندس {tech_name}!")
+                    except Exception as e:
+                        st.error(f"حدث خطأ أثناء الإرسال: {e}")
