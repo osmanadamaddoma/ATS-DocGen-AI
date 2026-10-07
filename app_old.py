@@ -544,7 +544,9 @@ selected_app = st.sidebar.radio(
     on_change=lambda: st.session_state.update(current_page="main_apps")
 )
 
-# [بقية الدوال والشاشات ستحافظ على نفس المنطق البرمجي، مع تفعيل الترجمة كالتالي]
+# =========================================================
+# Page Routing Configuration
+# =========================================================
 
 if st.session_state.current_page == "chat":
     st.title("🤖 " + ("Smart AI Assistant" if L == "en" else "المساعد الذكي الهندسي"))
@@ -554,19 +556,71 @@ if st.session_state.current_page == "chat":
         res = analyze_fault_with_gemini(user_query, language=L)
         st.chat_message("assistant").markdown(res)
 
-elif "5." in selected_app:
-    st.title("🔍 " + ("Cold Room Inspection (WIC 10 & WIC 40)" if L == "en" else "نظام فحص معدات التبريد (WIC 10 & WIC 40)"))
-    col_wic1, col_wic2 = st.columns(2)
-    wic_unit = col_wic1.radio("Select Unit:" if L == "en" else "اختر وحدة التبريد لفحصها:", ["WIC 10 Cold Room", "WIC 40 Cold Room"] if L == "en" else ["غرفة التبريد نموذج WIC 10", "غرفة التبريد نموذج WIC 40"])
-    controller_type = col_wic2.selectbox("Controller Type:" if L == "en" else "نوع المتحكم المستخدم (Controller):", ["Emerson", "Dixell"])
+elif st.session_state.current_page == "dashboard":
+    st.title("📊 " + ("Systems Control Dashboard" if L == "en" else "لوحة تحكم الأنظمة"))
+    st.info("Dashboard summary content will be displayed here." if L == "en" else "سيتم عرض ملخص لوحة التحكم والبيانات المجمعة هنا.")
 
-elif "6." in selected_app:
-    st.title("🧮 " + ("Smart Electrical & Carbon Calculator" if L == "en" else "الحاسبة الهندسية للكهرباء والانبعاثات"))
-    tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop" if L == "en" else "⚡ هبوط الجهد الكهربائي", "⛽ Fuel & Emissions" if L == "en" else "⛽ استهلاك الوقود والحمل"])
-    with tab_calc2:
-        col_c1, col_c2 = st.columns(2)
-        gen_model_calc = col_c1.selectbox("Generator Model:" if L == "en" else "طراز المولد:", ["Perkins", "Cummins", "CAT"])
-        pump_type = col_c2.selectbox("Fuel Pump System:" if L == "en" else "نوع نظام طلمبة الوقود:", [
-            "Mechanical Fuel Pump (Normal)" if L == "en" else "طلمبة ديزل قلب عادية (ميكانيكية)", 
-            "Electronic Injection (MEUI/ECM)" if L == "en" else "حقن إلكتروني (MEUI/ECM)"
+elif st.session_state.current_page == "main_apps":
+    # ---------------- Application 1 ----------------
+    if "1." in selected_app:
+        st.title("⚙️ " + ("Predictive Maintenance & Gensets" if L == "en" else "الصيانة التنبؤية والمولدات (شامل التقارير)"))
+        st.info("Predictive Maintenance Modules and Genset monitoring layout." if L == "en" else "واجهة مراقبة المولدات (Gensets) والصيانة التنبؤية.")
+        # أضف هنا بقية كود التطبيق الأول...
+
+    # ---------------- Application 2 ----------------
+    elif "2." in selected_app:
+        st.title("🎛️ " + ("Remote Operations & Control Center" if L == "en" else "غرفة التحكم والتشغيل عن بُعد (Remote Control Center)"))
+        st.info("Remote Operations Panel." if L == "en" else "لوحة التشغيل والمراقبة عن بعد.")
+        # أضف هنا بقية كود التطبيق الثاني...
+
+    # ---------------- Application 3 ----------------
+    elif "3." in selected_app:
+        st.title("📊 " + ("Daily Monitoring & Reminders" if L == "en" else "المتابعة اليومية وتقارير الإدارة والتذكيرات"))
+        st.info("Daily monitoring, logs, and schedule reminders." if L == "en" else "سجلات المتابعة اليومية، إدخال البيانات، والتذكيرات.")
+        # أضف هنا بقية كود التطبيق الثالث...
+
+    # ---------------- Application 4 ----------------
+    elif "4." in selected_app:
+        st.title("🤖 " + ("AI Diagnostics & Catalog Reader" if L == "en" else "المساعد الذكي والكتالوجات وقراءة الأكواد"))
+        st.info("Upload catalogs or use the AI to diagnose faults." if L == "en" else "نظام رفع الكتالوجات (PDF) وتحليل الأكواد عبر الذكاء الاصطناعي.")
+        # أضف هنا بقية كود التطبيق الرابع...
+
+    # ---------------- Application 5 ----------------
+    elif "5." in selected_app:
+        st.title("🔍 " + ("Cold Room Inspection (WIC 10 & WIC 40)" if L == "en" else "نظام فحص معدات التبريد (WIC 10 & WIC 40)"))
+        col_wic1, col_wic2 = st.columns(2)
+        wic_unit = col_wic1.radio(
+            "Select Unit:" if L == "en" else "اختر وحدة التبريد لفحصها:", 
+            ["WIC 10 Cold Room", "WIC 40 Cold Room"] if L == "en" else ["غرفة التبريد نموذج WIC 10", "غرفة التبريد نموذج WIC 40"]
+        )
+        controller_type = col_wic2.selectbox(
+            "Controller Type:" if L == "en" else "نوع المتحكم المستخدم (Controller):", 
+            ["Emerson", "Dixell"]
+        )
+        # يمكنك إضافة بقية واجهات قراءة الحساسات والتقارير الخاصة بالتطبيق الخامس هنا...
+
+    # ---------------- Application 6 ----------------
+    elif "6." in selected_app:
+        st.title("🧮 " + ("Smart Electrical & Carbon Calculator" if L == "en" else "الحاسبة الهندسية للكهرباء والانبعاثات"))
+        tab_calc1, tab_calc2 = st.tabs([
+            "⚡ Cable Voltage Drop" if L == "en" else "⚡ هبوط الجهد الكهربائي", 
+            "⛽ Fuel & Emissions" if L == "en" else "⛽ استهلاك الوقود والحمل"
         ])
+        
+        with tab_calc1:
+            st.write("Voltage Drop Calculation parameters..." if L == "en" else "معلمات حساب هبوط الجهد (Cable Voltage Drop)...")
+            
+        with tab_calc2:
+            col_c1, col_c2 = st.columns(2)
+            gen_model_calc = col_c1.selectbox(
+                "Generator Model:" if L == "en" else "طراز المولد:", 
+                ["Perkins", "Cummins", "CAT"]
+            )
+            pump_type = col_c2.selectbox(
+                "Fuel Pump System:" if L == "en" else "نوع نظام طلمبة الوقود:", 
+                [
+                    "Mechanical Fuel Pump (Normal)" if L == "en" else "طلمبة ديزل قلب عادية (ميكانيكية)", 
+                    "Electronic Injection (MEUI/ECM)" if L == "en" else "حقن إلكتروني (MEUI/ECM)"
+                ]
+            )
+            # يمكنك إضافة بقية واجهات الإدخال الخاصة بالاستهلاك هنا...
