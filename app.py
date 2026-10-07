@@ -485,6 +485,39 @@ if final_saved and not st.session_state.authenticated:
                         break
             except:
                 pass
+
+# =========================================================
+# Professional Sidebar Profile & System Description Design
+# =========================================================
+with st.sidebar:
+    st.markdown("---")
+    # App Branding & Profile Card Header
+    st.markdown(
+        """
+        <div style="background: linear-gradient(135deg, #182b49 0%, #2c3e50 100%); padding: 15px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="margin: 0; font-size: 18px; color: #f8f9fa;">ATS ENGINEERING</h3>
+            <p style="margin: 5px 0 0 0; font-size: 12px; color: #adb5bd;">Addoma Trading Services Suite</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Professional Bio Section inside Sidebar Expander or Box
+    with st.expander("📌 System & Engineer Profile", expanded=True):
+        st.markdown(
+            """
+            **Lead Consultant:** Eng. Osman Adam Addoma  
+            **Expertise:** Power Systems, Gensets Synchronization, & Industrial Refrigeration (WIC Systems).  
+            **Core Tech:** Python, Streamlit, Supabase, InfluxDB, & Gemini AI Diagnostics.  
+            **Mission:** Delivering cutting-edge electromechanical solutions, predictive maintenance, and smart IoT operational control.
+            """,
+            unsafe_allow_html=True
+        )
+        
+    st.markdown("---")
+
 # --- Language Selection Option in Sidebar ---
 st.sidebar.subheader("🌐 Language")
 selected_lang = st.sidebar.radio("Select Language:", ["Arabic (العربية)", "English"], index=1 if st.session_state.lang == "en" else 0)
@@ -1468,3 +1501,4 @@ else:
                     st.warning(f"⚠️ Warning: The generator is running at a very low load ({load_percentage:.1f}%). This leads to incomplete combustion in {gen_model_calc} engines and unburnt oil accumulation (Wet Stacking).")
                 elif load_percentage > 90:
                     st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
+. 
