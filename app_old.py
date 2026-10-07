@@ -56,11 +56,11 @@ if "current_page" not in st.session_state:
 # Update mini database structure to support main and sub menus
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
-        "Khartoum (Main Menu)": {
-            "Main Site - Kafouri (Sub Site)": {
-                "address": "Khartoum - Industrial Zone - Kafouri",
-                "technician_name": "Eng. Osman Adam Addoma",
-                "technician_whatsapp": "249912345678",
+        "(Main Menu)": {
+            "Main Site - (Sub Site)": {
+                "address": "                   ",
+                "technician_name": "                  ",
+                "technician_whatsapp": "                 ",
                 "generators": {
                     "G1": {
                         "model": "Perkins 410 kVA",
