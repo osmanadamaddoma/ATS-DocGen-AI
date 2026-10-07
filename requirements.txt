@@ -21,3 +21,11 @@ PyGithub
 pytz
 python-dotenv
 PyGithub
+streamlit==1.39.0
+pandas==2.2.3
+numpy==1.26.4
+plotly==5.24.1
+scikit-learn==1.5.2
+supabase==2.9.1
+python-dotenv==1.0.1
+pillow==10.4.0
