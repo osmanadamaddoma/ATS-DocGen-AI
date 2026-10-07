@@ -1330,8 +1330,8 @@ else:
             st.subheader("⚙️ Gensets and Machinery Predictive Maintenance Link & Smart WhatsApp Alarms")
             st.markdown("Monitor default operating hours rates and automatically generate smart text WhatsApp messages:")
             
-            default_tech_name = "Eng. Osman Adam Addoma"
-            default_whatsapp_num = "249912345678"
+            default_tech_name = "                         "
+            default_whatsapp_num = "                       "
             if 'selected_main_site' in locals() and 'selected_sub_site' in locals() and selected_main_site and selected_sub_site:
                 site_info = st.session_state.sites_data.get(selected_main_site, {}).get(selected_sub_site, {})
                 default_tech_name = site_info.get("technician_name", default_tech_name)
