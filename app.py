@@ -439,6 +439,7 @@ CLIENTS_DATABASE = {
         "duration_days": 365,
     },
 }
+
 ADMIN_CODES = ["ADDOMA-2026-PRO"]
 if supabase:
     try:
@@ -470,7 +471,6 @@ try:
         saved_code = cookie_manager.get(cookie="activation_code")
 except:
     saved_code = None
-
 final_saved = code_from_url if code_from_url else saved_code
 
 if "authenticated" not in st.session_state:
@@ -504,12 +504,44 @@ if final_saved and not st.session_state.authenticated:
             except:
                 pass
 
+
+# =========================================================
+# Professional Sidebar Profile & System Description Design
+# =========================================================
+with st.sidebar:
+    st.markdown("---")
+    # App Branding & Profile Card Header
+    st.markdown(
+        """
+        <div style="background: linear-gradient(135deg, #182b49 0%, #2c3e50 100%); padding: 15px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="margin: 0; font-size: 18px; color: #f8f9fa;">ATS ENGINEERING</h3>
+            <p style="margin: 5px 0 0 0; font-size: 12px; color: #adb5bd;">Addoma Trading Services Suite</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Professional Bio Section inside Sidebar Expander or Box
+    with st.expander("📌 System & Engineer Profile", expanded=True):
+        st.markdown(
+            """
+            **Lead Consultant:** Eng. Osman Adam Addoma  
+            **Expertise:** Power Systems, Gensets Synchronization, & Industrial Refrigeration (WIC Systems).  
+            **Core Tech:** Python, Streamlit, Supabase, InfluxDB, & Gemini AI Diagnostics.  
+            **Mission:** Delivering cutting-edge electromechanical solutions, predictive maintenance, and smart IoT operational control.
+            """,
+            unsafe_allow_html=True
+        )
+        
+    st.markdown("---")
+
 # --- Language Selection Option in Sidebar ---
 st.sidebar.subheader("🌐 Language")
 selected_lang = st.sidebar.radio("Select Language:", ["Arabic (العربية)", "English"], index=1 if st.session_state.lang == "en" else 0)
 st.session_state.lang = "en" if "English" in selected_lang else "ar"
 L = st.session_state.lang
-
 TXT = {
     "ar": {
         "title": "🔐 بوابة تفعيل النظام الموحد",
@@ -654,7 +686,6 @@ st.sidebar.markdown(TXT["app_selection"])
 def on_app_change():
     st.session_state.current_page = "main_apps"
 
-# أضفنا النظام السابع (DocIntel GenAI) للقوائم المترجمة
 apps_list_ar = [
     "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
     "🎛️ 2. غرفة التحكم والتشغيل عن بُعد (Remote Control Center)",
@@ -664,7 +695,6 @@ apps_list_ar = [
     "🧮 6. الحاسبة الهندسية للكهرباء والانبعاثات (Smart Eng Calculator)",
     "⚡ 7. نظام ATS للذكاء الاصطناعي (DocIntel GenAI)"
 ]
-
 apps_list_en = [
     "⚙️ 1. Predictive Maintenance & Gensets",
     "🎛 2. Remote Operations & Control Center",
@@ -798,6 +828,7 @@ if st.session_state.current_page == "chat":
                 response_text = f"Received query: '{user_query}'. Gemini API Key is missing in secrets."
             message_placeholder.markdown(response_text)
         st.session_state.messages.append({"role": "assistant", "content": response_text})
+
 elif st.session_state.current_page == "dashboard":
     st.title("📊 " + ("Systems Control Dashboard" if L == "en" else "لوحة تحكم الأنظمة والمتابعة"))
     col1, col2, col3 = st.columns(3)
@@ -807,6 +838,7 @@ elif st.session_state.current_page == "dashboard":
     st.divider()
     st.subheader("Live Telemetry & Diagnostics Overview")
     st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
+
 else:
     if "1." in selected_app:
         st.title("⚙️ " + ("Predictive Maintenance & Genset Monitoring" if L == "en" else "نظام الصيانة التنبؤية ومراقبة المولدات"))
@@ -909,9 +941,7 @@ else:
                 st.write("")
                 if st.button("📝 Open Calibration Modal"):
                     edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
-            # Generator data editing ...
-            # ... (باقي كود القسم الأول للصيانة التنبؤية تم الإبقاء عليه كما هو) ...
-
+                    
     elif "2." in selected_app:
         st.title("🎛️ " + ("Remote Control Center (IoT & Telemetry)" if L == "en" else "غرفة التحكم والتشغيل عن بُعد"))
         df_iot = fetch_live_iot_data()
@@ -1083,15 +1113,11 @@ else:
                 elif load_percentage > 90:
                     st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
 
-    # =========================================================
-    # الكود الجديد المضاف والمترجم بالكامل للغة الإنجليزية بناءً على طلبك
-    # =========================================================
     elif "7." in selected_app:
         # App Header and Visual Identity
         st.title("⚡ ATS DocIntel GenAI")
         st.markdown("### *Industrial Document Intelligence, Predictive RUL Analytics & Automated Fault Remediation Suite*")
         st.markdown("---")
-
         # Sidebar for document, catalog, and image uploads
         with st.sidebar:
             st.header("📂 Smart Input Panel")
@@ -1113,7 +1139,6 @@ else:
             
             st.markdown("---")
             st.info("💡 **Operating System:** ATS DocIntel is connected to the engine and cold room database for instant status analysis and sending alerts.")
-
         # Main interface divided into professional Tabs
         tab1, tab2, tab3, tab4 = st.tabs([
             "📊 Diagnostics & RUL Analytics", 
@@ -1121,9 +1146,8 @@ else:
             "🚨 Alarms & Coordinates System", 
             "📈 Fuel vs. Load Charts"
         ])
-
         with tab1:
-            st.subheader("Evaluation & Remaining Useful Life (RUL) Assessment")
+            st.subheader("Evaluation & Remaining Useful Life (RUL Assessment)")
             col1, col2, col3 = st.columns(3)
             
             with col1:
@@ -1145,7 +1169,6 @@ else:
             }
             df_audit = pd.DataFrame(data_audit)
             st.dataframe(df_audit, use_container_width=True)
-
         with tab2:
             st.subheader("Document Intelligence & Knowledge Graph (Inspired by Wordlit)")
             if uploaded_manuals:
@@ -1155,7 +1178,6 @@ else:
                 st.info("🤖 The AI model is now analyzing the catalogs to match Perkins or WIC equipment part numbers and fault codes.")
             else:
                 st.warning("Please upload maintenance catalogs in PDF format from the sidebar to begin text analysis and extract technical links.")
-
         with tab3:
             st.subheader("🚨 SMS & Audio Alerts System")
             
@@ -1181,7 +1203,6 @@ else:
                 st.write("### Active Alarms Log:")
                 st.error("⚠️ [Critical Alert 10:42 AM]: Perkins engine response error - Immediate solution plan dispatched to the engineer.")
                 st.warning("⚠️ [Preventive Alert]: Approaching diesel filter change schedule for 150 KVA generator.")
-
         with tab4:
             st.subheader("📈 Fuel vs. Load Analytics Reports")
             st.markdown("Chart illustrating fuel consumption efficiency based on generator loads:")
