@@ -634,7 +634,7 @@ apps_list_ar = [
     "🤖 4. المساعد الذكي والكتالوجات وقراءة الأكواد",
     "🔍 5. نظام فحص المعدات (WIC وغيرها)",
     "🧮 6. الحاسبة الهندسية للكهرباء والانبعاثات (Smart Eng Calculator)",
-    "⚡ 7. نظام ATS DocIntel GenAI (التحليل الذكي المتقدم)"
+    "⚡ 7. نظام ATS DocIntel GenAI المدمج"
 ]
 apps_list_en = [
     "⚙️ 1. Predictive Maintenance & Gensets",
@@ -1470,19 +1470,8 @@ else:
                     st.warning(f"⚠️ Warning: The generator is running at a very low load ({load_percentage:.1f}%). This leads to incomplete combustion in {gen_model_calc} engines and unburnt oil accumulation (Wet Stacking).")
                 elif load_percentage > 90:
                     st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
-    elif "7." in selected_app or "ATS DocIntel" in selected_app:
-        # =========================================================
-        # ⚡ ATS DocIntel GenAI Integration Module (دمج كود DocIntel)
-        # =========================================================
-        # إعداد الصفحة وتكوين العرض
-        st.set_page_config(
-            page_title="ATS DocIntel GenAI",
-            page_icon="⚡",
-            layout="wide",
-            initial_sidebar_state="expanded"
-        )
-
-        # ترويسة التطبيق والهوية البصرية
+    elif "7." in selected_app:
+        # إعداد الصفحة وتكوين العرض الخاصة بـ ATS DocIntel GenAI
         st.title("⚡ ATS DocIntel GenAI")
         st.markdown("### *Industrial Document Intelligence, Predictive RUL Analytics & Automated Fault Remediation Suite*")
         st.markdown("---")
@@ -1496,15 +1485,16 @@ else:
             uploaded_manuals = st.file_uploader(
                 "رفع كتالوجات الصيانة (PDF)", 
                 type=["pdf", "txt", "docx"],
-                accept_multiple_files=True
+                accept_multiple_files=True,
+                key="docintel_manuals"
             )
             
             st.markdown("---")
             
             # مقارنة صور القطع (التالفة مقابل الصالحة)
             st.subheader("🔍 مقارنة صور القطع")
-            healthy_img = st.file_uploader("صورة القطعة السليمة (المرجعية)", type=["jpg", "png", "jpeg"], key="healthy")
-            damaged_img = st.file_uploader("صورة القطعة التالفة (من الميدان)", type=["jpg", "png", "jpeg"], key="damaged")
+            healthy_img = st.file_uploader("صورة القطعة السليمة (المرجعية)", type=["jpg", "png", "jpeg"], key="docintel_healthy")
+            damaged_img = st.file_uploader("صورة القطعة التالفة (من الميدان)", type=["jpg", "png", "jpeg"], key="docintel_damaged")
             
             st.markdown("---")
             st.info("💡 **نظام التشغيل:** ATS DocIntel متصل بقاعدة بيانات المحركات وغرف التبريد لتحليل الحالة الفورية وإرسال التنبيهات.")
@@ -1518,7 +1508,7 @@ else:
         ])
 
         with tab1:
-            st.subheader("Evaluation & Remaining Useful Life (RUL) Assessment")
+            st.subheader("evaluation & Remaining Useful Life (RUL) Assessment")
             col1, col2, col3 = st.columns(3)
             
             with col1:
@@ -1557,16 +1547,16 @@ else:
             col_a, col_b = st.columns(2)
             with col_a:
                 st.write("### إعدادات إرسال التنبيهات للمهندس الميداني:")
-                eng_phone = st.text_input("رقم هاتف المهندس الفني", "+249XXXXXXXXX")
-                fault_location = st.text_input("موقع العمل / الموقع الجغرافي", "مصنع التعدين - المولد الرئيسي (130 KVA)")
+                eng_phone = st.text_input("رقم هاتف المهندس الفني", "+249XXXXXXXXX", key="docintel_phone")
+                fault_location = st.text_input("موقع الموقع / الموقع الجغرافي", "مصنع التعدين - المولد الرئيسي (130 KVA)", key="docintel_loc")
                 selected_fault = st.selectbox("نوع العطل المرصود", [
                     "انخفاض ضغط الزيت في محرك Perkins",
                     "ارتفاع حرارة غرفة التبريد WIC 40",
                     "خطأ في تزامن المولدات (DSE 8610)",
                     "تسرب في خط الوقود"
-                ])
+                ], key="docintel_fault")
                 
-                if st.button("إرسال التنبيه الفوري (SMS & Voice Alert)"):
+                if st.button("إرسال التنبيه الفوري (SMS & Voice Alert)", key="docintel_btn_send"):
                     if eng_phone:
                         st.success(f"✅ تم إرسال رسالة نصية وتنبيه صوتي بنجاح إلى الرقم ({eng_phone}) يوضح موقع العطل ('{fault_location}') ونوع المشكلة مع خطة العلاج المقترحة!")
                     else:
