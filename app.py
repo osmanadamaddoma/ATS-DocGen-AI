@@ -23,25 +23,21 @@ import streamlit as st
 import extra_streamlit_components as stx 
 from google import genai
 from gtts import gTTS
-
 # Try importing Supabase library
 try:
     from supabase import create_client, Client
 except ImportError:
     create_client = None
-
 # Import live IoT Database library
 try:
     from influxdb_client import InfluxDBClient
 except ImportError:
     InfluxDBClient = None
-
 # Try importing barcode reading library
 try:
     from pyzbar.pyzbar import decode as decode_qr
 except ImportError:
     decode_qr = None
-
 # =========================================================
 # 0. Main Page Settings, AI, Audio, and Language Initialization
 # =========================================================
@@ -50,7 +46,6 @@ st.set_page_config(
     page_icon="🔐",
     layout="wide",
 )
-
 # Initial session state variables initialization
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
@@ -58,7 +53,6 @@ if "lang" not in st.session_state:
     st.session_state.lang = "en" 
 if "current_page" not in st.session_state:
     st.session_state.current_page = "chat"
-
 # Update mini database structure to support main and sub menus
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
@@ -108,7 +102,6 @@ if "sites_data" not in st.session_state:
             }
         }
     }
-
 # Daily logs and readings tracking
 if "daily_logs" not in st.session_state:
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -126,17 +119,14 @@ if "daily_logs" not in st.session_state:
             "status": "Normal"
         }
     ]
-
 # Fetch Gemini key securely from secrets
 gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not gemini_key and "supabase" in st.secrets:
     gemini_key = st.secrets["supabase"].get("GEMINI_API_KEY")
 if not gemini_key:
     st.warning("⚠️ GEMINI_API_KEY not found. Please add it to st.secrets.")
-
 # Initialize Gemini API client
 client = genai.Client(api_key=gemini_key) if gemini_key else None
-
 # Supabase database settings for app connection
 supabase = None
 if create_client:
@@ -157,7 +147,6 @@ if create_client:
 else:
     st.warning("⚠️ Supabase library is not installed. Please install it using pip install supabase")
 
-# Updated audio function with dual language support, mute option, and continuous loop for alarms
 def play_audio(text, lang='en', loop=False):
     if st.session_state.get("audio_muted", False):
         return
@@ -218,9 +207,6 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
                     return "⚠️ High server load (503). Please retry in a few seconds." if language == "en" else "⚠️ الخادم يمر بضغط عالٍ حالياً (503). يرجى المحاولة مرة أخرى."
             return f"❌ Error: {err_msg}"
 
-# =========================================================
-# 1. System Helper Functions and Comprehensive PDF Report Design
-# =========================================================
 def sanitize_latin_only(text):
     if not isinstance(text, str):
         text = str(text)
@@ -296,9 +282,6 @@ class ComprehensivePDF(FPDF):
             align="C",
         )
 
-# =========================================================
-# 1.5 Live Database and IoT Integration Functions
-# =========================================================
 def fetch_live_iot_data():
     if not InfluxDBClient or "influxdb" not in st.secrets:
         import random
@@ -332,9 +315,6 @@ def fetch_live_iot_data():
     except Exception:
         return pd.DataFrame()
 
-# =========================================================
-# 1.8 Smart Engineering Tools and Calculators
-# =========================================================
 def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85):
     rho_copper = 0.0178 
     v_drop = (math.sqrt(3) * current_a * distance_m * rho_copper * cos_phi) / cable_mm2
@@ -416,9 +396,6 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perk
     co2_kg = liters * 2.68
     return round(liters, 1), round(co2_kg, 1), round(sfc, 3), round(eff, 1)
 
-# =========================================================
-# 2. Unified Subscription System and Packages (with Cookie Management)
-# =========================================================
 CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
         "name": "Osman Adam Addoma (Addoma Trading Services)",
@@ -439,7 +416,6 @@ CLIENTS_DATABASE = {
         "duration_days": 365,
     },
 }
-
 ADMIN_CODES = ["ADDOMA-2026-PRO"]
 if supabase:
     try:
@@ -472,10 +448,8 @@ try:
 except:
     saved_code = None
 final_saved = code_from_url if code_from_url else saved_code
-
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-
 if final_saved and not st.session_state.authenticated:
     clean_saved = str(final_saved).strip().upper()
     if clean_saved in CLIENTS_DATABASE:
@@ -504,13 +478,8 @@ if final_saved and not st.session_state.authenticated:
             except:
                 pass
 
-
-# =========================================================
-# Professional Sidebar Profile & System Description Design
-# =========================================================
 with st.sidebar:
     st.markdown("---")
-    # App Branding & Profile Card Header
     st.markdown(
         """
         <div style="background: linear-gradient(135deg, #182b49 0%, #2c3e50 100%); padding: 15px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
@@ -520,10 +489,7 @@ with st.sidebar:
         """,
         unsafe_allow_html=True
     )
-    
     st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Professional Bio Section inside Sidebar Expander or Box
     with st.expander("📌 System & Engineer Profile", expanded=True):
         st.markdown(
             """
@@ -534,10 +500,8 @@ with st.sidebar:
             """,
             unsafe_allow_html=True
         )
-        
     st.markdown("---")
 
-# --- Language Selection Option in Sidebar ---
 st.sidebar.subheader("🌐 Language")
 selected_lang = st.sidebar.radio("Select Language:", ["Arabic (العربية)", "English"], index=1 if st.session_state.lang == "en" else 0)
 st.session_state.lang = "en" if "English" in selected_lang else "ar"
@@ -626,10 +590,13 @@ else:
         st.write("---")
         if st.button(TXT["btn_chat"], use_container_width=True):
             st.session_state.current_page = "chat"
+            st.rerun()
         if st.button(TXT["btn_dashboard"], use_container_width=True):
             st.session_state.current_page = "dashboard"
+            st.rerun()
         if st.button(TXT["btn_apps"], use_container_width=True):
             st.session_state.current_page = "main_apps"
+            st.rerun()
         st.write("---")
         if st.button(TXT["btn_logout"], type="primary", use_container_width=True):
             st.session_state.authenticated = False
@@ -649,7 +616,6 @@ is_pro = False
 client_name = "Visitor"
 plan_type = "N/A"
 days_left = 0
-
 if input_code in CLIENTS_DATABASE:
     data = CLIENTS_DATABASE[input_code]
     client_name = data["name"]
@@ -705,10 +671,10 @@ apps_list_en = [
     "⚡ 7. ATS DocIntel GenAI Suite"
 ]
 
-selected_app = st.sidebar.radio(
+selected_app = st.sidebar.selectbox(
     TXT["choose_app"],
     apps_list_ar if L == "ar" else apps_list_en,
-    on_change=on_app_change
+    key="selected_app_dropdown"
 )
 st.sidebar.divider()
 
@@ -1112,34 +1078,25 @@ else:
                     st.warning(f"⚠️ Warning: The generator is running at a very low load ({load_percentage:.1f}%). This leads to incomplete combustion in {gen_model_calc} engines and unburnt oil accumulation (Wet Stacking).")
                 elif load_percentage > 90:
                     st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
-
     elif "7." in selected_app:
-        # App Header and Visual Identity
         st.title("⚡ ATS DocIntel GenAI")
         st.markdown("### *Industrial Document Intelligence, Predictive RUL Analytics & Automated Fault Remediation Suite*")
         st.markdown("---")
-        # Sidebar for document, catalog, and image uploads
         with st.sidebar:
             st.header("📂 Smart Input Panel")
             st.markdown("Upload catalogs (PDF) and equipment images for comparison and analysis:")
-            
-            # Upload technical catalogs
             uploaded_manuals = st.file_uploader(
                 "Upload Maintenance Catalogs (PDF)", 
                 type=["pdf", "txt", "docx"],
                 accept_multiple_files=True
             )
-            
             st.markdown("---")
-            
-            # Compare parts images (damaged vs healthy)
             st.subheader("🔍 Parts Image Comparison")
             healthy_img = st.file_uploader("Healthy Part Image (Reference)", type=["jpg", "png", "jpeg"], key="healthy")
             damaged_img = st.file_uploader("Damaged Part Image (From Field)", type=["jpg", "png", "jpeg"], key="damaged")
-            
             st.markdown("---")
             st.info("💡 **Operating System:** ATS DocIntel is connected to the engine and cold room database for instant status analysis and sending alerts.")
-        # Main interface divided into professional Tabs
+        
         tab1, tab2, tab3, tab4 = st.tabs([
             "📊 Diagnostics & RUL Analytics", 
             "📑 AI Documents (NLP)", 
@@ -1149,18 +1106,14 @@ else:
         with tab1:
             st.subheader("Evaluation & Remaining Useful Life (RUL Assessment)")
             col1, col2, col3 = st.columns(3)
-            
             with col1:
                 st.metric(label="Overall Machine Status", value="92%", delta="Stable")
             with col2:
                 st.metric(label="Spare Parts Remaining Useful Life (RUL)", value="450 Run Hours", delta="-30 hours this week")
             with col3:
                 st.metric(label="Dynamic Sync Efficiency (DSE)", value="98.5%", delta="+1.2%")
-                
             st.markdown("---")
             st.write("### Components Inspection Report & Fault Deduction:")
-            
-            # Predictive inspection schedule simulation
             data_audit = {
                 "Component / System": ["Diesel Pump (Mechanical Pump)", "70-pin Sensors (Perkins)", "Cooling Unit (WIC 40)", "Control System (DSE 8610)"],
                 "Operational Status": ["Requires preventive maintenance soon", "100% Healthy", "Stable", "Excellent"],
@@ -1170,7 +1123,7 @@ else:
             df_audit = pd.DataFrame(data_audit)
             st.dataframe(df_audit, use_container_width=True)
         with tab2:
-            st.subheader("Document Intelligence & Knowledge Graph (Inspired by Wordlit)")
+            st.subheader("Document Intelligence & Knowledge Graph")
             if uploaded_manuals:
                 st.success(f"Successfully uploaded and processed {len(uploaded_manuals)} technical file(s)/catalog(s).")
                 for file in uploaded_manuals:
@@ -1180,7 +1133,6 @@ else:
                 st.warning("Please upload maintenance catalogs in PDF format from the sidebar to begin text analysis and extract technical links.")
         with tab3:
             st.subheader("🚨 SMS & Audio Alerts System")
-            
             col_a, col_b = st.columns(2)
             with col_a:
                 st.write("### Field Engineer Alert Settings:")
@@ -1192,13 +1144,11 @@ else:
                     "Generator Sync Error (DSE 8610)",
                     "Fuel Line Leak"
                 ])
-                
                 if st.button("Send Instant Alert (SMS & Voice Alert)"):
                     if eng_phone:
                         st.success(f"✅ SMS and voice alert successfully sent to ({eng_phone}) detailing the fault location ('{fault_location}') and issue type along with the proposed remediation plan!")
                     else:
                         st.error("Please enter the engineer's phone number first.")
-                        
             with col_b:
                 st.write("### Active Alarms Log:")
                 st.error("⚠️ [Critical Alert 10:42 AM]: Perkins engine response error - Immediate solution plan dispatched to the engineer.")
@@ -1206,17 +1156,13 @@ else:
         with tab4:
             st.subheader("📈 Fuel vs. Load Analytics Reports")
             st.markdown("Chart illustrating fuel consumption efficiency based on generator loads:")
-            
-            # Simulating Fuel vs. Load chart using Matplotlib
             fig, ax = plt.subplots(figsize=(10, 4))
             loads = np.array([20, 40, 60, 80, 100])
-            fuel_consumption = np.array([12, 22, 35, 52, 75])  # Liters/hour
-            
+            fuel_consumption = np.array([12, 22, 35, 52, 75])
             ax.plot(loads, fuel_consumption, marker='o', color='#1f77b4', linewidth=2.5, label='Actual Fuel Consumption (L/h)')
             ax.set_title('Fuel Consumption vs. Load Curve (%)', fontsize=12, fontweight='bold')
             ax.set_xlabel('Load Percentage (%)')
             ax.set_ylabel('Consumption Rate (Liters/hour)')
             ax.grid(True, linestyle='--', alpha=0.6)
             ax.legend()
-            
             st.pyplot(fig)
