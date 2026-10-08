@@ -47,39 +47,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# =========================================================
-# كود تفعيل التجربة المجانية (7 أيام) المضاف حديثاً
-# =========================================================
-DEMO_ACTIVATION_CODE = "TRIAL-7DAYS"
-
-st.title("⚙️ نظام تفعيل التجربة - ADDOMA AI")
-
-# حقل إدخال الكود للعميل
-entered_code = st.text_input("أدخل كود التجربة (للحصول على 7 أيام مجانية):", type="default")
-
-if entered_code:
-    if entered_code == DEMO_ACTIVATION_CODE:
-        # استخدام st.session_state لتسجيل تاريخ بداية التجربة للمتصفح الحالي
-        if "trial_start_date" not in st.session_state:
-            # تخزين وقت البداية الحالي
-            st.session_state["trial_start_date"] = datetime.now()
-        
-        # حساب الأيام المنقضية
-        elapsed_time = datetime.now() - st.session_state["trial_start_date"]
-        remaining_days = 7 - elapsed_time.days
-        
-        if remaining_days >= 0:
-            st.success(f"✅ تم التفعيل بنجاح! متبقي لك {remaining_days} أيام في التجربة المجانية.")
-            
-            # --- هنا تفتح واجهة التطبيق والخدمات للعميل ---
-            st.info("مرحباً بك في لوحة تحكم المولدات وغرفة التحكم عن بعد...")
-            
-        else:
-            st.error("❌ عذراً، انتهت صلاحية التجربة المجانية (7 أيام). يرجى الاشتراك بباقة المديرين أو الشركات للمتابعة.")
-    else:
-        st.error("❌ كود التفعيل غير صحيح. تأكد من إدخال الكود الصحيح.")
-
 # Initial session state variables initialization
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
@@ -439,7 +406,7 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perk
     co2_kg = liters * 2.68
     return round(liters, 1), round(co2_kg, 1), round(sfc, 3), round(eff, 1)
 # =========================================================
-# 2. Unified Subscription System and Packages (with Cookie Management)
+# 2. Unified Subscription System and Packages (with Cookie Management & 7-Day Trial Support)
 # =========================================================
 CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
@@ -459,6 +426,12 @@ CLIENTS_DATABASE = {
         "plan": "Yearly",
         "start_date": "2026-03-15",
         "duration_days": 365,
+    },
+    "TRIAL-7DAYS": {
+        "name": "Free Trial User",
+        "plan": "7-Day Trial",
+        "start_date": datetime.now().strftime("%Y-%m-%d"),
+        "duration_days": 7,
     },
 }
 ADMIN_CODES = ["ADDOMA-2026-PRO"]
@@ -495,6 +468,13 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if final_saved and not st.session_state.authenticated:
     clean_saved = str(final_saved).strip().upper()
+    if clean_saved.startswith("TRIAL-") and clean_saved not in CLIENTS_DATABASE:
+        CLIENTS_DATABASE[clean_saved] = {
+            "name": "Free Trial User",
+            "plan": "7-Day Trial",
+            "start_date": datetime.now().strftime("%Y-%m-%d"),
+            "duration_days": 7,
+        }
     if clean_saved in CLIENTS_DATABASE:
         st.session_state.authenticated = True
         st.session_state.active_code = clean_saved
@@ -558,11 +538,11 @@ st.session_state.lang = "en" if "English" in selected_lang else "ar"
 L = st.session_state.lang
 TXT = {
     "ar": {
-        "title": "🔐 بوابة تفعيل النظام الموحد",
+        "title": "🔐 بوابة تفعيل النظام الموحد (يدعم كود التجربة 7 أيام: TRIAL-7DAYS)",
         "code_input": "كود التفعيل:",
         "btn_activate": "تفعيل",
         "invalid_code": "❌ كود التفعيل غير صحيح.",
-        "warning_auth": "🔒 يرجى إدخال كود اشتراك صالح للوصول إلى التطبيقات والمساعد الذكي.",
+        "warning_auth": "🔒 يرجى إدخال كود اشتراك صالح (أو كود التجربة TRIAL-7DAYS) للوصول إلى التطبيقات والمساعد الذكي.",
         "nav_header": "⚙️ نظام الدومة للخدمات التجارية",
         "nav_status": "🟢 النظام متصل ومفعل",
         "btn_chat": "💬 المساعد الذكي الهندسي",
@@ -577,11 +557,11 @@ TXT = {
         "choose_app": "اختر النظام المطلوب:"
     },
     "en": {
-        "title": "🔐 Unified Activation Portal",
+        "title": "🔐 Unified Activation Portal (Trial 7-Days Support: TRIAL-7DAYS)",
         "code_input": "Activation Code:",
         "btn_activate": "Activate",
         "invalid_code": "❌ Invalid activation code.",
-        "warning_auth": "🔒 Please enter a valid activation code to access system applications.",
+        "warning_auth": "🔒 Please enter a valid activation code (or trial code TRIAL-7DAYS) to access system applications.",
         "nav_header": "⚙️ Addoma Trading Services System",
         "nav_status": "🟢 System Connected & Active",
         "btn_chat": "💬 Smart Engineering Assistant",
@@ -615,6 +595,13 @@ if not st.session_state.authenticated:
             except Exception as e:
                 print(f"Reload before check error: {e}")
         clean_code = user_code.strip().upper()
+        if clean_code.startswith("TRIAL-") and clean_code not in CLIENTS_DATABASE:
+            CLIENTS_DATABASE[clean_code] = {
+                "name": "Free Trial User",
+                "plan": "7-Day Trial",
+                "start_date": datetime.now().strftime("%Y-%m-%d"),
+                "duration_days": 7,
+            }
         if clean_code in CLIENTS_DATABASE:
             st.session_state.authenticated = True
             st.session_state.active_code = clean_code
@@ -842,7 +829,7 @@ elif st.session_state.current_page == "dashboard":
     st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
 else:
     if "1." in selected_app:
-        st.title("⚙️ " + ("Predictive Maintenance & Genset Monitoring" if L == "en" else "نظام الصيانة التنبؤية ومراقبة المولدات"))
+        st.title("⚙️ " + ("Predictive Maintenance & Gensets" if L == "en" else "نظام الصيانة التنبؤية ومراقبة المولدات"))
         col_top_audio1, col_top_audio2 = st.columns([3, 1])
         with col_top_audio2:
             mute_label = "🔇 Mute" if not st.session_state.audio_muted else "🔊 Unmute"
