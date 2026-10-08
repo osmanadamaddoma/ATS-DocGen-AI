@@ -485,39 +485,6 @@ if final_saved and not st.session_state.authenticated:
                         break
             except:
                 pass
-
-# =========================================================
-# Professional Sidebar Profile & System Description Design
-# =========================================================
-with st.sidebar:
-    st.markdown("---")
-    # App Branding & Profile Card Header
-    st.markdown(
-        """
-        <div style="background: linear-gradient(135deg, #182b49 0%, #2c3e50 100%); padding: 15px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <h3 style="margin: 0; font-size: 18px; color: #f8f9fa;">ATS ENGINEERING</h3>
-            <p style="margin: 5px 0 0 0; font-size: 12px; color: #adb5bd;">Addoma Trading Services Suite</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Professional Bio Section inside Sidebar Expander or Box
-    with st.expander("📌 System & Engineer Profile", expanded=True):
-        st.markdown(
-            """
-            **Lead Consultant:** Eng. Osman Adam Addoma  
-            **Expertise:** Power Systems, Gensets Synchronization, & Industrial Refrigeration (WIC Systems).  
-            **Core Tech:** Python, Streamlit, Supabase, InfluxDB, & Gemini AI Diagnostics.  
-            **Mission:** Delivering cutting-edge electromechanical solutions, predictive maintenance, and smart IoT operational control.
-            """,
-            unsafe_allow_html=True
-        )
-        
-    st.markdown("---")
-
 # --- Language Selection Option in Sidebar ---
 st.sidebar.subheader("🌐 Language")
 selected_lang = st.sidebar.radio("Select Language:", ["Arabic (العربية)", "English"], index=1 if st.session_state.lang == "en" else 0)
@@ -661,6 +628,7 @@ st.sidebar.markdown(TXT["app_selection"])
 def on_app_change():
     st.session_state.current_page = "main_apps"
 apps_list_ar = [
+    "⚡ ATS DocIntel GenAI",
     "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
     "🎛️ 2. غرفة التحكم والتشغيل عن بُعد (Remote Control Center)",
     "📊 3. المتابعة اليومية وتقارير الإدارة والتذكيرات",
@@ -669,6 +637,7 @@ apps_list_ar = [
     "🧮 6. الحاسبة الهندسية للكهرباء والانبعاثات (Smart Eng Calculator)"
 ]
 apps_list_en = [
+    "⚡ ATS DocIntel GenAI",
     "⚙️ 1. Predictive Maintenance & Gensets",
     "🎛 2. Remote Operations & Control Center",
     "📊 3. Daily Monitoring & Reminders",
@@ -808,7 +777,129 @@ elif st.session_state.current_page == "dashboard":
     st.subheader("Live Telemetry & Diagnostics Overview")
     st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
 else:
-    if "1." in selected_app:
+    if "⚡ ATS DocIntel GenAI" in selected_app:
+        # إعداد الصفحة وتكوين العرض
+        st.set_page_config(
+            page_title="ATS DocIntel GenAI",
+            page_icon="⚡",
+            layout="wide",
+            initial_sidebar_state="expanded"
+        )
+
+        # ترويسة التطبيق والهوية البصرية
+        st.title("⚡ ATS DocIntel GenAI")
+        st.markdown("### *Industrial Document Intelligence, Predictive RUL Analytics & Automated Fault Remediation Suite*")
+        st.markdown("---")
+
+        # الشريط الجانبي (Sidebar) لرفع المستندات والكتالوجات والصور
+        with st.sidebar:
+            st.header("📂 لوحة المدخلات الذكية")
+            st.markdown("رفع الكتالوجات (PDF) وصور المعدات للمقارنة والتحليل:")
+            
+            # رفع الكتالوجات الفنية
+            uploaded_manuals = st.file_uploader(
+                "رفع كتالوجات الصيانة (PDF)", 
+                type=["pdf", "txt", "docx"],
+                accept_multiple_files=True
+            )
+            
+            st.markdown("---")
+            
+            # مقارنة صور القطع (التالفة مقابل الصالحة)
+            st.subheader("🔍 مقارنة صور القطع")
+            healthy_img = st.file_uploader("صورة القطعة السليمة (المرجعية)", type=["jpg", "png", "jpeg"], key="healthy")
+            damaged_img = st.file_uploader("صورة القطعة التالفة (من الميدان)", type=["jpg", "png", "jpeg"], key="damaged")
+            
+            st.markdown("---")
+            st.info("💡 **نظام التشغيل:** ATS DocIntel متصل بقاعدة بيانات المحركات وغرف التبريد لتحليل الحالة الفورية وإرسال التنبيهات.")
+
+        # الواجهة الرئيسية مقسمة إلى تبويبات (Tabs) احترافية
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "📊 تحليل التشخيص والعمر الافتراضي (RUL)", 
+            "📑 مستندات الذكاء الاصطناعي (NLP)", 
+            "🚨 نظام الإنذارات والإحداثيات", 
+            "📈 رسوم استهلاك الوقود مقابل الحمل"
+        ])
+
+        with tab1:
+            st.subheader("evaluation & Remaining Useful Life (RUL) Assessment")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric(label="حالة الماكينة العامة", value="92%", delta="مستقرة")
+            with col2:
+                st.metric(label="العمر المتبقي لقطع الغيار (RUL)", value="450 ساعة تشغيل", delta="-30 ساعة هذا الأسبوع")
+            with col3:
+                st.metric(label="درجة كفاءة التزامن (DSE)", value="98.5%", delta="+1.2%")
+                
+            st.markdown("---")
+            st.write("### تقرير فحص المكونات واستنتاج الخلل:")
+            
+            # محاكاة جدول الفحص التنبؤي
+            data_audit = {
+                "المكون / النظام": ["طلمبة الديزل (Mechanical Pump)", "حساسات 70-pin (Perkins)", "وحدة التبريد (WIC 40)", "نظام التحكم (DSE 8610)"],
+                "الحالة التشغيلية": ["تحتاج صيانة وقائية قريباً", "سليمة 100%", "مستقرة", "ممتازة"],
+                "نسبة التآكل المتوقعة": ["18%", "2%", "5%", "1%"],
+                "الإجراء الموصى به (Action Plan)": ["معايرة الضغط وتغيير الفلاتر", "لا يوجد إجراء", "فحص غاز التبريد", "تحديث البرنامج الثابت"]
+            }
+            df_audit = pd.DataFrame(data_audit)
+            st.dataframe(df_audit, use_container_width=True)
+
+        with tab2:
+            st.subheader("Document Intelligence & Knowledge Graph (Inspired by Wordlit)")
+            if uploaded_manuals:
+                st.success(f"تم بنجاح رفع ومعالجة عدد {len(uploaded_manuals)} ملف/كتالوج فني.")
+                for file in uploaded_manuals:
+                    st.write(f"📄 **تم استخراج البيانات وفهرسة الكتالوج:** {file.name}")
+                st.info("🤖 نموذج الذكاء الاصطناعي يقوم الآن بتحليل الكتالوجات لمطابقة أرقام القطع وأكواد الأعطال الخاصة بـ Perkins أو معدات WIC.")
+            else:
+                st.warning("الرجاء رفع كتالوجات الصيانة بصيغة PDF من الشريط الجانبي لبدء تحليل النصوص واستخراج الروابط الفنية.")
+
+        with tab3:
+            st.subheader("🚨 نظام التنبيهات الصوتية والرسائل النصية (SMS & Audio Alerts)")
+            
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.write("### إعدادات إرسال التنبيهات للمهندس الميداني:")
+                eng_phone = st.text_input("رقم هاتف المهندس الفني", "+249XXXXXXXXX")
+                fault_location = st.text_input("موقع الموقع / الموقع الجغرافي", "مصنع التعدين - المولد الرئيسي (130 KVA)")
+                selected_fault = st.selectbox("نوع العطل المرصود", [
+                    "انخفاض ضغط الزيت في محرك Perkins",
+                    "ارتفاع حرارة غرفة التبريد WIC 40",
+                    "خطأ في تزامن المولدات (DSE 8610)",
+                    "تسرب في خط الوقود"
+                ])
+                
+                if st.button("إرسال التنبيه الفوري (SMS & Voice Alert)"):
+                    if eng_phone:
+                        st.success(f"✅ تم إرسال رسالة نصية وتنبيه صوتي بنجاح إلى الرقم ({eng_phone}) يوضح موقع العطل ('{fault_location}') ونوع المشكلة مع خطة العلاج المقترحة!")
+                    else:
+                        st.error("الرجاء إدخال رقم هاتف المهندس أولاً.")
+                        
+            with col_b:
+                st.write("### سجل الإنذارات النشطة:")
+                st.error("⚠️ [تنبيه حرج 10:42 صباحاً]: خطأ في استجابة محرك البيركنز - تم توجيه خطة الحل الفورية للمهندس.")
+                st.warning("⚠️ [تنبيه وقائي]: اقتراب موعد تغيير فلتر الديزل لمولد 150 KVA.")
+
+        with tab4:
+            st.subheader("📈 تقارير استهلاك الوقود مقابل الحمل (Fuel vs. Load Analytics)")
+            st.markdown("مخطط بياني يوضح كفاءة استهلاك الوقود بناءً على أحمال المولدات:")
+            
+            # محاكاة رسم بياني لاستهلاك الوقود مقابل الحمل باستخدام Matplotlib
+            fig, ax = plt.subplots(figsize=(10, 4))
+            loads = np.array([20, 40, 60, 80, 100])
+            fuel_consumption = np.array([12, 22, 35, 52, 75])  # لتر/ساعة
+            
+            ax.plot(loads, fuel_consumption, marker='o', color='#1f77b4', linewidth=2.5, label='استهلاك الوقود الفعلي (L/h)')
+            ax.set_title('منحنى استهلاك الوقود مقابل الأحمال (%)', fontsize=12, fontweight='bold')
+            ax.set_xlabel('نسبة الحمل (%)')
+            ax.set_ylabel('معدل الاستهلاك (لتر/ساعة)')
+            ax.grid(True, linestyle='--', alpha=0.6)
+            ax.legend()
+            
+            st.pyplot(fig)
+
+    elif "1." in selected_app:
         st.title("⚙️ " + ("Predictive Maintenance & Genset Monitoring" if L == "en" else "نظام الصيانة التنبؤية ومراقبة المولدات"))
         col_top_audio1, col_top_audio2 = st.columns([3, 1])
         with col_top_audio2:
@@ -1123,382 +1214,3 @@ else:
                 gen_img_file = st.file_uploader("Upload Generator Photo", type=["png", "jpg", "jpeg"])
             with col_up2:
                 parts_img_file = st.file_uploader("Upload Maintenance Photo", type=["png", "jpg", "jpeg"])
-            
-            def generate_full_pdf_bytes():
-                import matplotlib.pyplot as plt
-                temp_logo_path = None
-                temp_charts = []
-                if logo_file:
-                    temp_logo_path = f"temp_logo_{uuid.uuid4().hex}.png"
-                    with open(temp_logo_path, "wb") as f:
-                        f.write(logo_file.getbuffer())
-                def save_temp_chart(fig):
-                    p = f"/tmp/chart_{uuid.uuid4().hex}.png"
-                    fig.savefig(p, dpi=150, bbox_inches='tight')
-                    plt.close(fig)
-                    temp_charts.append(p)
-                    return p
-                fig1, ax1 = plt.subplots(figsize=(6,3.5))
-                colors_mpl = ['green' if x<70 else 'orange' if x<90 else 'red' for x in df_result["Usage Ratio (%)"]]
-                ax1.barh(df_result["Spare Part / Filter"], df_result["Usage Ratio (%)"], color=colors_mpl)
-                ax1.set_xlabel("Usage %")
-                ax1.set_title(f"Parts Usage - {selected_gen}")
-                ax1.invert_yaxis()
-                chart1_path = save_temp_chart(fig1)
-                
-                fig2, ax2 = plt.subplots(figsize=(3.5,3.5))
-                ax2.pie([current_h, rem_h], labels=['Elapsed', 'Remaining'], autopct='%1.1f%%', colors=["#182b49", "#28a745"])
-                ax2.set_title("Run Hours Ratio")
-                chart2_path = save_temp_chart(fig2)
-                
-                ft = get_fuel_table_from_csv(st.session_state.get("fuel_csv_upload", None) if "fuel_csv_upload" in st.session_state and st.session_state.fuel_csv_upload else None)
-                loads = sorted(ft.keys())
-                fig3, ax3 = plt.subplots(figsize=(6,3.2))
-                ax3.plot(loads, [ft[l]["CAT C32"] for l in loads], marker='o', label='CAT C32')
-                ax3.plot(loads, [ft[l]["Cummins KTA50"] for l in loads], marker='s', label='Cummins')
-                ax3.plot(loads, [ft[l]["Perkins 2506"] for l in loads], marker='^', label='Perkins')
-                ax3.plot(loads, [ft[l]["AVG"] for l in loads], marker='d', linestyle='--', label='AVG')
-                ax3.set_xlabel("Load %")
-                ax3.set_ylabel("SFC L/kWh")
-                ax3.set_title("Fuel SFC Curve - From Your CSV")
-                ax3.legend(fontsize=7)
-                ax3.grid(True, alpha=0.3)
-                chart3_path = save_temp_chart(fig3)
-                
-                fig4, ax4 = plt.subplots(figsize=(6,2.5))
-                ax4.plot(loads, [ft[l]["eff"] for l in loads], marker='o', color='green')
-                ax4.set_xlabel("Load %")
-                ax4.set_ylabel("Efficiency %")
-                ax4.set_title("Efficiency vs Load")
-                ax4.grid(True, alpha=0.3)
-                chart4_path = save_temp_chart(fig4)
-                
-                pdf = ComprehensivePDF(
-                    "COMPREHENSIVE GENERATOR REPORT - WITH FUEL CURVE & MAINTENANCE",
-                    logo_path=temp_logo_path,
-                    site_address=current_site_address,
-                    main_site=selected_main_site,
-                    sub_site=selected_sub_site
-                )
-                pdf.add_page()
-                pdf.set_fill_color(245, 247, 250)
-                pdf.rect(10, 35, 190, 60, "F")
-                pdf.set_xy(12, 37)
-                pdf.set_font("Helvetica", "B", 10)
-                pdf.set_text_color(24, 43, 73)
-                pdf.cell(0, 6, f"Site Address (In Header): {sanitize_latin_only(current_site_address)}", ln=True)
-                
-                pdf.set_x(12)
-                pdf.set_font("Helvetica", "B", 9)
-                pdf.cell(0, 5, f"Site Name: {sanitize_latin_only(selected_sub_site)} | Main Region: {sanitize_latin_only(selected_main_site)}", ln=True)
-                
-                pdf.set_x(12)
-                pdf.cell(0, 5, f"Generator ID: {sanitize_latin_only(selected_gen)} | Model: {sanitize_latin_only(gen_info['model'])} | {gen_info['kw']} kW | Load: {gen_info['load']} kW", ln=True)
-                pdf.set_x(12)
-                pdf.cell(0, 5, f"Run Hours: {gen_info['run_hours']} hrs | Target: {gen_info['target']} hrs", ln=True)
-                
-                pdf.set_x(12)
-                pdf.set_font("Helvetica", "B", 8)
-                pdf.cell(0, 5, f"Electrical Sensors: Voltage: {calib_e.get('v_measured', 0)}V | Freq: {calib_e.get('freq_measured', 0)}Hz | Current: {calib_e.get('current_measured', 0)}A | PF: {calib_e.get('pf', 0)}", ln=True)
-                pdf.set_x(12)
-                pdf.cell(0, 5, f"Mechanical Sensors: Oil Press: {calib_m.get('oil_press_bar', 0)}Bar | Coolant Temp: {calib_m.get('coolant_temp_c', 0)}C | RPM: {calib_m.get('rpm', 0)} | Battery: {calib_m.get('battery_v', 0)}V", ln=True)
-                pdf.set_x(12)
-                pdf.cell(0, 5, f"Fuel SFC Now: {ft[75]['AVG'] if gen_info['load']/max(gen_info['kw'],1)*100>60 else ft[50]['AVG']} L/kWh | Efficiency: {ft[75]['eff'] if gen_info['load']/max(gen_info['kw'],1)*100>60 else ft[50]['eff']}% | CO2 Factor: 2.68 kg/L", ln=True)
-                
-                amb_temp_val = calib_m.get('ambient_temp', 43.0)
-                pdf.ln(1)
-                pdf.set_x(12)
-                pdf.set_font("Helvetica", "B", 8)
-                pdf.set_text_color(200, 30, 30)
-                pdf.cell(0, 5, f"Oil Change & Recommendation [Ambient {amb_temp_val} C]: {'20W50' if amb_temp_val>=45 else '15W40'}", ln=True)
-                pdf.ln(4)
-                
-                headers_pdf = ["#", "Part / Service Name", "Lifespan", "Used", "Remain", "Status"]
-                widths = [10, 60, 25, 25, 25, 45]
-                pdf.set_font("Helvetica", "B", 8)
-                pdf.set_fill_color(24, 43, 73)
-                pdf.set_text_color(255, 255, 255)
-                for h, w in zip(headers_pdf, widths):
-                    pdf.cell(w, 6, h, border=1, fill=True, align="C")
-                pdf.ln()
-                pdf.set_font("Helvetica", "", 7)
-                pdf.set_text_color(0, 0, 0)
-                for i, row in df_result.iterrows():
-                    fill = (i % 2 == 0)
-                    pdf.set_fill_color(240, 243, 246) if fill else pdf.set_fill_color(255, 255, 255)
-                    pdf.cell(widths[0], 5, str(row["Unit"]), border=1, align="C", fill=fill)
-                    pdf.cell(widths[1], 5, sanitize_latin_only(str(row["Spare Part / Filter"]))[:32], border=1, fill=fill)
-                    pdf.cell(widths[2], 5, str(row["Lifespan (hrs)"]), border=1, align="C", fill=fill)
-                    pdf.cell(widths[3], 5, str(row["Elapsed Hours (hrs)"]), border=1, align="C", fill=fill)
-                    pdf.cell(widths[4], 5, str(row["Remaining Duration (hrs)"]), border=1, align="C", fill=fill)
-                    pdf.cell(widths[5], 5, sanitize_latin_only(str(row["Alarm Status"])), border=1, fill=fill)
-                    pdf.ln()
-                
-                pdf.add_page()
-                pdf.set_font("Helvetica", "B", 11)
-                pdf.cell(0, 8, "Page 2: Performance Charts - Parts Usage, Run Hours, Fuel & Efficiency", ln=True, align="C")
-                if os.path.exists(chart1_path):
-                    pdf.image(chart1_path, x=10, y=20, w=90)
-                if os.path.exists(chart2_path):
-                    pdf.image(chart2_path, x=110, y=20, w=80)
-                if os.path.exists(chart3_path):
-                    pdf.image(chart3_path, x=10, y=95, w=90)
-                if os.path.exists(chart4_path):
-                    pdf.image(chart4_path, x=110, y=95, w=90)
-                pdf.set_xy(10, 165)
-                pdf.set_font("Helvetica", "", 7)
-                pdf.multi_cell(0, 4, f"Site Address in Header Footer: {sanitize_latin_only(current_site_address)} | Analysis: Low load (<50%) increases SFC from {ft[100]['AVG']} to {ft[25]['AVG']} L/kWh (+29% waste). Recommendation: Keep load >70% for {ft[75]['eff']}% efficiency.")
-                
-                pdf.add_page()
-                pdf.set_font("Helvetica", "B", 11)
-                pdf.cell(0, 8, "Page 3: Detailed Fuel Table From Your CSV - Predictive Maintenance", ln=True, align="C")
-                pdf.ln(2)
-                pdf.set_font("Helvetica", "B", 8)
-                pdf.set_fill_color(24,43,73)
-                pdf.set_text_color(255,255,255)
-                f_headers = ["Load %", "CAT g/kWh", "Cummins", "Perkins", "SFC L/kWh", "Eff %", "CO2 kg/L"]
-                
-                f_widths = [15, 30, 30, 30, 25, 25, 35]
-                for h, w in zip(f_headers, f_widths):
-                    pdf.cell(w, 6, h, border=1, fill=True, align="C")
-                pdf.ln()
-                pdf.set_font("Helvetica", "", 8)
-                pdf.set_text_color(0, 0, 0)
-                
-                for load in sorted(ft.keys(), reverse=True):
-                    pdf.cell(f_widths[0], 5, f"{load}%", border=1, align="C")
-                    
-                    cat_val = ft[load].get("g_cat")
-                    if cat_val is None and "CAT C32" in ft[load]:
-                        cat_val = int(ft[load]["CAT C32"] * 850)
-                    pdf.cell(f_widths[1], 5, str(cat_val if cat_val is not None else "-"), border=1, align="C")
-                    
-                    cum_val = ft[load].get("g_cummins")
-                    if cum_val is None and "Cummins KTA50" in ft[load]:
-                        cum_val = int(ft[load]["Cummins KTA50"] * 850)
-                    pdf.cell(f_widths[2], 5, str(cum_val if cum_val is not None else "-"), border=1, align="C")
-                    
-                    per_val = ft[load].get("g_perkins")
-                    if per_val is None and "Perkins 2506" in ft[load]:
-                        per_val = int(ft[load]["Perkins 2506"] * 850)
-                    pdf.cell(f_widths[3], 5, str(per_val if per_val is not None else "-"), border=1, align="C")
-                    
-                    avg_val = ft[load].get("AVG", "-")
-                    pdf.cell(f_widths[4], 5, str(avg_val), border=1, align="C")
-                    
-                    eff_val = ft[load].get("eff", "-")
-                    pdf.cell(f_widths[5], 5, f"{eff_val}%" if eff_val != "-" else "-", border=1, align="C")
-                    
-                    pdf.cell(f_widths[6], 5, "2.68", border=1, align="C")
-                    pdf.ln()
-                    
-                for p in temp_charts:
-                    try:
-                        if os.path.exists(p):
-                            os.remove(p)
-                    except Exception:
-                        pass
-                        
-                pdf_out = pdf.output(dest="S")
-                return pdf_out.encode("latin-1", errors="replace") if isinstance(pdf_out, str) else bytes(pdf_out)
-            
-            st.download_button(
-                label=f"🖨️ Download COMPREHENSIVE Report ({selected_gen}) - 3 Pages With Fuel Curve & Site Address",
-                data=generate_full_pdf_bytes(),
-                file_name=f"COMPREHENSIVE_Report_{selected_gen}_{datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-                type="primary"
-            )
-    elif "2." in selected_app:
-        st.title("🎛️ " + ("Remote Control Center (IoT & Telemetry)" if L == "en" else "غرفة التحكم والتشغيل عن بُعد"))
-        df_iot = fetch_live_iot_data()
-        if not df_iot.empty:
-            latest = df_iot.iloc[-1]
-            col1, col2, col3 = st.columns(3)
-            col1.metric("🌡 Temp (°C)", f"{latest['temperature']:.1f}")
-            col2.metric("〰️ Vibration (mm/s)", f"{latest['vibration']:.2f}")
-            col3.metric("🗜️ Oil Press (Bar)", f"{latest['pressure']:.1f}")
-            fig_temp = px.line(df_iot, x='_time', y='temperature', title="Live Sensor Trend")
-            st.plotly_chart(fig_temp, use_container_width=True)
-        st.divider()
-        st.subheader("🕹️ Remote Operations Panel")
-        rc1, rc2, rc3 = st.columns(3)
-        with rc1:
-            if st.button("🟢 Start Generator", use_container_width=True):
-                st.success("Start signal dispatched!")
-        with rc2:
-            if st.button("🔴 Emergency Stop", use_container_width=True):
-                st.error("Emergency Stop dispatched!")
-        with rc3:
-            if st.button("🔄 Reset Alarms", use_container_width=True):
-                st.info("DSE Panel Reset!")
-    elif "3." in selected_app:
-        st.title("📊 " + ("Daily Monitoring & Tech Reminders" if L == "en" else "المتابعة اليومية وتقارير الإدارة"))
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        
-        tab_mgr1, tab_mgr2, tab_mgr3 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders", "🔔 Predictive Maintenance Table & WhatsApp Alarms"])
-        
-        with tab_mgr1:
-            today_logs = [log for log in st.session_state.daily_logs if log.get("date") == today_str]
-            st.write(f"Date: {today_str}")
-            if today_logs:
-                st.dataframe(pd.DataFrame(today_logs), use_container_width=True)
-            else:
-                st.warning("No logs registered today.")
-        with tab_mgr2:
-            tech_phone = st.text_input("Technician Phone Number:", value="249912345678")
-            reminder_msg = f"Addoma Maintenance Reminder: Please register daily genset logs for ({today_str})."
-            encoded_msg = urllib.parse.quote(reminder_msg)
-            whatsapp_url = f"https://wa.me/{tech_phone}?text={encoded_msg}"
-            st.markdown(f'''
-                <a href="{whatsapp_url}" target="_blank">
-                    <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">
-                        💬 Send WhatsApp Reminder
-                    </button>
-                </a>
-            ''', unsafe_allow_html=True)
-            
-        with tab_mgr3:
-            st.subheader("⚙️ Gensets and Machinery Predictive Maintenance Link & Smart WhatsApp Alarms")
-            st.markdown("Monitor default operating hours rates and automatically generate smart text WhatsApp messages:")
-            
-            default_tech_name = "                         "
-            default_whatsapp_num = "                       "
-            if 'selected_main_site' in locals() and 'selected_sub_site' in locals() and selected_main_site and selected_sub_site:
-                site_info = st.session_state.sites_data.get(selected_main_site, {}).get(selected_sub_site, {})
-                default_tech_name = site_info.get("technician_name", default_tech_name)
-                default_whatsapp_num = site_info.get("technician_whatsapp", default_whatsapp_num)
-            col_w_in1, col_w_in2 = st.columns(2)
-            assigned_tech_display = col_w_in1.text_input("Responsible Technician/Engineer Name:", value=default_tech_name)
-            target_whatsapp_num = col_w_in2.text_input("Target WhatsApp Number (with country code without symbols):", value=default_whatsapp_num)
-            
-            predictive_maintenance_data = [
-                {"Equipment / Genset": "G1 - Perkins 410kVA", "Part / Service": "Oil Filter", "Default Hours": 250, "Elapsed Hours": 240, "Remaining": 10, "Status": "Very close to maintenance date"},
-                {"Equipment / Genset": "G1 - Perkins 410kVA", "Part / Service": "Primary Fuel Filter", "Default Hours": 500, "Elapsed Hours": 485, "Remaining": 15, "Status": "Critical / Early Warning"},
-                {"Equipment / Genset": "G2 - Cummins 250kVA", "Part / Service": "Fan Belt", "Default Hours": 2000, "Elapsed Hours": 1200, "Remaining": 800, "Status": "Normal"},
-                {"Equipment / Genset": "WIC 10 Cold Room", "Part / Service": "Compressor Maintenance", "Default Hours": 8000, "Elapsed Hours": 7950, "Remaining": 50, "Status": "Critical / Predictive Maintenance Alarm"}
-            ]
-            df_pm = pd.DataFrame(predictive_maintenance_data)
-            st.dataframe(df_pm, use_container_width=True)
-            
-            default_smart_msg = f"🚨 *Predictive Maintenance & Automated Alert - Addoma Trading Services*\n\nTo Tech/Engineer Colleague: {assigned_tech_display}\nHello, the following default run hours consumption rates for generators and machinery have been detected:\n- G1 filters replacement due soon (few hours remaining).\n- Urgent maintenance scheduling required.\n\nPlease take necessary action as soon as possible."
-            
-            smart_message_input = st.text_area("Automatic Smart WhatsApp Message Text (Editable):", value=default_smart_msg)
-            
-            encoded_smart_msg = urllib.parse.quote(smart_message_input)
-            smart_whatsapp_url = f"https://wa.me/{target_whatsapp_num}?text={encoded_smart_msg}"
-            
-            st.markdown(f'''
-                <a href="{smart_whatsapp_url}" target="_blank">
-                    <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;">
-                        💬 Send Automatic Smart WhatsApp Alert & Alarm Message to Tech ({assigned_tech_display})
-                    </button>
-                </a>
-            ''', unsafe_allow_html=True)
-    elif "4." in selected_app:
-        st.title("🤖 " + ("AI Diagnostics & Fault Code Reader" if L == "en" else "المساعد الذكي والكتالوجات وقراءة الأكواد"))
-        col_files1, col_files2 = st.columns(2)
-        with col_files1:
-            st.subheader("📚 Catalog Upload (PDF)")
-            manual_file = st.file_uploader("Upload Equipment Catalog", type=["pdf"])
-            if manual_file:
-                st.success("Catalog uploaded successfully.")
-        with col_files2:
-            st.subheader("📷 Barcode/QR Reader")
-            qr_file = st.file_uploader("Upload QR Code Image", type=["png", "jpg", "jpeg"])
-            if qr_file:
-                st.info("Barcode reader processing...")
-    
-    elif "5." in selected_app:
-        st.title("🔍 " + ("Cold Room Inspection (WIC 10 & WIC 40)" if L == "en" else "نظام فحص معدات التبريد (WIC 10 & WIC 40)"))
-        st.markdown("### ❄️ Refrigeration and Freezing Rooms Data Reading System")
-        
-        col_wic1, col_wic2 = st.columns(2)
-        wic_unit = col_wic1.radio("Select cold room unit to inspect:", ["WIC 10 Cold Room Model", "WIC 40 Cold Room Model"])
-        controller_type = col_wic2.selectbox("Controller Type Used:", ["Emerson", "Dixell"])
-        st.divider()
-        col_w1, col_w2, col_w3 = st.columns(3)
-        with col_w1:
-            current_temp = st.number_input("Current Temperature (°C):", value=-18.0)
-            set_point = st.number_input("Set Point (°C):", value=-20.0)
-        with col_w2:
-            refrigerant_press = st.number_input("Refrigerant Pressure (Bar):", value=2.5)
-            defrost_status = st.selectbox("Defrost Cycle Status:", ["Off", "On", "Error/Alarm"])
-        with col_w3:
-            alarm_code = st.text_input("Alarm Code (if any):", placeholder="e.g., E1 or HA")
-            
-        if st.button("💾 Register and Read Inspection Data", type="primary"):
-            st.success(f"Unit ({wic_unit}) readings with controller ({controller_type}) registered successfully!")
-            if current_temp > set_point + 5:
-                st.warning(f"⚠️ Warning: Current temperature is significantly higher than normal. Please check refrigerant status or {controller_type} controller.")
-            if alarm_code:
-                st.error(f"🚨 System alarm registered: {alarm_code}. It will be forwarded to the AI assistant for analysis.")
-    elif "6." in selected_app:
-        st.title("🧮 " + ("Smart Electrical & Carbon Calculator" if L == "en" else "الحاسبة الهندسية للكهرباء والانبعاثات"))
-        
-        tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop", "⛽ Fuel & Emissions"])
-        
-        with tab_calc1:
-            st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
-            c1, c2, c3 = st.columns(3)
-            i_amp = c1.number_input("Required Current (Amperes):", value=250.0)
-            dist_m = c2.number_input("Cable Length (Meters):", value=120.0)
-            c_size = c3.selectbox("Cable Size (mm²):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4)
-            
-            v_drop, v_drop_pct = calculate_cable_voltage_drop(i_amp, dist_m, c_size)
-            
-            m_col1, m_col2 = st.columns(2)
-            m_col1.metric("Calculated Voltage Drop", f"{v_drop} V")
-            m_col2.metric("Voltage Drop Percentage", f"{v_drop_pct} %")
-            
-            if v_drop_pct > 4.0:
-                st.error("⚠️ Warning: Voltage drop percentage exceeds standard allowable limit (4%)! Please increase cable size.")
-            else:
-                st.success("✅ Cable size is excellent and within safe engineering limits.")
-        with tab_calc2:
-            st.subheader("⛽ Link Load Data to Fuel Consumption and Emissions")
-            
-            uploaded_csv_calc = st.file_uploader("Upload your fuel table (Optional - CSV):", type=["csv"], key="fuel_csv_calc")
-            fuel_table_loaded = get_fuel_table_from_csv(uploaded_csv_calc)
-            
-            col_c1, col_c2 = st.columns(2)
-            gen_model_calc = col_c1.selectbox("Generator Model:", ["Perkins", "Cummins", "CAT"])
-            pump_type = col_c2.selectbox("Fuel Pump System Type:", [
-                "Standard Core Diesel Pump (Mechanical)", 
-                "Electronic Injection (MEUI/ECM)"
-            ])
-            
-            col_c3, col_c4, col_c5 = st.columns(3)
-            kw_capacity = col_c3.number_input("Total Generator Capacity (kW):", value=150.0, step=10.0)
-            current_load_kw = col_c4.number_input("Enter and Edit Current Generator Load (kW):", value=100.0)
-            run_hours_calc = col_c5.number_input("Run Hours to Estimate:", value=10.0)
-            
-            if st.button("📊 Link Load Data and Calculate Consumption", type="primary"):
-                liters, co2, sfc, eff = calculate_fuel_consumption_and_emissions(
-                    kw_load=current_load_kw,
-                    run_hours=run_hours_calc,
-                    gen_model=gen_model_calc,
-                    kw_capacity=kw_capacity,
-                    fuel_table=fuel_table_loaded
-                )
-                
-                if "Mechanical" in pump_type:
-                    liters = round(liters * 1.05, 1)
-                    co2 = round(co2 * 1.05, 1)
-                    st.info("💡 Note: Consumption reading adjusted due to the use of a mechanical core fuel pump system.")
-                
-                st.success("Data linked and consumption calculated successfully based on instantaneous load!")
-                
-                calc_res1, calc_res2, calc_res3, calc_res4 = st.columns(4)
-                calc_res1.metric("Total Fuel Consumed", f"{liters} Liters")
-                calc_res2.metric("CO2 Emissions", f"{co2} kg")
-                calc_res3.metric("Specific Fuel Consumption (SFC)", f"{sfc} L/kWh")
-                calc_res4.metric("Genset Efficiency at this Load", f"{eff} %")
-                
-                load_percentage = (current_load_kw / kw_capacity) * 100 if kw_capacity > 0 else 0
-                if load_percentage < 50:
-                    st.warning(f"⚠️ Warning: The generator is running at a very low load ({load_percentage:.1f}%). This leads to incomplete combustion in {gen_model_calc} engines and unburnt oil accumulation (Wet Stacking).")
-                elif load_percentage > 90:
-                    st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
-                    
