@@ -1,35 +1,35 @@
-![ATS ENG Promo Banner](banner.jpg)
+# ⚙️ Osman Adam Addoma | Consultant Engineer
 
-📱 **Scan QR to try Demo:** https://qrco.de/bh2wH9 | 🎬 [Watch Promo Video](promo.mp4)
-# Industrial Generator Predictive Maintenance AI
+**Consultant Engineer | Power Systems Specialist | Industrial Automation & AI Developer**
 
-An AI-driven predictive maintenance application designed to monitor industrial generators and forecast mechanical or electrical failures before they occur.
+---
 
-https://industrial-predictive-genrator-maintenance-ai-m7drtvpc3rkxdzky.streamlit.app/
+### 🧰 About Me
+- 💡 **Specialization:** Industrial Power Systems, Generator Synchronization & Load Sharing (Deep Sea Controllers DSE 8610 MKII / DSE 7320 MKII).
+- 🛠️ **Field Experience:** Over 20 years in heavy diesel engine diagnostics (Perkins, Cummins, CAT), MEP, and commercial cold storage solutions (WIC 10 & WIC 40).
+- 💻 **Software & AI:** Industrial Predictive Maintenance Dashboards, Streamlit Web Apps, Python Simulations, and Supabase / InfluxDB Backend Integration.
+- 🏢 **Current Role:** Manager at **Addoma Trading Services**.
 
-**Key Features**
-* **Machine Learning Model:** Random Forest Classifier trained on key operational parameters (Temperature, Vibration, Voltage, Operating Hours).
-* **Failure Analysis:** Evaluates combined thermal and mechanical stress threshold dynamics for continuous power systems.
-* **Real-Time Inference:** Generates instant diagnostics for incoming live sensor data stream.
+---
 
-**Technologies**
-* Python, Pandas, NumPy, Scikit-Learn
-README.md
-​"© 2026 Osman Adam Addoma. All Rights Reserved. Unauthorized copying, modification, or distribution of this code or project structure is strictly prohibited
-# ⚙️ ADDOMA Industrial Predictive Maintenance AI
-### نظام الصيانة التنبؤية الشامل للمولدات الصناعية
+### 🛠️ Core Engineering & Tech Stack
+- **Languages & Frameworks:** Python (Streamlit, Matplotlib, NumPy, Pandas), SQL, HTML/CSS.
+- **Databases & Cloud:** Supabase (PostgreSQL), InfluxDB, GitHub, AnythingLLM.
+- **Industrial Automation:** SCADA, PLC, BMS, APFC Panels, DSE Controllers, MEP Integration.
 
-🔴 **Live Demo:** https://industrial-predictive-genrator-maintenance-ai-czfdnbfhbk4ywwaa.streamlit.app/
-🔑 **Demo Code:** `CLIENT-M-881` (30 Days Trial)
+---
 
-#### ما الذي يفعله؟
-- تنبؤ بالأعطال قبل 72 ساعة بالذكاء الاصطناعي
-- 6 تطبيقات: الصيانة، غرفة التحكم عن بعد، التقارير اليومية، المساعد الذكي، فحص WIC، الحاسبة الهندسية
-- حفظ سحابي لقوائم المولدات عبر Supabase
-- نظام اشتراكات للعملاء (شهري/سنوي)
+### 🚀 Key Projects
+1. **Industrial Predictive Maintenance AI Dashboard:**
+   - Full generator lifecycle management, real-time IoT telemetry, 14-part maintenance schedule, and comprehensive PDF report generation.
+2. **Cold Storage & Refrigeration Automation:**
+   - Visual inspection and diagnostic modules for Porkka Finland WIC 10 & WIC 40 cold rooms using Emerson & Dixell controllers.
 
-#### للمهندسين والشركات
-جرب الآن بدون تثبيت - يعمل على الموبايل.
+---
 
-Built with: Streamlit, Python, Supabase, InfluxDB, FPDF
-Author: Osman Adam - Addoma Trading Services - Omdurman, Sudan
+### 📬 Connect with Me
+- 🌐 **Company:** Addoma Trading Services
+- 💼 **Consultancy:** [Consultport Profile](#)
+- 📝 **Technical Writing:** Hive (`@eng1`) | Publish0x
+
+---
