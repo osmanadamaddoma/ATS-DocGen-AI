@@ -70,7 +70,7 @@ if "sites_data" not in st.session_state:
                 "technician_name": "                  ",
                 "technician_whatsapp": "                 ",
                 "generators": {
-                    "G1": {
+                    "  ": {
                         "model": "Perkins 410 kVA",
                         "run_hours": 700.0,
                         "target": 940.0,
@@ -88,7 +88,7 @@ if "sites_data" not in st.session_state:
                             "ambient_temp": 43.0
                         }
                     },
-                    "G2": {
+                    "  ": {
                         "model": "Cummins 250 kVA",
                         "run_hours": 1200.0,
                         "target": 1500.0,
@@ -118,9 +118,9 @@ if "daily_logs" not in st.session_state:
         {
             "timestamp": f"{today_str} 08:30:00",
             "date": today_str,
-            "site": "Khartoum (Main Menu) - Main Site - Kafouri (Sub Site)",
-            "generator": "G1",
-            "technician": "Ahmed Maintenance Tech",
+            "site": "Khartoum (Main Menu)",
+            "generator": "   ",
+            "technician": "                 ",
             "run_hours": 700.0,
             "v_measured": 398.0,
             "oil_press": 4.5,
@@ -432,9 +432,9 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perk
 CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
         "name": "Osman Adam Addoma (Addoma Trading Services)",
-        "plan": "Monthly",
-        "start_date": "2026-09-15",
-        "duration_days": 30,
+        "plan": "Yearly",
+        "start_date": "2026-10-08",
+        "duration_days": 365,
     },
     "CLIENT-M-881": {
         "name": "Nile Engineering Industries Company",
