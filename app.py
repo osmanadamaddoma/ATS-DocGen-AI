@@ -10,6 +10,7 @@ import io
 import base64
 import math
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
@@ -22,21 +23,25 @@ import streamlit as st
 import extra_streamlit_components as stx # Cookie management library added
 from google import genai
 from gtts import gTTS
+
 # Try importing Supabase library
 try:
     from supabase import create_client, Client
 except ImportError:
     create_client = None
+
 # Import live IoT Database library
 try:
     from influxdb_client import InfluxDBClient
 except ImportError:
     InfluxDBClient = None
+
 # Try importing barcode reading library
 try:
     from pyzbar.pyzbar import decode as decode_qr
 except ImportError:
     decode_qr = None
+
 # =========================================================
 # 0. Main Page Settings, AI, Audio, and Language Initialization
 # =========================================================
@@ -45,14 +50,17 @@ st.set_page_config(
     page_icon="🔐",
     layout="wide",
 )
+
 # Initial session state variables initialization
 if "audio_muted" not in st.session_state:
     st.session_state.audio_muted = False
 if "lang" not in st.session_state:
     st.session_state.lang = "en" # 'ar' or 'en'
+
 # Default page on entry
 if "current_page" not in st.session_state:
     st.session_state.current_page = "chat"
+
 # Update mini database structure to support main and sub menus
 if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
@@ -102,6 +110,7 @@ if "sites_data" not in st.session_state:
             }
         }
     }
+
 # Daily logs and readings tracking
 if "daily_logs" not in st.session_state:
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -119,14 +128,17 @@ if "daily_logs" not in st.session_state:
             "status": "Normal"
         }
     ]
+
 # Fetch Gemini key securely from secrets
 gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not gemini_key and "supabase" in st.secrets:
     gemini_key = st.secrets["supabase"].get("GEMINI_API_KEY")
 if not gemini_key:
     st.warning("⚠️ GEMINI_API_KEY not found. Please add it to st.secrets.")
+
 # Initialize Gemini API client
 client = genai.Client(api_key=gemini_key) if gemini_key else None
+
 # Supabase database settings for app connection
 supabase = None
 if create_client:
@@ -146,6 +158,7 @@ if create_client:
         st.info("💡 Supabase keys not found. Please add them (SUPABASE_URL and SUPABASE_KEY) in st.secrets.")
 else:
     st.warning("⚠️ Supabase library is not installed. Please install it using pip install supabase")
+
 # Updated audio function with dual language support, mute option, and continuous loop for alarms
 def play_audio(text, lang='en', loop=False):
     """Convert text to speech using gTTS and play if mute is not active with loop support"""
@@ -171,6 +184,7 @@ def play_audio(text, lang='en', loop=False):
             st.audio(audio_data, format='audio/mp3', autoplay=True)
     except Exception as e:
         st.error(f"Audio playback error: {e}")
+
 @st.cache_data(ttl=3600)
 def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
     """AI call function with high pressure error handling (503), retries, and bilingual support"""
@@ -207,6 +221,7 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
                 else:
                     return "⚠️ High server load (503). Please retry in a few seconds." if language == "en" else "⚠️ الخادم يمر بضغط عالٍ حالياً (503). يرجى المحاولة مرة أخرى."
             return f"❌ Error: {err_msg}"
+
 # =========================================================
 # 1. System Helper Functions and Comprehensive PDF Report Design
 # =========================================================
@@ -215,6 +230,7 @@ def sanitize_latin_only(text):
         text = str(text)
     clean_text = re.sub(r"[^\x00-\x7F]+", "", text).strip()
     return clean_text if clean_text else "N/A"
+
 class ComprehensivePDF(FPDF):
     def __init__(
         self,
@@ -230,6 +246,7 @@ class ComprehensivePDF(FPDF):
         self.site_address = site_address
         self.main_site = main_site
         self.sub_site = sub_site
+
     def header(self):
         self.set_fill_color(24, 43, 73)
         self.rect(0, 0, 210, 8, "F")
@@ -263,6 +280,7 @@ class ComprehensivePDF(FPDF):
         self.set_line_width(0.5)
         self.line(10, 30, 200, 30)
         self.ln(10)
+
     def footer(self):
         self.set_y(-15)
         self.set_draw_color(200, 200, 200)
@@ -283,6 +301,7 @@ class ComprehensivePDF(FPDF):
             f"Page {self.page_no()} | Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Site: {sanitize_latin_only(self.site_address)}",
             align="C",
         )
+
 # =========================================================
 # 1.5 Live Database and IoT Integration Functions
 # =========================================================
@@ -319,6 +338,7 @@ def fetch_live_iot_data():
         return pd.DataFrame()
     except Exception:
         return pd.DataFrame()
+
 # =========================================================
 # 1.8 Smart Engineering Tools and Calculators
 # =========================================================
@@ -328,6 +348,7 @@ def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85)
     v_drop = (math.sqrt(3) * current_a * distance_m * rho_copper * cos_phi) / cable_mm2
     v_drop_pct = (v_drop / 400.0) * 100
     return round(v_drop, 2), round(v_drop_pct, 2)
+
 def get_fuel_table_from_csv(uploaded_csv=None):
     """Read fuel table from uploaded CSV file or use internal table"""
     default_table = {
@@ -366,6 +387,7 @@ def get_fuel_table_from_csv(uploaded_csv=None):
             print(f"CSV parse error: {e}")
             return default_table
     return default_table
+
 def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perkins", kw_capacity=None, fuel_table=None):
     """Estimate diesel consumption and emissions - smart version reading from CSV table based on load percentage and engine type"""
     if fuel_table is None:
@@ -403,6 +425,7 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perk
     liters = kw_load * sfc * run_hours
     co2_kg = liters * 2.68
     return round(liters, 1), round(co2_kg, 1), round(sfc, 3), round(eff, 1)
+
 # =========================================================
 # 2. Unified Subscription System and Packages (with Cookie Management)
 # =========================================================
@@ -427,6 +450,7 @@ CLIENTS_DATABASE = {
     },
 }
 ADMIN_CODES = ["ADDOMA-2026-PRO"]
+
 if supabase:
     try:
         res_load = supabase.table("subscriptions").select("*").execute()
@@ -441,10 +465,12 @@ if supabase:
                 }
     except Exception as e:
         print(f"Load subscriptions error: {e}")
+
 def get_cookie_manager():
     if "cookie_manager" not in st.session_state:
         st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager_persistent_final_v3")
     return st.session_state["cookie_manager"]
+
 cookie_manager = get_cookie_manager()
 query_params = st.query_params
 code_from_url = query_params.get("code", None)
@@ -455,9 +481,12 @@ try:
         saved_code = cookie_manager.get(cookie="activation_code")
 except:
     saved_code = None
+
 final_saved = code_from_url if code_from_url else saved_code
+
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+
 if final_saved and not st.session_state.authenticated:
     clean_saved = str(final_saved).strip().upper()
     if clean_saved in CLIENTS_DATABASE:
@@ -485,11 +514,13 @@ if final_saved and not st.session_state.authenticated:
                         break
             except:
                 pass
+
 # --- Language Selection Option in Sidebar ---
 st.sidebar.subheader("🌐 Language")
 selected_lang = st.sidebar.radio("Select Language:", ["Arabic (العربية)", "English"], index=1 if st.session_state.lang == "en" else 0)
 st.session_state.lang = "en" if "English" in selected_lang else "ar"
 L = st.session_state.lang
+
 TXT = {
     "ar": {
         "title": "🔐 بوابة تفعيل النظام الموحد",
@@ -530,6 +561,7 @@ TXT = {
         "choose_app": "Select System Module:"
     }
 }[L]
+
 if not st.session_state.authenticated:
     st.title(TXT["title"])
     user_code = st.sidebar.text_input(TXT["code_input"], type="password")
@@ -590,11 +622,13 @@ else:
             if "active_code" in st.session_state:
                 del st.session_state["active_code"]
             st.rerun()
+
 input_code = st.session_state.get("active_code", "")
 is_pro = False
 client_name = "Visitor"
 plan_type = "N/A"
 days_left = 0
+
 if input_code in CLIENTS_DATABASE:
     data = CLIENTS_DATABASE[input_code]
     client_name = data["name"]
@@ -620,13 +654,17 @@ if input_code in CLIENTS_DATABASE:
         if "code" in st.query_params:
             del st.query_params["code"]
         st.stop()
+
 if not is_pro:
     st.warning(TXT["warning_auth"])
     st.stop()
+
 st.sidebar.divider()
 st.sidebar.markdown(TXT["app_selection"])
+
 def on_app_change():
     st.session_state.current_page = "main_apps"
+
 apps_list_ar = [
     "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
     "🎛️ 2. غرفة التحكم والتشغيل عن بُعد (Remote Control Center)",
@@ -634,7 +672,7 @@ apps_list_ar = [
     "🤖 4. المساعد الذكي والكتالوجات وقراءة الأكواد",
     "🔍 5. نظام فحص المعدات (WIC وغيرها)",
     "🧮 6. الحاسبة الهندسية للكهرباء والانبعاثات (Smart Eng Calculator)",
-    "⚡ 7. نظام ATS DocIntel GenAI المدمج"
+    "⚡ 7. نظام ATS DocIntel GenAI"
 ]
 apps_list_en = [
     "⚙️ 1. Predictive Maintenance & Gensets",
@@ -645,12 +683,14 @@ apps_list_en = [
     "🧮 6. Smart Electrical & Carbon Calculator",
     "⚡ 7. ATS DocIntel GenAI Suite"
 ]
+
 selected_app = st.sidebar.radio(
     TXT["choose_app"],
     apps_list_ar if L == "ar" else apps_list_en,
     on_change=on_app_change
 )
 st.sidebar.divider()
+
 @st.dialog("📝 Edit Generator & Calibration Data" if L == "en" else "📝 إدخال وتعديل بيانات المولد والمعايرة")
 def edit_generator_modal(main_site, sub_site, gen_key):
     gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
@@ -741,6 +781,7 @@ def edit_generator_modal(main_site, sub_site, gen_key):
             })
             st.success("✅ Saved successfully and synced to Supabase!")
             st.rerun()
+
 if st.session_state.current_page == "chat":
     st.title("🤖 " + ("Smart AI Assistant" if L == "en" else "المساعد الذكي الهندسي"))
     st.caption("Addoma Trading Services - Industrial AI Engine")
@@ -1470,8 +1511,8 @@ else:
                     st.warning(f"⚠️ Warning: The generator is running at a very low load ({load_percentage:.1f}%). This leads to incomplete combustion in {gen_model_calc} engines and unburnt oil accumulation (Wet Stacking).")
                 elif load_percentage > 90:
                     st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
+
     elif "7." in selected_app:
-        # إعداد الصفحة وتكوين العرض الخاصة بـ ATS DocIntel GenAI
         st.title("⚡ ATS DocIntel GenAI")
         st.markdown("### *Industrial Document Intelligence, Predictive RUL Analytics & Automated Fault Remediation Suite*")
         st.markdown("---")
@@ -1486,15 +1527,15 @@ else:
                 "رفع كتالوجات الصيانة (PDF)", 
                 type=["pdf", "txt", "docx"],
                 accept_multiple_files=True,
-                key="docintel_manuals"
+                key="uploaded_manuals_docintel"
             )
             
             st.markdown("---")
             
             # مقارنة صور القطع (التالفة مقابل الصالحة)
             st.subheader("🔍 مقارنة صور القطع")
-            healthy_img = st.file_uploader("صورة القطعة السليمة (المرجعية)", type=["jpg", "png", "jpeg"], key="docintel_healthy")
-            damaged_img = st.file_uploader("صورة القطعة التالفة (من الميدان)", type=["jpg", "png", "jpeg"], key="docintel_damaged")
+            healthy_img = st.file_uploader("صورة القطعة السليمة (المرجعية)", type=["jpg", "png", "jpeg"], key="healthy_docintel")
+            damaged_img = st.file_uploader("صورة القطعة التالفة (من الميدان)", type=["jpg", "png", "jpeg"], key="damaged_docintel")
             
             st.markdown("---")
             st.info("💡 **نظام التشغيل:** ATS DocIntel متصل بقاعدة بيانات المحركات وغرف التبريد لتحليل الحالة الفورية وإرسال التنبيهات.")
@@ -1533,7 +1574,7 @@ else:
 
         with tab2:
             st.subheader("Document Intelligence & Knowledge Graph (Inspired by Wordlit)")
-            if uploaded_manuals:
+            if 'uploaded_manuals' in locals() and uploaded_manuals:
                 st.success(f"تم بنجاح رفع ومعالجة عدد {len(uploaded_manuals)} ملف/كتالوج فني.")
                 for file in uploaded_manuals:
                     st.write(f"📄 **تم استخراج البيانات وفهرسة الكتالوج:** {file.name}")
@@ -1547,16 +1588,16 @@ else:
             col_a, col_b = st.columns(2)
             with col_a:
                 st.write("### إعدادات إرسال التنبيهات للمهندس الميداني:")
-                eng_phone = st.text_input("رقم هاتف المهندس الفني", "+249XXXXXXXXX", key="docintel_phone")
-                fault_location = st.text_input("موقع الموقع / الموقع الجغرافي", "مصنع التعدين - المولد الرئيسي (130 KVA)", key="docintel_loc")
+                eng_phone = st.text_input("رقم هاتف المهندس الفني", "+249XXXXXXXXX", key="docintel_eng_phone")
+                fault_location = st.text_input("موقع الموقع / الموقع الجغرافي", "مصنع التعدين - المولد الرئيسي (130 KVA)", key="docintel_fault_location")
                 selected_fault = st.selectbox("نوع العطل المرصود", [
                     "انخفاض ضغط الزيت في محرك Perkins",
                     "ارتفاع حرارة غرفة التبريد WIC 40",
                     "خطأ في تزامن المولدات (DSE 8610)",
                     "تسرب في خط الوقود"
-                ], key="docintel_fault")
+                ], key="docintel_selected_fault")
                 
-                if st.button("إرسال التنبيه الفوري (SMS & Voice Alert)", key="docintel_btn_send"):
+                if st.button("إرسال التنبيه الفوري (SMS & Voice Alert)", key="docintel_alert_btn"):
                     if eng_phone:
                         st.success(f"✅ تم إرسال رسالة نصية وتنبيه صوتي بنجاح إلى الرقم ({eng_phone}) يوضح موقع العطل ('{fault_location}') ونوع المشكلة مع خطة العلاج المقترحة!")
                     else:
