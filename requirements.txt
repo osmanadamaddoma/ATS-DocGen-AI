@@ -21,3 +21,6 @@ PyGithub
 pytz
 python-dotenv
 PyGithub
+influxdb-client
+extra-streamlit-components
+openpyxl
