@@ -178,7 +178,7 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
     """AI call function with high pressure error handling (503), retries, and bilingual support"""
     if not client:
         return "⚠️ GEMINI_API_KEY not found." if language == "en" else "⚠ لم يتم العثور على مفتاح GEMINI_API_KEY."
-    lang_instr = "Respond in English." if language == "en" else "اكتب الإجابة بلغة عربية تقنية واضحة ومباشرة."
+    lang_instr = "Respond in English." if language == "en" else "Write the response in clear and direct technical Arabic."
     prompt = f"""
     You are an expert industrial consulting engineer specializing in generators, DSE control panels (DSE 7320, DSE 8610 MKII), Perkins & Cummins engines, and cooling systems.
     Fault Code / Alarm: "{fault_code}"
@@ -533,10 +533,29 @@ with st.sidebar:
     st.markdown("---")
 # --- Language Selection Option in Sidebar ---
 st.sidebar.subheader("🌐 Language")
-selected_lang = st.sidebar.radio("Select Language:", ["Arabic (العربية)", "English"], index=1 if st.session_state.lang == "en" else 0)
-st.session_state.lang = "en" if "English" in selected_lang else "ar"
+selected_lang = st.sidebar.radio("Select Language:", ["English", "Arabic (العربية)"], index=0 if st.session_state.lang == "en" else 1)
+st.session_state.lang = "ar" if "Arabic" in selected_lang else "en"
 L = st.session_state.lang
 TXT = {
+    "en": {
+        "title": "🔐 Unified System Activation Portal (Trial 7-Days Support: TRIAL-7DAYS)",
+        "code_input": "Activation Code:",
+        "btn_activate": "Activate",
+        "invalid_code": "❌ Invalid activation code.",
+        "warning_auth": "🔒 Please enter a valid subscription code (or trial code TRIAL-7DAYS) to access applications and AI assistant.",
+        "nav_header": "⚙️ Addoma Trading Services System",
+        "nav_status": "🟢 System Connected & Active",
+        "btn_chat": "💬 Smart Engineering Assistant",
+        "btn_dashboard": "📊 Systems Control Dashboard",
+        "btn_apps": "🛠️ Comprehensive Engineering Apps",
+        "btn_logout": "🚪 Logout / Clear License",
+        "client": "👤 Client:",
+        "plan": "📦 Plan:",
+        "remaining": "⏳ Remaining:",
+        "days": "Days",
+        "app_selection": "🛠️ Available Apps (Pro Version)",
+        "choose_app": "Select Required System:"
+    },
     "ar": {
         "title": "🔐 بوابة تفعيل النظام الموحد (يدعم كود التجربة 7 أيام: TRIAL-7DAYS)",
         "code_input": "كود التفعيل:",
@@ -555,25 +574,6 @@ TXT = {
         "days": "يوم",
         "app_selection": "🛠️ التطبيقات المتاحة (نسخة احترافية)",
         "choose_app": "اختر النظام المطلوب:"
-    },
-    "en": {
-        "title": "🔐 Unified Activation Portal (Trial 7-Days Support: TRIAL-7DAYS)",
-        "code_input": "Activation Code:",
-        "btn_activate": "Activate",
-        "invalid_code": "❌ Invalid activation code.",
-        "warning_auth": "🔒 Please enter a valid activation code (or trial code TRIAL-7DAYS) to access system applications.",
-        "nav_header": "⚙️ Addoma Trading Services System",
-        "nav_status": "🟢 System Connected & Active",
-        "btn_chat": "💬 Smart Engineering Assistant",
-        "btn_dashboard": "📊 Systems Control Dashboard",
-        "btn_apps": "🛠️ Engineering Apps Suite",
-        "btn_logout": "🚪 Logout / Clear License",
-        "client": "👤 Client:",
-        "plan": "📦 Plan:",
-        "remaining": "⏳ Days Left:",
-        "days": "days",
-        "app_selection": "🛠️ Available Apps (Pro Version)",
-        "choose_app": "Select System Module:"
     }
 }[L]
 if not st.session_state.authenticated:
@@ -680,6 +680,14 @@ st.sidebar.divider()
 st.sidebar.markdown(TXT["app_selection"])
 def on_app_change():
     st.session_state.current_page = "main_apps"
+apps_list_en = [
+    "⚙️ 1. Predictive Maintenance & Gensets (With Reports)",
+    "🎛️ 2. Remote Operations & Control Center",
+    "📊 3. Daily Monitoring, Management Reports & Reminders",
+    "🤖 4. AI Assistant, Catalogs & Code Reader (ATS DocIntel GenAI)",
+    "🔍 5. Equipment Inspection (WIC & Others)",
+    "🧮 6. Smart Electrical & Emissions Calculator"
+]
 apps_list_ar = [
     "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
     "🎛️ 2. غرفة التحكم والتشغيل عن بُعد (Remote Control Center)",
@@ -688,21 +696,13 @@ apps_list_ar = [
     "🔍 5. نظام فحص المعدات (WIC وغيرها)",
     "🧮 6. الحاسبة الهندسية للكهرباء والانبعاثات (Smart Eng Calculator)"
 ]
-apps_list_en = [
-    "⚙️ 1. Predictive Maintenance & Gensets",
-    "🎛 2. Remote Operations & Control Center",
-    "📊 3. Daily Monitoring & Reminders",
-    "🤖 4. AI Diagnostics & Catalog Reader (ATS DocIntel GenAI)",
-    "🔍 5. Equipment Inspection (WIC & Heavy Duty)",
-    "🧮 6. Smart Electrical & Carbon Calculator"
-]
 selected_app = st.sidebar.radio(
     TXT["choose_app"],
-    apps_list_ar if L == "ar" else apps_list_en,
+    apps_list_en if L == "en" else apps_list_ar,
     on_change=on_app_change
 )
 st.sidebar.divider()
-@st.dialog("📝 Edit Generator & Calibration Data" if L == "en" else "📝 إدخال وتعديل بيانات المولد والمعايرة")
+@st.dialog("📝 Edit Generator & Calibration Data")
 def edit_generator_modal(main_site, sub_site, gen_key):
     gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
     elec = gen_data.get("calib_elec", {})
@@ -793,16 +793,16 @@ def edit_generator_modal(main_site, sub_site, gen_key):
             st.success("✅ Saved successfully and synced to Supabase!")
             st.rerun()
 if st.session_state.current_page == "chat":
-    st.title("🤖 " + ("Smart AI Assistant" if L == "en" else "المساعد الذكي الهندسي"))
+    st.title("🤖 Smart Engineering AI Assistant")
     st.caption("Addoma Trading Services - Industrial AI Engine")
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "assistant", "content": "Hello! How can I assist you today with generator control, refrigeration, or diagnostics?" if L == "en" else "مرحباً بك! كيف يمكنني مساعدتك اليوم في المولدات، التبريد، أو الصيانة؟"}
+            {"role": "assistant", "content": "Hello! How can I assist you today with generator control, refrigeration, or maintenance?"}
         ]
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
-    user_query = st.chat_input("Ask a technical question..." if L == "en" else "اكتب استفسارك الهندسي هنا...")
+    user_query = st.chat_input("Type your technical query here...")
     if user_query:
         with st.chat_message("user"):
             st.markdown(user_query)
@@ -819,7 +819,7 @@ if st.session_state.current_page == "chat":
             message_placeholder.markdown(response_text)
         st.session_state.messages.append({"role": "assistant", "content": response_text})
 elif st.session_state.current_page == "dashboard":
-    st.title("📊 " + ("Systems Control Dashboard" if L == "en" else "لوحة تحكم الأنظمة والمتابعة"))
+    st.title("📊 Systems Control Dashboard")
     col1, col2, col3 = st.columns(3)
     col1.metric(label="Generators Status", value="Stable", delta="Sync Ready")
     col2.metric(label="WIC Cold Rooms", value="2 Units (WIC10 & WIC40)", delta="-1°C", delta_color="inverse")
@@ -829,7 +829,7 @@ elif st.session_state.current_page == "dashboard":
     st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
 else:
     if "1." in selected_app:
-        st.title("⚙️ " + ("Predictive Maintenance & Gensets" if L == "en" else "نظام الصيانة التنبؤية ومراقبة المولدات"))
+        st.title("⚙️ Predictive Maintenance & Gensets")
         col_top_audio1, col_top_audio2 = st.columns([3, 1])
         with col_top_audio2:
             mute_label = "🔇 Mute" if not st.session_state.audio_muted else "🔊 Unmute"
@@ -1331,7 +1331,7 @@ else:
                 type="primary"
             )
     elif "2." in selected_app:
-        st.title("🎛️ " + ("Remote Control Center (IoT & Telemetry)" if L == "en" else "غرفة التحكم والتشغيل عن بُعد"))
+        st.title("🎛️ Remote Control Center (IoT & Telemetry)")
         df_iot = fetch_live_iot_data()
         if not df_iot.empty:
             latest = df_iot.iloc[-1]
@@ -1354,7 +1354,7 @@ else:
             if st.button("🔄 Reset Alarms", use_container_width=True):
                 st.info("DSE Panel Reset!")
     elif "3." in selected_app:
-        st.title("📊 " + ("Daily Monitoring & Tech Reminders" if L == "en" else "المتابعة اليومية وتقارير الإدارة"))
+        st.title("📊 Daily Monitoring & Management Reports")
         today_str = datetime.now().strftime("%Y-%m-%d")
         
         tab_mgr1, tab_mgr2, tab_mgr3 = st.tabs(["📋 Summary Report", "⏰ Automation Reminders", "🔔 Predictive Maintenance Table & WhatsApp Alarms"])
@@ -1425,12 +1425,12 @@ else:
         st.markdown("---")
         # أدوات القوائم المنسدلة ورفع الملفات الجانبية الخاصة بـ DocIntel
         with st.sidebar:
-            st.header("📂 لوحة المدخلات الذكية")
-            st.markdown("رفع الكتالوجات (PDF) وصور المعدات للمقارنة والتحليل:")
+            st.header("📂 Smart Inputs Panel")
+            st.markdown("Upload maintenance manuals (PDF) and equipment images for comparison & analysis:")
             
             # رفع الكتالوجات الفنية
             uploaded_manuals = st.file_uploader(
-                "رفع كتالوجات الصيانة (PDF)", 
+                "Upload Maintenance Manuals (PDF)", 
                 type=["pdf", "txt", "docx"],
                 accept_multiple_files=True,
                 key="docintel_manuals_uploader"
@@ -1439,39 +1439,39 @@ else:
             st.markdown("---")
             
             # مقارنة صور القطع (التالفة مقابل الصالحة)
-            st.subheader("🔍 مقارنة صور القطع")
-            healthy_img = st.file_uploader("صورة القطعة السليمة (المرجعية)", type=["jpg", "png", "jpeg"], key="healthy_docintel")
-            damaged_img = st.file_uploader("صورة القطعة التالفة (من الميدان)", type=["jpg", "png", "jpeg"], key="damaged_docintel")
+            st.subheader("🔍 Parts Image Comparison")
+            healthy_img = st.file_uploader("Healthy Part Image (Reference)", type=["jpg", "png", "jpeg"], key="healthy_docintel")
+            damaged_img = st.file_uploader("Damaged Part Image (Field)", type=["jpg", "png", "jpeg"], key="damaged_docintel")
             
             st.markdown("---")
-            st.info("💡 **نظام التشغيل:** ATS DocIntel متصل بقاعدة بيانات المحركات وغرف التبريد لتحليل الحالة الفورية وإرسال التنبيهات.")
+            st.info("💡 **Operating System:** ATS DocIntel is connected to engine and cold room databases for real-time status analysis and alert dispatch.")
         # الواجهة الرئيسية مقسمة إلى تبويبات (Tabs) احترافية
         tab1, tab2, tab3, tab4 = st.tabs([
-            "📊 تحليل التشخيص والعمر الافتراضي (RUL)", 
-            "📑 مستندات الذكاء الاصطناعي (NLP & QR Reader)", 
-            "🚨 نظام الإنذارات والإحداثيات", 
-            "📈 رسوم استهلاك الوقود مقابل الحمل"
+            "📊 Diagnostics & RUL Assessment", 
+            "📑 AI Documents (NLP & QR Reader)", 
+            "🚨 Alarms & Coordinates System", 
+            "📈 Fuel Consumption vs Load Analytics"
         ])
         with tab1:
             st.subheader("Evaluation & Remaining Useful Life (RUL) Assessment")
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.metric(label="حالة الماكينة العامة", value="92%", delta="مستقرة")
+                st.metric(label="Overall Machine Status", value="92%", delta="Stable")
             with col2:
-                st.metric(label="العمر المتبقي لقطع الغيار (RUL)", value="450 ساعة تشغيل", delta="-30 ساعة هذا الأسبوع")
+                st.metric(label="Remaining Spare Part Life (RUL)", value="450 Operating Hrs", delta="-30 hrs this week")
             with col3:
-                st.metric(label="درجة كفاءة التزامن (DSE)", value="98.5%", delta="+1.2%")
+                st.metric(label="DSE Synchronization Efficiency", value="98.5%", delta="+1.2%")
                 
             st.markdown("---")
-            st.write("### تقرير فحص المكونات واستنتاج الخلل:")
+            st.write("### Component Inspection & Fault Deduction Report:")
             
             # محاكاة جدول الفحص التنبؤي
             data_audit = {
-                "المكون / النظام": ["طلمبة الديزل (Mechanical Pump)", "حساسات 70-pin (Perkins)", "وحدة التبريد (WIC 40)", "نظام التحكم (DSE 8610)"],
-                "الحالة التشغيلية": ["تحتاج صيانة وقائية قريباً", "سليمة 100%", "مستقرة", "ممتازة"],
-                "نسبة التآكل المتوقعة": ["18%", "2%", "5%", "1%"],
-                "الإجراء الموصى به (Action Plan)": ["معايرة الضغط وتغيير الفلاتر", "لا يوجد إجراء", "فحص غاز التبريد", "تحديث البرنامج الثابت"]
+                "Component / System": ["Mechanical Diesel Pump", "70-pin Sensors (Perkins)", "Refrigeration Unit (WIC 40)", "Control System (DSE 8610)"],
+                "Operational Status": ["Needs preventive maintenance soon", "100% Healthy", "Stable", "Excellent"],
+                "Expected Wear Ratio": ["18%", "2%", "5%", "1%"],
+                "Recommended Action Plan": ["Calibrate pressure & change filters", "No action required", "Check refrigerant gas", "Update firmware"]
             }
             df_audit = pd.DataFrame(data_audit)
             st.dataframe(df_audit, use_container_width=True)
@@ -1481,56 +1481,56 @@ else:
             col_doc1, col_doc2 = st.columns(2)
             with col_doc1:
                 if uploaded_manuals:
-                    st.success(f"تم بنجاح رفع ومعالجة عدد {len(uploaded_manuals)} ملف/كتالوج فني.")
+                    st.success(f"Successfully uploaded and processed {len(uploaded_manuals)} technical manual(s).")
                     for file in uploaded_manuals:
-                        st.write(f"📄 **تم استخراج البيانات وفهرسة الكتالوج:** {file.name}")
-                    st.info("🤖 نموذج الذكاء الاصطناعي يقوم الآن بتحليل الكتالوجات لمطابقة أرقام القطع وأكواد الأعطال الخاصة بـ Perkins أو معدات WIC.")
+                        st.write(f"📄 **Extracted Data & Catalog Indexed:** {file.name}")
+                    st.info("🤖 AI model is now analyzing manuals to match part numbers and fault codes for Perkins or WIC equipment.")
                 else:
-                    st.warning("الرجاء رفع كتالوجات الصيانة بصيغة PDF من الشريط الجانبي لبدء تحليل النصوص واستخراج الروابط الفنية.")
+                    st.warning("Please upload maintenance manuals in PDF format from the sidebar to begin text analysis and extract technical links.")
             
             with col_doc2:
-                st.subheader("📷 قارئ الباروكود وأكواد QR الميدانية")
-                qr_file_doc = st.file_uploader("رفع صورة كود QR/Barcode لقطع الغيار", type=["png", "jpg", "jpeg"], key="qr_docintel_reader")
+                st.subheader("📷 Field Barcode & QR Code Reader")
+                qr_file_doc = st.file_uploader("Upload QR/Barcode Image of Spare Parts", type=["png", "jpg", "jpeg"], key="qr_docintel_reader")
                 if qr_file_doc:
-                    st.info("جاري تحليل الكود ومطابقته مع قواعد بيانات الصيانة...")
+                    st.info("Analyzing code and matching with maintenance databases...")
         with tab3:
-            st.subheader("🚨 نظام التنبيهات الصوتية والرسائل النصية (SMS & Audio Alerts)")
+            st.subheader("🚨 SMS & Voice Alert System")
             
             col_a, col_b = st.columns(2)
             with col_a:
-                st.write("### إعدادات إرسال التنبيهات للمهندس الميداني:")
-                eng_phone = st.text_input("رقم هاتف المهندس الفني", "+249XXXXXXXXX", key="docintel_phone")
-                fault_location = st.text_input("موقع الموقع / الموقع الجغرافي", "مصنع التعدين - المولد الرئيسي (130 KVA)", key="docintel_loc")
-                selected_fault = st.selectbox("نوع العطل المرصود", [
-                    "انخفاض ضغط الزيت في محرك Perkins",
-                    "ارتفاع حرارة غرفة التبريد WIC 40",
-                    "خطأ في تزامن المولدات (DSE 8610)",
-                    "تسرب في خط الوقود"
+                st.write("### Field Engineer Alert Settings:")
+                eng_phone = st.text_input("Field Engineer Phone Number", "+249XXXXXXXXX", key="docintel_phone")
+                fault_location = st.text_input("Site Location / Geolocation", "Mining Factory - Main Generator (130 KVA)", key="docintel_loc")
+                selected_fault = st.selectbox("Detected Fault Type", [
+                    "Low Oil Pressure in Perkins Engine",
+                    "High Temperature in WIC 40 Cold Room",
+                    "Genset Synchronization Error (DSE 8610)",
+                    "Fuel Line Leakage"
                 ], key="docintel_fault_sel")
                 
-                if st.button("إرسال التنبيه الفوري (SMS & Voice Alert)"):
+                if st.button("Send Instant Alert (SMS & Voice Alert)"):
                     if eng_phone:
-                        st.success(f"✅ تم إرسال رسالة نصية وتنبيه صوتي بنجاح إلى الرقم ({eng_phone}) يوضح موقع العطل ('{fault_location}') ونوع المشكلة مع خطة العلاج المقترحة!")
+                        st.success(f"✅ SMS and voice alert successfully sent to ({eng_phone}) indicating fault location ('{fault_location}'), problem type, and proposed treatment plan!")
                     else:
-                        st.error("الرجاء إدخال رقم هاتف المهندس أولاً.")
+                        st.error("Please enter the engineer's phone number first.")
                         
             with col_b:
-                st.write("### سجل الإنذارات النشطة:")
-                st.error("⚠️ [تنبيه حرج 10:42 صباحاً]: خطأ في استجابة محرك البيركنز - تم توجيه خطة الحل الفورية للمهندس.")
-                st.warning("⚠️ [تنبيه وقائي]: اقتراب موعد تغيير فلتر الديزل لمولد 150 KVA.")
+                st.write("### Active Alarms Log:")
+                st.error("⚠️ [Critical Alert 10:42 AM]: Perkins engine response error - instant resolution plan forwarded to engineer.")
+                st.warning("⚠️ [Preventive Alert]: Approaching diesel filter change date for 150 KVA generator.")
         with tab4:
-            st.subheader("📈 تقارير استهلاك الوقود مقابل الحمل (Fuel vs. Load Analytics)")
-            st.markdown("مخطط بياني يوضح كفاءة استهلاك الوقود بناءً على أحمال المولدات:")
+            st.subheader("📈 Fuel Consumption vs. Load Analytics")
+            st.markdown("Chart illustrating fuel consumption efficiency based on generator loads:")
             
             # محاكاة رسم بياني لاستهلاك الوقود مقابل الحمل باستخدام Matplotlib
             fig, ax = plt.subplots(figsize=(10, 4))
             loads = np.array([20, 40, 60, 80, 100])
-            fuel_consumption = np.array([12, 22, 35, 52, 75])  # لتر/ساعة
+            fuel_consumption = np.array([12, 22, 35, 52, 75])  # Liters/hour
             
-            ax.plot(loads, fuel_consumption, marker='o', color='#1f77b4', linewidth=2.5, label='استهلاك الوقود الفعلي (L/h)')
-            ax.set_title('منحنى استهلاك الوقود مقابل الأحمال (%)', fontsize=12, fontweight='bold')
-            ax.set_xlabel('نسبة الحمل (%)')
-            ax.set_ylabel('معدل الاستهلاك (لتر/ساعة)')
+            ax.plot(loads, fuel_consumption, marker='o', color='#1f77b4', linewidth=2.5, label='Actual Fuel Consumption (L/h)')
+            ax.set_title('Fuel Consumption vs. Load Curve (%)', fontsize=12, fontweight='bold')
+            ax.set_xlabel('Load Percentage (%)')
+            ax.set_ylabel('Consumption Rate (L/h)')
             ax.grid(True, linestyle='--', alpha=0.6)
             ax.legend()
             
