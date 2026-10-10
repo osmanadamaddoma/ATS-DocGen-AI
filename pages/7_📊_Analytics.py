@@ -31,7 +31,7 @@ if "work_orders" not in st.session_state:
     ]
 if "telemetry_logs" not in st.session_state:
     # Simulated time-series sensor data telemetry flow
-    dates = pd.date_range(end=datetime.datetime.now(), periods=50, freq='H')
+    dates = pd.date_range(end=datetime.datetime.now(), periods=50, freq='h')
     st.session_state.telemetry_logs = pd.DataFrame({
         "timestamp": dates,
         "temperature": np.random.normal(82, 3, 50),
