@@ -1418,7 +1418,7 @@ else:
             ''', unsafe_allow_html=True)
     elif "4." in selected_app:
         # =========================================================
-        # 🤖 4. ATS DocIntel GenAI Suite (منظومة التشخيص الذكي العالمية المدمجة بالكامل)
+        # 🤖 4. ATS DocIntel GenAI Suite (منظومة التشخيص الذكي العالمية المدمجة بالكامل مع القوائم المحدثة)
         # =========================================================
         st.title("🌐 منظومة التشخيص الذكي العالمية - Multi-Domain Industrial & Medical AI")
         st.markdown("نظام خبير عالمي لاستيعاب، تحليل، وتشخيص أعطال المعدات الثقيلة، محركات الديزل، غرف التبريد، المنظومات الطبية، وتحليل الكتالوجات والمخططات الهندسية.")
@@ -1480,7 +1480,7 @@ else:
             # مدخلات التشخيص المتقدم
             col1_in, col2_in = st.columns(2)
             with col1_in:
-                equipment_model = st.text_input("موديل أو رقم الآلية / الجهاز (مثال: Perkins 2206C / Porkka WIC 40 / PLC System):", "")
+                equipment_model = st.text_input("موديل أو رقم الآلية / الجهاز (مثال: Perkins 2206C / Porkka WIC 40 / PLC System / Medical Unit X):", "")
             with col2_in:
                 error_code = st.text_input("أكواد الأخطاء (Error Codes) أو قراءات الحساسات / الأعراض الظاهرة:", "")
 
@@ -1552,10 +1552,10 @@ else:
             st.write("### Component Inspection & Fault Deduction Report:")
             
             data_audit = {
-                "Component / System": ["Mechanical Diesel Pump", "70-pin Sensors (Perkins)", "Refrigeration Unit (WIC 40)", "Control System (DSE 8610)"],
-                "Operational Status": ["Needs preventive maintenance soon", "100% Healthy", "Stable", "Excellent"],
-                "Expected Wear Ratio": ["18%", "2%", "5%", "1%"],
-                "Recommended Action Plan": ["Calibrate pressure & change filters", "No action required", "Check refrigerant gas", "Update firmware"]
+                "Component / System": ["Mechanical Diesel Pump", "70-pin Sensors (Perkins)", "Refrigeration Unit (WIC 40)", "PLC / SCADA Automation Panel", "Medical Diagnostic Electronics"],
+                "Operational Status": ["Needs preventive maintenance soon", "100% Healthy", "Stable", "Optimized", "Calibrated"],
+                "Expected Wear Ratio": ["18%", "2%", "5%", "3%", "1%"],
+                "Recommended Action Plan": ["Calibrate pressure & change filters", "No action required", "Check refrigerant gas", "Verify PLC logic & SCADA link", "Check sensor calibration"]
             }
             df_audit = pd.DataFrame(data_audit)
             st.dataframe(df_audit, use_container_width=True)
@@ -1569,7 +1569,7 @@ else:
                     st.success(f"Successfully uploaded and processed {len(uploaded_manuals)} technical manual(s).")
                     for file in uploaded_manuals:
                         st.write(f"📄 **Extracted Data & Catalog Indexed:** {file.name}")
-                    st.info("🤖 AI model is now analyzing manuals to match part numbers and fault codes for Perkins or WIC equipment.")
+                    st.info("🤖 AI model is now analyzing manuals to match part numbers, schematics, and fault codes across all domains.")
                 else:
                     st.warning("Please upload maintenance manuals in PDF format from the sidebar to begin text analysis and extract technical links.")
             
@@ -1577,7 +1577,7 @@ else:
                 st.subheader("📷 Field Barcode & QR Code Reader")
                 qr_file_doc = st.file_uploader("Upload QR/Barcode Image of Spare Parts", type=["png", "jpg", "jpeg"], key="qr_docintel_reader")
                 if qr_file_doc:
-                    st.info("Analyzing code and matching with maintenance databases...")
+                    st.info("Analyzing code and matching with multi-domain databases...")
 
         with tab3:
             st.subheader("🚨 SMS & Voice Alert System")
@@ -1586,24 +1586,29 @@ else:
             with col_a:
                 st.write("### Field Engineer Alert Settings:")
                 eng_phone = st.text_input("Field Engineer Phone Number", "+249XXXXXXXXX", key="docintel_phone")
-                fault_location = st.text_input("Site Location / Geolocation", "Mining Factory - Main Generator (130 KVA)", key="docintel_loc")
+                fault_location = st.text_input("Site Location / Geolocation", "Industrial Plant - Main Generator & Automation Unit", key="docintel_loc")
+                
+                # قائمة منسدلة محدثة تشمل المقترحات المتعددة للأعطال عبر كل الأنظمة
                 selected_fault = st.selectbox("Detected Fault Type", [
-                    "Low Oil Pressure in Perkins Engine",
-                    "High Temperature in WIC 40 Cold Room",
-                    "Genset Synchronization Error (DSE 8610)",
-                    "Fuel Line Leakage"
+                    "Low Oil Pressure in Perkins / CAT Engine",
+                    "High Temperature in WIC Cold Room / Vaccine Freezer",
+                    "Genset Synchronization Error (DSE 8610 / 7320)",
+                    "Fuel Line Leakage or Pump Pressure Drop",
+                    "PLC Communication Failure / SCADA Integration Error",
+                    "Power Factor Correction Panel Failure / Contactor Duty Issue",
+                    "Medical Equipment Sensor Calibration Error / Electronic Fault"
                 ], key="docintel_fault_sel")
                 
                 if st.button("Send Instant Alert (SMS & Voice Alert)"):
                     if eng_phone:
-                        st.success(f"✅ SMS and voice alert successfully sent to ({eng_phone}) indicating fault location ('{fault_location}'), problem type, and proposed treatment plan!")
+                        st.success(f"✅ SMS and voice alert successfully sent to ({eng_phone}) indicating fault location ('{fault_location}'), problem type ('{selected_fault}'), and proposed multi-domain treatment plan!")
                     else:
                         st.error("Please enter the engineer's phone number first.")
                         
             with col_b:
                 st.write("### Active Alarms Log:")
                 st.error("⚠️ [Critical Alert 10:42 AM]: Perkins engine response error - instant resolution plan forwarded to engineer.")
-                st.warning("⚠️ [Preventive Alert]: Approaching diesel filter change date for 150 KVA generator.")
+                st.warning("⚠️ [Preventive Alert]: Approaching filter change date for industrial generator & PLC backup battery check.")
 
         with tab4:
             st.subheader("📈 Fuel Consumption vs. Load Analytics")
