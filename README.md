@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/osmanadamaddoma/ATS-DocGen-AI/main/assets/ATS_Banner.jpg" width="100%" alt="ATS ENG - Industrial Intelligence Suite"/>
-</p>
+   <img src="https://raw.githubusercontent.com/osmanadamaddoma/ATS-DocGen-AI/main/assets/ATS_Banner.jpg"
 
 <h3 align="center">ATS ENG | Industrial Intelligence Suite — Built in Omdurman for GCC Factories</h3>
 <p align="center">
