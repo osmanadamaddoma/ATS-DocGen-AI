@@ -196,7 +196,7 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model="gemini-3.6-flash",
+                model="gemini-2.5-flash",
                 contents=prompt,
             )
             return response.text
@@ -1418,19 +1418,35 @@ else:
             ''', unsafe_allow_html=True)
     elif "4." in selected_app:
         # =========================================================
-        # 🤖 4. ATS DocIntel GenAI Suite (إدراج الكود بالكامل)
+        # 🤖 4. ATS DocIntel GenAI Suite (منظومة التشخيص الذكي العالمية المدمجة)
         # =========================================================
-        st.title("⚡ ATS DocIntel GenAI")
-        st.markdown("### *Industrial Document Intelligence, Predictive RUL Analytics & Automated Fault Remediation Suite*")
+        st.title("🌐 منظومة التشخيص الذكي العالمية - Multi-Domain Industrial & Medical AI")
+        st.markdown("نظام خبير عالمي لاستيعاب، تحليل، وتشخيص أعطال المعدات الثقيلة، محركات الديزل، غرف التبريد، المنظومات الطبية، وتحليل الكتالوجات والمخططات الهندسية.")
         st.markdown("---")
+
+        # قائمة الخبراء الاختصاصيين في النظام
+        domain_experts = {
+            "⚡ محركات المولدات الثقيلة (Perkins / CAT / Cummins & Sync)": 
+                "You are a world-class Senior Power Systems and Diesel Engine Consultant. Expert in MEUI/ECM, Deep Sea controllers (DSE 8610/7320), synchronization, and Governor/AVR tuning.",
+            
+            "❄️ غرف التبريد والتجميد والمنظومات الطبية (Porkka / Dixell / Emerson)": 
+                "You are an elite Refrigeration and Biomedical Cold Chain Systems Engineer. Expert in commercial cold rooms, vaccine freezers, Dixell/Emerson controllers, thermodynamics, and precise temperature-control validation.",
+            
+            "🔌 الأتمتة الصناعية ولوحات التحكم (PLCs, SCADA, BMS & Power Factor)": 
+                "You are a Principal Industrial Automation and MEP Expert. Expert in PLC logic, SCADA integration, automatic power factor correction panels, and heavy-duty contactor switching duties (AC-1 to AC-4).",
+            
+            "🧬 المنظومات الطبية والعقول الحاسوبية الحساسة": 
+                "You are a biomedical engineering and embedded systems specialist. Expert in diagnostic medical equipment, microcontrollers, electronic boards, sensors calibration, and fault isolation in sensitive tech."
+        }
+
         # أدوات القوائم المنسدلة ورفع الملفات الجانبية الخاصة بـ DocIntel
         with st.sidebar:
             st.header("📂 Smart Inputs Panel")
             st.markdown("Upload maintenance manuals (PDF) and equipment images for comparison & analysis:")
             
-            # رفع الكتالوجات الفنية
+            # رفع الكتالوجات الفنية والمستندات
             uploaded_manuals = st.file_uploader(
-                "Upload Maintenance Manuals (PDF)", 
+                "Upload Maintenance Manuals (PDF/TXT/DOCX)", 
                 type=["pdf", "txt", "docx"],
                 accept_multiple_files=True,
                 key="docintel_manuals_uploader"
@@ -1445,6 +1461,11 @@ else:
             
             st.markdown("---")
             st.info("💡 **Operating System:** ATS DocIntel is connected to engine and cold room databases for real-time status analysis and alert dispatch.")
+
+        # اختيار التخصص من واجهة المستخدم
+        selected_domain = st.selectbox("حدد قطاع الآلية أو النظام المراد تشخيصه:", list(domain_experts.keys()))
+        system_prompt_persona = domain_experts[selected_domain]
+
         # الواجهة الرئيسية مقسمة إلى تبويبات (Tabs) احترافية
         tab1, tab2, tab3, tab4 = st.tabs([
             "📊 Diagnostics & RUL Assessment", 
@@ -1452,21 +1473,84 @@ else:
             "🚨 Alarms & Coordinates System", 
             "📈 Fuel Consumption vs Load Analytics"
         ])
+        
         with tab1:
             st.subheader("Evaluation & Remaining Useful Life (RUL) Assessment")
-            col1, col2, col3 = st.columns(3)
             
-            with col1:
+            # مدخلات التشخيص المتقدم
+            col1_in, col2_in = st.columns(2)
+            with col1_in:
+                equipment_model = st.text_input("موديل أو رقم الآلية / الجهاز (مثال: Perkins 2206C / Porkka WIC 40 / Medical Unit X):", "")
+            with col2_in:
+                error_code = st.text_input("أكواد الأخطاء (Error Codes) أو قراءات الحساسات / الأعراض الظاهرة:", "")
+
+            detailed_description = st.text_area("وصف دقيق للحالة التشغيلية، الإشارات، أو الفحص الميداني:", "")
+
+            # إضافة زر التشخيص الذكي المدعوم بالملفات
+            if st.button("🚀 بدء التشخيص الهندسي الشامل"):
+                if not client:
+                    st.warning("عذراً، محرك الذكاء الاصطناعي غير متصل (تحقق من مفتاح GEMINI_API_KEY).")
+                elif not detailed_description and not error_code and not uploaded_manuals:
+                    st.warning("يرجى إدخال تفاصيل الحالة، كود الخطأ، أو إرفاق مستند/كتالوج لكي يتمكن الخبير من التحليل.")
+                else:
+                    with st.spinner("جاري استدعاء الطبقات العميقة للذكاء الاصطناعي وتحليل العقل المشغل للآلية والمستندات المرفقة..."):
+                        try:
+                            # تجهيز محتوى الإدخال لـ Gemini
+                            contents = []
+                            
+                            # معالجة الملفات المرفقة إن وجدت
+                            if uploaded_manuals:
+                                for manual_file in uploaded_manuals:
+                                    file_extension = manual_file.name.split('.')[-1].lower()
+                                    if file_extension in ['png', 'jpg', 'jpeg']:
+                                        image = Image.open(manual_file)
+                                        contents.append(image)
+                                    elif file_extension == 'pdf':
+                                        uploaded_pdf = client.files.upload(file=manual_file)
+                                        contents.append(uploaded_pdf)
+
+                            # صياغة الاستعلام الهندسي النصي
+                            full_query = f"""
+                            [EQUIPMENT/SYSTEM]: {equipment_model}
+                            [ERROR CODES / SENSOR READINGS]: {error_code}
+                            [FIELD OBSERVATIONS]: {detailed_description}
+                            
+                            Provide a world-class, professional engineering diagnostic report structured as follows:
+                            1. **Root Cause Analysis (التحليل الجذري للسبب)**
+                            2. **Step-by-Step Troubleshooting / Action Plan (خطوات الإصلاح الفعلي الميداني)**
+                            3. **Safety & Calibration Precautions (احتياطات السلامة والمعايرة الدقيقة)**
+                            4. **Preventive Maintenance Recommendations (توصيات الصيانة التنبؤية المستقبلية)**
+                            """
+                            contents.append(full_query)
+                            
+                            # استدعاء نموذج Gemini المدعوم بالوسائط المتعددة والملفات
+                            response = client.models.generate_content(
+                                model='gemini-2.5-flash',
+                                contents=contents,
+                                config={
+                                    'system_instruction': system_prompt_persona
+                                }
+                            )
+                            
+                            st.success("### 📊 التقرير الهندسي التشخيصي المعتمد:")
+                            st.markdown(response.text)
+                            
+                        except Exception as e:
+                            st.error(f"حدث خطأ أثناء المعالجة وتحليل الملفات: {e}")
+
+            st.markdown("---")
+            
+            col_m1, col_m2, col_m3 = st.columns(3)
+            with col_m1:
                 st.metric(label="Overall Machine Status", value="92%", delta="Stable")
-            with col2:
+            with col_m2:
                 st.metric(label="Remaining Spare Part Life (RUL)", value="450 Operating Hrs", delta="-30 hrs this week")
-            with col3:
+            with col_m3:
                 st.metric(label="DSE Synchronization Efficiency", value="98.5%", delta="+1.2%")
                 
             st.markdown("---")
             st.write("### Component Inspection & Fault Deduction Report:")
             
-            # محاكاة جدول الفحص التنبؤي
             data_audit = {
                 "Component / System": ["Mechanical Diesel Pump", "70-pin Sensors (Perkins)", "Refrigeration Unit (WIC 40)", "Control System (DSE 8610)"],
                 "Operational Status": ["Needs preventive maintenance soon", "100% Healthy", "Stable", "Excellent"],
@@ -1475,6 +1559,7 @@ else:
             }
             df_audit = pd.DataFrame(data_audit)
             st.dataframe(df_audit, use_container_width=True)
+
         with tab2:
             st.subheader("Document Intelligence & Knowledge Graph (Inspired by Wordlit)")
             
@@ -1493,6 +1578,7 @@ else:
                 qr_file_doc = st.file_uploader("Upload QR/Barcode Image of Spare Parts", type=["png", "jpg", "jpeg"], key="qr_docintel_reader")
                 if qr_file_doc:
                     st.info("Analyzing code and matching with maintenance databases...")
+
         with tab3:
             st.subheader("🚨 SMS & Voice Alert System")
             
@@ -1518,11 +1604,11 @@ else:
                 st.write("### Active Alarms Log:")
                 st.error("⚠️ [Critical Alert 10:42 AM]: Perkins engine response error - instant resolution plan forwarded to engineer.")
                 st.warning("⚠️ [Preventive Alert]: Approaching diesel filter change date for 150 KVA generator.")
+
         with tab4:
             st.subheader("📈 Fuel Consumption vs. Load Analytics")
             st.markdown("Chart illustrating fuel consumption efficiency based on generator loads:")
             
-            # محاكاة رسم بياني لاستهلاك الوقود مقابل الحمل باستخدام Matplotlib
             fig, ax = plt.subplots(figsize=(10, 4))
             loads = np.array([20, 40, 60, 80, 100])
             fuel_consumption = np.array([12, 22, 35, 52, 75])  # Liters/hour
@@ -1535,6 +1621,7 @@ else:
             ax.legend()
             
             st.pyplot(fig)
+            
     elif "5." in selected_app:
         st.title("🔍 " + ("Cold Room Inspection (WIC 10 & WIC 40)" if L == "en" else "نظام فحص معدات التبريد (WIC 10 & WIC 40)"))
         st.markdown("### ❄️ Refrigeration and Freezing Rooms Data Reading System")
