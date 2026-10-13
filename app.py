@@ -1418,13 +1418,13 @@ else:
             ''', unsafe_allow_html=True)
     elif "4." in selected_app:
         # =========================================================
-        # 🤖 4. ATS DocIntel GenAI Suite (منظومة التشخيص الذكي العالمية المدمجة)
+        # 🤖 4. ATS DocIntel GenAI Suite (منظومة التشخيص الذكي العالمية المدمجة بالكامل)
         # =========================================================
         st.title("🌐 منظومة التشخيص الذكي العالمية - Multi-Domain Industrial & Medical AI")
         st.markdown("نظام خبير عالمي لاستيعاب، تحليل، وتشخيص أعطال المعدات الثقيلة، محركات الديزل، غرف التبريد، المنظومات الطبية، وتحليل الكتالوجات والمخططات الهندسية.")
         st.markdown("---")
 
-        # قائمة الخبراء الاختصاصيين في النظام
+        # قائمة الخبراء الاختصاصيين في النظام (Multi-Domain Expert Engine)
         domain_experts = {
             "⚡ محركات المولدات الثقيلة (Perkins / CAT / Cummins & Sync)": 
                 "You are a world-class Senior Power Systems and Diesel Engine Consultant. Expert in MEUI/ECM, Deep Sea controllers (DSE 8610/7320), synchronization, and Governor/AVR tuning.",
@@ -1480,13 +1480,13 @@ else:
             # مدخلات التشخيص المتقدم
             col1_in, col2_in = st.columns(2)
             with col1_in:
-                equipment_model = st.text_input("موديل أو رقم الآلية / الجهاز (مثال: Perkins 2206C / Porkka WIC 40 / Medical Unit X):", "")
+                equipment_model = st.text_input("موديل أو رقم الآلية / الجهاز (مثال: Perkins 2206C / Porkka WIC 40 / PLC System):", "")
             with col2_in:
                 error_code = st.text_input("أكواد الأخطاء (Error Codes) أو قراءات الحساسات / الأعراض الظاهرة:", "")
 
             detailed_description = st.text_area("وصف دقيق للحالة التشغيلية، الإشارات، أو الفحص الميداني:", "")
 
-            # إضافة زر التشخيص الذكي المدعوم بالملفات
+            # زر التشخيص الذكي المدعوم بالملفات والخبراء المتعددين
             if st.button("🚀 بدء التشخيص الهندسي الشامل"):
                 if not client:
                     st.warning("عذراً، محرك الذكاء الاصطناعي غير متصل (تحقق من مفتاح GEMINI_API_KEY).")
