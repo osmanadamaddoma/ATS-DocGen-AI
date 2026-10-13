@@ -1,4 +1,4 @@
-   <img src="https://raw.githubusercontent.com/osmanadamaddoma/ATS-DocGen-AI/main/assets/ATS_Banner.jpg"
+<p align="center"><img src="https://raw.githubusercontent.com/osmanadamaddoma/ATS-DocGen-AI/main/IMG-20261013-WA0385.jpg" width="100%"/></p>
 
 <h3 align="center">ATS ENG | Industrial Intelligence Suite — Built in Omdurman for GCC Factories</h3>
 <p align="center">
