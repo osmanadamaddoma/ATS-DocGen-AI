@@ -1,3 +1,13 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/osmanadamaddoma/osmanadamaddoma/main/ATS_Square_1080x1080.jpg" width="600" alt="ATS ENG - Industrial Intelligence Suite | Built in Omdurman for GCC"/>
+</p>
+
+<p align="center">
+  <b>ATS ENG | Industrial Intelligence Suite — Built in Omdurman for GCC Factories</b><br/>
+  <code>Perkins | CAT | Cummins | IoT | AI | Predictive Maintenance</code>
+</p>
+
+---
 # 🏭 ATS Industrial Intelligence Suite | Osman Addoma
 > **20+ Years Field Experience → Converted into AI Systems for Factories & Projects**
 
