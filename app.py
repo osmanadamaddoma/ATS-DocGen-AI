@@ -9,6 +9,10 @@ import threading
 import io
 import base64
 import math
+import logging
+import tempfile
+import html
+import random
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,6 +27,13 @@ import streamlit as st
 import extra_streamlit_components as stx  # Cookie management library added
 from google import genai
 from gtts import gTTS
+
+# Application-wide logging: detailed errors stay in server logs, not in the UI.
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ats_docintel")
+MAX_UPLOAD_MB = int(os.environ.get("ATS_MAX_UPLOAD_MB", "25"))
+MAX_AI_CONTEXT_CHARS = int(os.environ.get("ATS_MAX_AI_CONTEXT_CHARS", "12000"))
+CO2_KG_PER_LITER = float(os.environ.get("ATS_CO2_KG_PER_LITER", "2.68"))
 # Try importing Supabase library
 try:
     from supabase import create_client, Client
@@ -60,11 +71,11 @@ if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
         "(Main Menu)": {
             "Main Site - (Sub Site)": {
-                "address": "                   ",
-                "technician_name": "                  ",
-                "technician_whatsapp": "                 ",
+                "address": " ",
+                "technician_name": " ",
+                "technician_whatsapp": " ",
                 "generators": {
-                    "  ": {
+                    "G1": {
                         "model": "Perkins 410 kVA",
                         "run_hours": 700.0,
                         "target": 940.0,
@@ -82,7 +93,7 @@ if "sites_data" not in st.session_state:
                             "ambient_temp": 43.0
                         }
                     },
-                    "  ": {
+                    "G2": {
                         "model": "Cummins 250 kVA",
                         "run_hours": 1200.0,
                         "target": 1500.0,
@@ -112,8 +123,8 @@ if "daily_logs" not in st.session_state:
             "timestamp": f"{today_str} 08:30:00",
             "date": today_str,
             "site": "Khartoum (Main Menu)",
-            "generator": "   ",
-            "technician": "                 ",
+            "generator": " ",
+            "technician": " ",
             "run_hours": 700.0,
             "v_measured": 398.0,
             "oil_press": 4.5,
@@ -127,71 +138,61 @@ if not gemini_key and "supabase" in st.secrets:
     gemini_key = st.secrets["supabase"].get("GEMINI_API_KEY")
 if not gemini_key:
     st.warning("⚠️ GEMINI_API_KEY not found. Please add it to st.secrets.")
-# Initialize Gemini API client
-client = genai.Client(api_key=gemini_key) if gemini_key else None
-# Supabase database settings for app connection
-supabase = None
-if create_client:
-    supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-    supabase_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
-    if not supabase_url and "supabase" in st.secrets:
-        supabase_url = st.secrets["supabase"].get("SUPABASE_URL")
-        supabase_key = st.secrets["supabase"].get("SUPABASE_KEY")
-    if supabase_url and supabase_key:
-        try:
-            supabase = create_client(supabase_url, supabase_key)
-            response = supabase.table("subscriptions").select("*").limit(1).execute()
-            st.success("✅ Application connected and activated successfully with Supabase database!")
-        except Exception as e:
-            st.error(f"❌ Database connection failed: {e}")
-    else:
-        st.info("💡 Supabase keys not found. Please add them (SUPABASE_URL and SUPABASE_KEY) in st.secrets.")
-else:
-    st.warning("⚠️ Supabase library is not installed. Please install it using pip install supabase")
+# Initialize external clients once per process, not on every Streamlit rerun.
+@st.cache_resource
+def get_gemini_client(api_key):
+    return genai.Client(api_key=api_key) if api_key else None
+
+client = get_gemini_client(gemini_key)
+
+@st.cache_resource
+def get_supabase_client(url, key):
+    if not create_client or not url or not key:
+        return None
+    try:
+        return create_client(url, key)
+    except Exception:
+        logger.exception("Unable to create Supabase client")
+        return None
+
+supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+supabase_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
+if not supabase_url and "supabase" in st.secrets:
+    supabase_url = st.secrets["supabase"].get("SUPABASE_URL")
+    supabase_key = st.secrets["supabase"].get("SUPABASE_KEY")
+supabase = get_supabase_client(supabase_url, supabase_key)
+if supabase is None and supabase_url and supabase_key:
+    logger.warning("Supabase client is unavailable")
 # Updated audio function with dual language support, mute option, and continuous loop for alarms
 def play_audio(text, lang='en', loop=False):
     """Convert text to speech using gTTS and play if mute is not active with loop support"""
     if st.session_state.get("audio_muted", False):
         return
     try:
-        tts_lang = 'en' if st.session_state.lang == 'en' or lang == 'en' else 'ar'
+        tts_lang = lang if lang in {'ar', 'en'} else st.session_state.get('lang', 'en')
         tts = gTTS(text=text, lang=tts_lang)
         audio_data = io.BytesIO()
         tts.write_to_fp(audio_data)
         audio_bytes = audio_data.getvalue()
         if loop:
             b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
-            audio_html = f"""
-                <audio autoplay loop controls style="width: 100%;">
-                    <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
-                    Your browser does not support audio playback.
-                </audio>
-            """
+            audio_html = f""" <audio autoplay loop controls style="width: 100%;"> <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3"> Your browser does not support audio playback. </audio> """
             st.components.v1.html(audio_html, height=60)
         else:
             audio_data.seek(0)
             st.audio(audio_data, format='audio/mp3', autoplay=True)
-    except Exception as e:
-        st.error(f"Audio playback error: {e}")
-@st.cache_data(ttl=3600)
+    except Exception:
+        logger.exception("Audio playback failed")
+        st.warning("Audio playback is temporarily unavailable.")
+@st.cache_data(ttl=3600, show_spinner=False)
 def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
     """AI call function with high pressure error handling (503), retries, and bilingual support"""
     if not client:
         return "⚠️ GEMINI_API_KEY not found." if language == "en" else "⚠ لم يتم العثور على مفتاح GEMINI_API_KEY."
     lang_instr = "Respond in English." if language == "en" else "Write the response in clear and direct technical Arabic."
-    prompt = f"""
-    You are an expert industrial consulting engineer specializing in generators, DSE control panels (DSE 7320, DSE 8610 MKII), Perkins & Cummins engines, and cooling systems.
-    Fault Code / Alarm: "{fault_code}"
-    Catalog Context:
-    \"\"\"
-    {context_text if context_text else "No specific catalog excerpt."}
-    \"\"\"
-    Provide a professional diagnostic report with:
-    1. Technical Explanation / Fault Nature.
-    2. Top 3 Probable Causes.
-    3. Sequential Field Corrective Actions.
-    {lang_instr}
-    """
+    context_text = (context_text or "")[:MAX_AI_CONTEXT_CHARS]
+    fault_code = str(fault_code or "")[:2000]
+    prompt = f""" You are an expert industrial consulting engineer specializing in generators, DSE control panels (DSE 7320, DSE 8610 MKII), Perkins & Cummins engines, and cooling systems. Fault Code / Alarm: "{fault_code}" Catalog Context: \"\"\" {context_text if context_text else "No specific catalog excerpt."} \"\"\" Provide a professional diagnostic report with: 1. Technical Explanation / Fault Nature. 2. Top 3 Probable Causes. 3. Sequential Field Corrective Actions. {lang_instr} """
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -208,24 +209,20 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
                     continue
                 else:
                     return "⚠️ High server load (503). Please retry in a few seconds." if language == "en" else "⚠️ الخادم يمر بضغط عالٍ حالياً (503). يرجى المحاولة مرة أخرى."
-            return f"❌ Error: {err_msg}"
+            logger.exception("Gemini request failed")
+            return ("❌ AI service error. Please try again later." if language == "en"
+                    else "❌ حدث خطأ في خدمة الذكاء الاصطناعي. يرجى المحاولة لاحقًا.")
 # =========================================================
 # 1. System Helper Functions and Comprehensive PDF Report Design
 # =========================================================
 def sanitize_latin_only(text):
-    if not isinstance(text, str):
-        text = str(text)
-    clean_text = re.sub(r"[^\x00-\x7F]+", "", text).strip()
-    return clean_text if clean_text else "N/A"
+    """Return printable text without silently deleting Arabic/Unicode content."""
+    if text is None:
+        return "N/A"
+    clean_text = " ".join(str(text).split()).strip()
+    return clean_text or "N/A"
 class ComprehensivePDF(FPDF):
-    def __init__(
-        self,
-        title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT",
-        logo_path=None,
-        site_address="N/A",
-        main_site="N/A",
-        sub_site="N/A",
-    ):
+    def __init__( self, title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT", logo_path=None, site_address="N/A", main_site="N/A", sub_site="N/A", ):
         super().__init__()
         self.report_title = title_text
         self.logo_path = logo_path
@@ -289,44 +286,38 @@ class ComprehensivePDF(FPDF):
 # 1.5 Live Database and IoT Integration Functions
 # =========================================================
 def fetch_live_iot_data():
-    """Fetch live telemetry readings from live time-series database if available"""
+    """Fetch telemetry; return an empty frame when no real source is configured."""
     if not InfluxDBClient or "influxdb" not in st.secrets:
-        import random
-        today = datetime.now()
-        data = []
-        for i in range(20):
-            t = today - timedelta(minutes=(20-i)*2)
-            data.append({
-                "_time": t,
-                "temperature": 80.0 + random.uniform(-3, 6),
-                "vibration": 3.2 + random.uniform(-0.5, 1.2),
-                "pressure": 4.1 + random.uniform(-0.4, 0.4)
-            })
-        df = pd.DataFrame(data).sort_values("_time")
-        return df
+        return pd.DataFrame()
     try:
         cfg = st.secrets["influxdb"]
         client_iot = InfluxDBClient(url=cfg["url"], token=cfg["token"], org=cfg["org"])
-        query_api = client_iot.query_api()
-        flux_query = f'''
-        from(bucket: "{cfg["bucket"]}")
-            |> range(start: -30m)
-            |> filter(fn: (r) => r["_measurement"] == "generator_01")
-            |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-        '''
-        df_db = query_api.query_data_frame(flux_query)
-        if not df_db.empty:
-            df_db['_time'] = pd.to_datetime(df_db['_time'])
+        try:
+            flux_query = f''' from(bucket: "{cfg["bucket"]}") |> range(start: -30m) |> filter(fn: (r) => r["_measurement"] == "generator_01") |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value") '''
+            df_db = client_iot.query_api().query_data_frame(flux_query)
+            if isinstance(df_db, list):
+                df_db = pd.concat(df_db, ignore_index=True) if df_db else pd.DataFrame()
+            if not df_db.empty and "_time" in df_db.columns:
+                df_db["_time"] = pd.to_datetime(df_db["_time"], errors="coerce")
             return df_db
-        return pd.DataFrame()
+        finally:
+            close = getattr(client_iot, "close", None)
+            if callable(close):
+                close()
     except Exception:
+        logger.exception("InfluxDB telemetry query failed")
         return pd.DataFrame()
+
 # =========================================================
 # 1.8 Smart Engineering Tools and Calculators
 # =========================================================
 def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85):
     """Calculate 3-Phase electrical voltage drop"""
-    rho_copper = 0.0178  # Copper resistivity
+    if current_a < 0 or distance_m < 0 or cable_mm2 <= 0:
+        raise ValueError("Current, distance, and cable area must be valid positive values")
+    if not 0 <= cos_phi <= 1:
+        raise ValueError("Power factor must be between 0 and 1")
+    rho_copper = 0.0178  # Ohm*mm²/m at approximately 20°C
     v_drop = (math.sqrt(3) * current_a * distance_m * rho_copper * cos_phi) / cable_mm2
     v_drop_pct = (v_drop / 400.0) * 100
     return round(v_drop, 2), round(v_drop_pct, 2)
@@ -350,7 +341,7 @@ def get_fuel_table_from_csv(uploaded_csv=None):
                 def g_to_l(g):
                     try:
                         return float(g) / 850.0
-                    except:
+                    except (TypeError, ValueError):
                         return sfc
                 table[load] = {
                     "CAT C32": g_to_l(row.get("CAT C32 g/kWh", sfc*850)),
@@ -372,11 +363,16 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perk
     """Estimate diesel consumption and emissions - smart version reading from CSV table based on load percentage and engine type"""
     if fuel_table is None:
         fuel_table = get_fuel_table_from_csv()
+    if kw_load < 0 or run_hours < 0:
+        raise ValueError("Load and run hours cannot be negative")
+    if kw_capacity is not None and kw_capacity <= 0:
+        raise ValueError("Generator capacity must be greater than zero")
     if kw_capacity and kw_capacity > 0:
         load_pct = (kw_load / kw_capacity) * 100.0
     else:
         load_pct = 100.0 if kw_load > 100 else kw_load
-    load_pct = max(25.0, min(100.0, load_pct))
+    if load_pct < 0 or load_pct > 100:
+        raise ValueError(f"Calculated load percentage is out of range: {load_pct:.1f}%")
     model_key = "AVG"
     if "CAT" in str(gen_model).upper():
         model_key = "CAT C32"
@@ -403,7 +399,7 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perk
             sfc = sfc_low + ratio * (sfc_up - sfc_low)
             eff = eff_low + ratio * (eff_up - eff_low)
     liters = kw_load * sfc * run_hours
-    co2_kg = liters * 2.68
+    co2_kg = liters * CO2_KG_PER_LITER
     return round(liters, 1), round(co2_kg, 1), round(sfc, 3), round(eff, 1)
 # =========================================================
 # 2. Unified Subscription System and Packages (with Cookie Management & 7-Day Trial Support)
@@ -455,26 +451,20 @@ def get_cookie_manager():
     return st.session_state["cookie_manager"]
 cookie_manager = get_cookie_manager()
 query_params = st.query_params
-code_from_url = query_params.get("code", None)
+code_from_url = None  # Authentication codes are never accepted from the URL.
 saved_code = None
 try:
     saved_code = cookie_manager.get(cookie="activation_code_v5")
     if not saved_code:
         saved_code = cookie_manager.get(cookie="activation_code")
-except:
+except Exception:
+    logger.exception("Unable to read activation cookie")
     saved_code = None
-final_saved = code_from_url if code_from_url else saved_code
+final_saved = saved_code
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if final_saved and not st.session_state.authenticated:
     clean_saved = str(final_saved).strip().upper()
-    if clean_saved.startswith("TRIAL-") and clean_saved not in CLIENTS_DATABASE:
-        CLIENTS_DATABASE[clean_saved] = {
-            "name": "Free Trial User",
-            "plan": "7-Day Trial",
-            "start_date": datetime.now().strftime("%Y-%m-%d"),
-            "duration_days": 7,
-        }
     if clean_saved in CLIENTS_DATABASE:
         st.session_state.authenticated = True
         st.session_state.active_code = clean_saved
@@ -498,8 +488,8 @@ if final_saved and not st.session_state.authenticated:
                         st.session_state.user_email = CLIENTS_DATABASE[c]["name"]
                         st.session_state.role = "admin" if c in ADMIN_CODES else "client"
                         break
-            except:
-                pass
+            except Exception:
+                logger.exception("Subscription lookup failed")
 # =========================================================
 # Professional Sidebar Profile & System Description Design
 # =========================================================
@@ -507,12 +497,7 @@ with st.sidebar:
     st.markdown("---")
     # App Branding & Profile Card Header
     st.markdown(
-        """
-        <div style="background: linear-gradient(135deg, #182b49 0%, #2c3e50 100%); padding: 15px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <h3 style="margin: 0; font-size: 18px; color: #f8f9fa;">ATS ENGINEERING</h3>
-            <p style="margin: 5px 0 0 0; font-size: 12px; color: #adb5bd;">Addoma Trading Services Suite</p>
-        </div>
-        """,
+        """ <div style="background: linear-gradient(135deg, #182b49 0%, #2c3e50 100%); padding: 15px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"> <h3 style="margin: 0; font-size: 18px; color: #f8f9fa;">ATS ENGINEERING</h3> <p style="margin: 5px 0 0 0; font-size: 12px; color: #adb5bd;">Addoma Trading Services Suite</p> </div> """,
         unsafe_allow_html=True
     )
     
@@ -521,12 +506,7 @@ with st.sidebar:
     # Professional Bio Section inside Sidebar Expander or Box
     with st.expander("📌 System & Engineer Profile", expanded=True):
         st.markdown(
-            """
-            **Lead Consultant:** Eng. Osman Adam Addoma  
-            **Expertise:** Power Systems, Gensets Synchronization, & Industrial Refrigeration (WIC Systems).  
-            **Core Tech:** Python, Streamlit, Supabase, InfluxDB, & Gemini AI Diagnostics.  
-            **Mission:** Delivering cutting-edge electromechanical solutions, predictive maintenance, and smart IoT operational control.
-            """,
+            """ **Lead Consultant:** Eng. Osman Adam Addoma **Expertise:** Power Systems, Gensets Synchronization, & Industrial Refrigeration (WIC Systems). **Core Tech:** Python, Streamlit, Supabase, InfluxDB, & Gemini AI Diagnostics. **Mission:** Delivering cutting-edge electromechanical solutions, predictive maintenance, and smart IoT operational control. """,
             unsafe_allow_html=True
         )
         
@@ -595,13 +575,6 @@ if not st.session_state.authenticated:
             except Exception as e:
                 print(f"Reload before check error: {e}")
         clean_code = user_code.strip().upper()
-        if clean_code.startswith("TRIAL-") and clean_code not in CLIENTS_DATABASE:
-            CLIENTS_DATABASE[clean_code] = {
-                "name": "Free Trial User",
-                "plan": "7-Day Trial",
-                "start_date": datetime.now().strftime("%Y-%m-%d"),
-                "duration_days": 7,
-            }
         if clean_code in CLIENTS_DATABASE:
             st.session_state.authenticated = True
             st.session_state.active_code = clean_code
@@ -611,9 +584,8 @@ if not st.session_state.authenticated:
             try:
                 cookie_manager.set("activation_code_v5", clean_code, expires_at=expires_at)
                 cookie_manager.set("activation_code", clean_code, expires_at=expires_at)
-            except:
-                pass
-            st.query_params["code"] = clean_code
+            except Exception:
+                logger.exception("Unable to persist activation cookie")
             st.rerun()
         else:
             st.sidebar.error(TXT["invalid_code"])
@@ -622,7 +594,7 @@ if not st.session_state.authenticated:
 else:
     with st.sidebar:
         st.header(TXT["nav_header"])
-        st.success(TXT["nav_status"])
+        st.success(TXT["nav_status"] if supabase else "🟡 UI active — Supabase is not connected")
         st.write("---")
         if st.button(TXT["btn_chat"], use_container_width=True):
             st.session_state.current_page = "chat"
@@ -636,8 +608,8 @@ else:
             try:
                 cookie_manager.delete("activation_code_v5")
                 cookie_manager.delete("activation_code")
-            except:
-                pass
+            except Exception:
+                logger.exception("Unable to clear activation cookies during logout")
             if "code" in st.query_params:
                 del st.query_params["code"]
             if "active_code" in st.session_state:
@@ -668,8 +640,8 @@ if input_code in CLIENTS_DATABASE:
         try:
             cookie_manager.delete("activation_code_v5")
             cookie_manager.delete("activation_code")
-        except:
-            pass
+        except Exception:
+            logger.exception("Unable to clear expired activation cookies")
         if "code" in st.query_params:
             del st.query_params["code"]
         st.stop()
@@ -985,7 +957,8 @@ else:
                                 supabase.table("generators_data").upsert(data_to_insert).execute()
                                 st.success("✅ Updated data saved to Supabase successfully!")
                             except Exception as e:
-                                st.error(f"Error saving to Supabase: {e}")
+                                logger.exception("Error saving generator data to Supabase")
+                                st.error("Unable to save data to Supabase. Please try again.")
                         else:
                             st.warning("⚠ Supabase connection currently unavailable.")
                         st.rerun()
@@ -997,7 +970,8 @@ else:
                                 try:
                                     supabase.table("generators_data").delete().eq("generator_id", selected_gen).execute()
                                 except Exception:
-                                    pass
+                                    logger.exception("Error deleting generator from Supabase")
+                                    st.warning("Generator removed locally, but cloud deletion failed.")
                             st.success(f"🗑️ Generator {selected_gen} data deleted permanently!")
                             st.rerun()
             
@@ -1035,13 +1009,7 @@ else:
                 encoded_alarm_wa = urllib.parse.quote(active_alarm_text)
                 alarm_wa_link = f"https://wa.me/{tech_w_num}?text={encoded_alarm_wa}"
                 
-                st.markdown(f'''
-                    <a href="{alarm_wa_link}" target="_blank">
-                        <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; margin-bottom:10px;">
-                            💬 Send Instant WhatsApp Alarm to Responsible Tech ({tech_w_name})
-                        </button>
-                    </a>
-                ''', unsafe_allow_html=True)
+                st.markdown(f''' <a href="{html.escape(alarm_wa_link, quote=True)}" target="_blank"> <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; margin-bottom:10px;"> 💬 Send Instant WhatsApp Alarm to Responsible Tech ({html.escape(str(tech_w_name))}) </button> </a> ''', unsafe_allow_html=True)
             parts_key = f"parts_{selected_main_site}_{selected_sub_site}_{selected_gen}"
             if parts_key not in st.session_state:
                 st.session_state[parts_key] = [
@@ -1346,13 +1314,13 @@ else:
         rc1, rc2, rc3 = st.columns(3)
         with rc1:
             if st.button("🟢 Start Generator", use_container_width=True):
-                st.success("Start signal dispatched!")
+                st.warning("Simulation only: no generator command was sent.")
         with rc2:
             if st.button("🔴 Emergency Stop", use_container_width=True):
-                st.error("Emergency Stop dispatched!")
+                st.error("Simulation only: emergency-stop command was not sent.")
         with rc3:
             if st.button("🔄 Reset Alarms", use_container_width=True):
-                st.info("DSE Panel Reset!")
+                st.info("Simulation only: DSE reset command was not sent.")
     elif "3." in selected_app:
         st.title("📊 Daily Monitoring & Management Reports")
         today_str = datetime.now().strftime("%Y-%m-%d")
@@ -1371,20 +1339,14 @@ else:
             reminder_msg = f"Addoma Maintenance Reminder: Please register daily genset logs for ({today_str})."
             encoded_msg = urllib.parse.quote(reminder_msg)
             whatsapp_url = f"https://wa.me/{tech_phone}?text={encoded_msg}"
-            st.markdown(f'''
-                <a href="{whatsapp_url}" target="_blank">
-                    <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">
-                        💬 Send WhatsApp Reminder
-                    </button>
-                </a>
-            ''', unsafe_allow_html=True)
+            st.markdown(f''' <a href="{whatsapp_url}" target="_blank"> <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;"> 💬 Send WhatsApp Reminder </button> </a> ''', unsafe_allow_html=True)
             
         with tab_mgr3:
             st.subheader("⚙️ Gensets and Machinery Predictive Maintenance Link & Smart WhatsApp Alarms")
             st.markdown("Monitor default operating hours rates and automatically generate smart text WhatsApp messages:")
             
-            default_tech_name = "                         "
-            default_whatsapp_num = "                       "
+            default_tech_name = " "
+            default_whatsapp_num = " "
             if 'selected_main_site' in locals() and 'selected_sub_site' in locals() and selected_main_site and selected_sub_site:
                 site_info = st.session_state.sites_data.get(selected_main_site, {}).get(selected_sub_site, {})
                 default_tech_name = site_info.get("technician_name", default_tech_name)
@@ -1409,13 +1371,7 @@ else:
             encoded_smart_msg = urllib.parse.quote(smart_message_input)
             smart_whatsapp_url = f"https://wa.me/{target_whatsapp_num}?text={encoded_smart_msg}"
             
-            st.markdown(f'''
-                <a href="{smart_whatsapp_url}" target="_blank">
-                    <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;">
-                        💬 Send Automatic Smart WhatsApp Alert & Alarm Message to Tech ({assigned_tech_display})
-                    </button>
-                </a>
-            ''', unsafe_allow_html=True)
+            st.markdown(f''' <a href="{html.escape(smart_whatsapp_url, quote=True)}" target="_blank"> <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;"> 💬 Send Automatic Smart WhatsApp Alert & Alarm Message to Tech ({assigned_tech_display}) </button> </a> ''', unsafe_allow_html=True)
     elif "4." in selected_app:
         # =========================================================
         # 🤖 4. ATS DocIntel GenAI Suite (منظومة التشخيص الذكي العالمية المدمجة بالكامل مع القوائم المحدثة)
@@ -1460,7 +1416,7 @@ else:
             damaged_img = st.file_uploader("Damaged Part Image (Field)", type=["jpg", "png", "jpeg"], key="damaged_docintel")
             
             st.markdown("---")
-            st.info("💡 **Operating System:** ATS DocIntel is connected to engine and cold room databases for real-time status analysis and alert dispatch.")
+            st.info("💡 **System status:** external telemetry and alert delivery are shown only when configured; otherwise the app remains in safe demo mode.")
 
         # اختيار التخصص من واجهة المستخدم
         selected_domain = st.selectbox("حدد قطاع الآلية أو النظام المراد تشخيصه:", list(domain_experts.keys()))
@@ -1501,6 +1457,8 @@ else:
                             # معالجة الملفات المرفقة إن وجدت
                             if uploaded_manuals:
                                 for manual_file in uploaded_manuals:
+                                    if manual_file.size > MAX_UPLOAD_MB * 1024 * 1024:
+                                        raise ValueError(f"{manual_file.name} exceeds the {MAX_UPLOAD_MB} MB upload limit")
                                     file_extension = manual_file.name.split('.')[-1].lower()
                                     if file_extension in ['png', 'jpg', 'jpeg']:
                                         image = Image.open(manual_file)
@@ -1510,17 +1468,7 @@ else:
                                         contents.append(uploaded_pdf)
 
                             # صياغة الاستعلام الهندسي النصي
-                            full_query = f"""
-                            [EQUIPMENT/SYSTEM]: {equipment_model}
-                            [ERROR CODES / SENSOR READINGS]: {error_code}
-                            [FIELD OBSERVATIONS]: {detailed_description}
-                            
-                            Provide a world-class, professional engineering diagnostic report structured as follows:
-                            1. **Root Cause Analysis (التحليل الجذري للسبب)**
-                            2. **Step-by-Step Troubleshooting / Action Plan (خطوات الإصلاح الفعلي الميداني)**
-                            3. **Safety & Calibration Precautions (احتياطات السلامة والمعايرة الدقيقة)**
-                            4. **Preventive Maintenance Recommendations (توصيات الصيانة التنبؤية المستقبلية)**
-                            """
+                            full_query = f""" [EQUIPMENT/SYSTEM]: {equipment_model} [ERROR CODES / SENSOR READINGS]: {error_code} [FIELD OBSERVATIONS]: {detailed_description} Provide a world-class, professional engineering diagnostic report structured as follows: 1. **Root Cause Analysis (التحليل الجذري للسبب)** 2. **Step-by-Step Troubleshooting / Action Plan (خطوات الإصلاح الفعلي الميداني)** 3. **Safety & Calibration Precautions (احتياطات السلامة والمعايرة الدقيقة)** 4. **Preventive Maintenance Recommendations (توصيات الصيانة التنبؤية المستقبلية)** """
                             contents.append(full_query)
                             
                             # استدعاء نموذج Gemini المدعوم بالوسائط المتعددة والملفات
@@ -1536,7 +1484,8 @@ else:
                             st.markdown(response.text)
                             
                         except Exception as e:
-                            st.error(f"حدث خطأ أثناء المعالجة وتحليل الملفات: {e}")
+                            logger.exception("DocIntel analysis failed")
+                            st.error("حدث خطأ أثناء التحليل. تحقق من الملف والإعدادات وحاول مرة أخرى.")
 
             st.markdown("---")
             
@@ -1601,7 +1550,8 @@ else:
                 
                 if st.button("Send Instant Alert (SMS & Voice Alert)"):
                     if eng_phone:
-                        st.success(f"✅ SMS and voice alert successfully sent to ({eng_phone}) indicating fault location ('{fault_location}'), problem type ('{selected_fault}'), and proposed multi-domain treatment plan!")
+                        st.warning("Alert prepared only. No SMS or voice provider is configured, so nothing was sent.")
+                        st.code(f"To: {eng_phone}\nLocation: {fault_location}\nFault: {selected_fault}")
                     else:
                         st.error("Please enter the engineer's phone number first.")
                         
