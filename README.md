@@ -1,10 +1,4 @@
-<p align="center">
-  <img src="IMG-20261013-WA0385.jpg" width="49%" />
-  <img src="IMG-20261006-WA8136.jpg" width="49%" />
-</p>
-<p align="center"><img src="IMG-20261014-WA4576.jpg" width="100%" /></p>
 
-<p align="center"><img src="IMG-20261014-WA4576.jpg" width="220" style="border-radius:50%" /></p>
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/osmanadamaddoma/osmanadamaddoma/main/banner-real-face.png" width="100%" />
