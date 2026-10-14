@@ -18,9 +18,7 @@
   ⚡ CAT 3516C 3000kW | Perkins | Cummins | DSE 8610/7320 Sync Expert
 </p>
 
-<p align="center">
-  <img src="IMG-20261014-WA4675.jpg" width="220" style="border-radius:50%; border:5px solid #ef4444" />
-</p>
+
 
 <p align="center">
   🔴 LIVE DEMO: https://ats-docgen-ai-mmvq4yws2dqhuwhzktrhw8.streamlit.app
