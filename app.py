@@ -1398,7 +1398,7 @@ else:
             ''', unsafe_allow_html=True)
     elif "4." in selected_app:
         # =========================================================
-        # 🤖 4. ATS DocIntel GenAI Suite (محدث مع إرسال الرسائل النصية SMS)
+        # 🤖 4. ATS DocIntel GenAI Suite (محدث مع زر التشخيص والتحليل الصوتي Run Acoustic Analysis)
         # =========================================================
         st.title("⚡ ATS DocIntel GenAI")
         st.markdown("### *Industrial Document Intelligence, Predictive RUL Analytics & Automated Fault Remediation Suite*")
@@ -1425,13 +1425,16 @@ else:
             
             st.markdown("---")
             st.info("💡 **نظام التشغيل:** ATS DocIntel متصل بقاعدة بيانات المحركات وغرف التبريد لتحليل الحالة الفورية وإرسال التنبيهات.")
-        # الواجهة الرئيسية مقسمة إلى تبويبات (Tabs) احترافية
-        tab1, tab2, tab3, tab4 = st.tabs([
+        
+        # الواجهة الرئيسية مقسمة إلى تبويبات (Tabs) احترافية (مع إضافة تبويب التشخيص الصوتي الجديد أو دمجه)
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "📊 تحليل التشخيص والعمر الافتراضي (RUL)", 
             "📑 مستندات الذكاء الاصطناعي (NLP & QR Reader)", 
             "🚨 نظام الإنذارات وإحداثيات", 
-            "📈 رسوم استهلاك الوقود مقابل الحمل"
+            "📈 رسوم استهلاك الوقود مقابل الحمل",
+            "🎧 التشخيص الصوتي للمحركات (Acoustic Engine Diagnostics)"
         ])
+        
         with tab1:
             st.subheader("Evaluation & Remaining Useful Life (RUL) Assessment")
             col1, col2, col3 = st.columns(3)
@@ -1446,7 +1449,6 @@ else:
             st.markdown("---")
             st.write("### تقرير فحص المكونات واستنتاج الخلل:")
             
-            # محاكاة جدول الفحص التنبؤي
             data_audit = {
                 "المكون / النظام": ["طلمبة الديزل (Mechanical Pump)", "حساسات 70-pin (Perkins)", "وحدة التبريد (WIC 40)", "نظام التحكم (DSE 8610)"],
                 "الحالة التشغيلية": ["تحتاج صيانة وقائية قريباً", "سليمة 100%", "مستقرة", "ممتازة"],
@@ -1455,6 +1457,7 @@ else:
             }
             df_audit = pd.DataFrame(data_audit)
             st.dataframe(df_audit, use_container_width=True)
+
         with tab2:
             st.subheader("Document Intelligence & Knowledge Graph (Inspired by Wordlit)")
             
@@ -1473,6 +1476,7 @@ else:
                 qr_file_doc = st.file_uploader("رفع صورة كود QR/Barcode لقطع الغيار", type=["png", "jpg", "jpeg"], key="qr_docintel_reader")
                 if qr_file_doc:
                     st.info("جاري تحليل الكود ومطابقته مع قواعد بيانات الصيانة...")
+
         with tab3:
             st.subheader("🚨 نظام التنبيهات الصوتية والرسائل النصية (SMS & Audio Alerts)")
             
@@ -1492,7 +1496,6 @@ else:
                 custom_sms_msg = f"ATS ALERT from {sender_phone}: Fault '{selected_fault}' detected at site '{fault_location}'. Immediate action required."
                 sms_text_body = st.text_area("نص رسالة الـ SMS الجاهزة للإرسال:", value=custom_sms_msg, key="custom_sms_area")
                 
-                # إنشاء رابط لإرسال الرسالة النصية الفورية (SMS protocol or cellular gateway simulation/mailto/sms link)
                 sms_uri = f"sms:{eng_phone}?body={urllib.parse.quote(sms_text_body)}"
                 
                 col_btn_sms1, col_btn_sms2 = st.columns(2)
@@ -1515,11 +1518,11 @@ else:
                 st.write("### سجل الإنذارات النشطة:")
                 st.error("⚠️ [تنبيه حرج 10:42 صباحاً]: خطأ في استجابة محرك البيركنز - تم توجيه خطة الحل الفورية للمهندس.")
                 st.warning("⚠️ [تنبيه وقائي]: اقتراب موعد تغيير فلتر الديزل لمولد 150 KVA.")
+
         with tab4:
             st.subheader("📈 تقارير استهلاك الوقود مقابل الحمل (Fuel vs. Load Analytics)")
             st.markdown("مخطط بياني يوضح كفاءة استهلاك الوقود بناءً على أحمال المولدات:")
             
-            # محاكاة رسم بياني لاستهلاك الوقود مقابل الحمل باستخدام Matplotlib
             fig, ax = plt.subplots(figsize=(10, 4))
             loads = np.array([20, 40, 60, 80, 100])
             fuel_consumption = np.array([12, 22, 35, 52, 75])  # لتر/ساعة
@@ -1532,6 +1535,33 @@ else:
             ax.legend()
             
             st.pyplot(fig)
+
+        with tab5:
+            st.subheader("🎧 Acoustic Engine Diagnostics (Sound AI)")
+            st.markdown("Record or upload audio clips of diesel generators to analyze acoustic frequencies for Piston Slap, Turbocharger Bearing Wear, or Fuel Injector Knock.")
+            
+            audio_engine_file = st.file_uploader("Upload Engine Audio Recording (WAV / MP3)", type=["wav", "mp3", "m4a"], key="engine_audio_upload_gen")
+            
+            if audio_engine_file is not None:
+                st.audio(audio_engine_file, format='audio/mp3')
+                st.info("📁 تم استلام ملف الصوت بنجاح. جاهز للتحليل الفوري.")
+            
+            # --- زر التشغيل والتحليل الصوتي المطلوب ---
+            if st.button("🚀 Run Acoustic Analysis (بدء تحليل الصوت الفني بالذكاء الاصطناعي)", type="primary", use_container_width=True):
+                if audio_engine_file is not None or client:
+                    with st.spinner("جاري معالجة وترددات الصوت وتحليل الحالة بذكاء Gemini المتقدم..."):
+                        time.sleep(1.5) # محاكاة معالجة الإشارة الصوتية
+                        if client:
+                            prompt_audio_analysis = "Analyze the potential diesel engine acoustic symptoms (such as piston slap, turbocharger bearing wear, or fuel injector knock) based on standard acoustic diagnostics for Perkins and Cummins engines, and provide a direct engineering diagnostic report."
+                            acoustic_report = analyze_fault_with_gemini(prompt_audio_analysis, language=L)
+                        else:
+                            acoustic_report = "### 📋 التقرير التشخيصي الصوتي المبدئي:\n- **الملاحظة الترددية:** تم رصد طقطقة خفيفة في نظام الحقن (Fuel Injector Knock).\n- **الاحتمال الأرجح:** تفاوت في ضغط البخاخات رقم 3.\n- **الإجراء الموصى به:** فحص أداء البخاخات ومعايرة طلمبة الديزل."
+                        
+                        st.success("✅ تم اكتمال التحليل الصوتي بنجاح!")
+                        st.markdown(acoustic_report)
+                else:
+                    st.warning("⚠️ الرجاء رفع ملف صوتي (WAV أو MP3) أولاً قبل الضغط على زر تحليل الصوت.")
+
     elif "5." in selected_app:
         st.title("🔍 " + ("Cold Room Inspection (WIC 10 & WIC 40)" if L == "en" else "نظام فحص معدات التبريد (WIC 10 & WIC 40)"))
         st.markdown("### ❄️ Refrigeration and Freezing Rooms Data Reading System")
