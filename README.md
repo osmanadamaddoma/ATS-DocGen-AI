@@ -1,4 +1,6 @@
-
+<p align="center">
+  <img src="IMG-20261013-WA0385.jpg" width="100%" />
+</p>
 
 ### 🔴 LIVE DEMO: https://ats-docgen-ai-mmvq4yws2dqhuwhzktrhw8.streamlit.app
 ### 🎁 Code: `TRIAL-7DAYS`
