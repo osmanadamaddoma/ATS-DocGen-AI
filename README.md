@@ -1,6 +1,4 @@
-src="https://img.shields.io/badge/🔴_LIVE_DEMO-ATS_Suite-red?style=for-the-badge" />
-  </a>
-</p>
+
 
 ### 🔴 LIVE DEMO: https://ats-docgen-ai-mmvq4yws2dqhuwhzktrhw8.streamlit.app
 ### 🎁 Code: `TRIAL-7DAYS`
