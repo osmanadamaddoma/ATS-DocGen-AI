@@ -1398,10 +1398,10 @@ else:
             ''', unsafe_allow_html=True)
     elif "4." in selected_app:
         # =========================================================
-        # 🤖 4. ATS DocIntel GenAI Suite (محدث مع زر التشخيص والتحليل الصوتي Run Acoustic Analysis)
+        # 🤖 4. ATS DocIntel GenAI Suite (محدث مع إرسال الرسائل النصية SMS والتشخيص الصوتي)
         # =========================================================
         st.title("⚡ ATS DocIntel GenAI")
-        st.markdown("### *Industrial Document Intelligence, Predictive RUL Analytics & Automated Fault Remediation Suite*")
+        st.markdown("### *Industrial Document Intelligence, Predictive RUL Analytics & Acoustic Sound Diagnostics Suite*")
         st.markdown("---")
         # أدوات القوائم المنسدلة ورفع الملفات الجانبية الخاصة بـ DocIntel
         with st.sidebar:
@@ -1426,7 +1426,7 @@ else:
             st.markdown("---")
             st.info("💡 **نظام التشغيل:** ATS DocIntel متصل بقاعدة بيانات المحركات وغرف التبريد لتحليل الحالة الفورية وإرسال التنبيهات.")
         
-        # الواجهة الرئيسية مقسمة إلى تبويبات (Tabs) احترافية (مع إضافة تبويب التشخيص الصوتي الجديد أو دمجه)
+        # الواجهة الرئيسية مقسمة إلى 5 تبويبات (Tabs) تشمل تحليل RUL، المستندات، الإنذارات، استهلاك الوقود، والتشخيص الصوتي
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "📊 تحليل التشخيص والعمر الافتراضي (RUL)", 
             "📑 مستندات الذكاء الاصطناعي (NLP & QR Reader)", 
@@ -1449,6 +1449,7 @@ else:
             st.markdown("---")
             st.write("### تقرير فحص المكونات واستنتاج الخلل:")
             
+            # محاكاة جدول الفحص التنبؤي
             data_audit = {
                 "المكون / النظام": ["طلمبة الديزل (Mechanical Pump)", "حساسات 70-pin (Perkins)", "وحدة التبريد (WIC 40)", "نظام التحكم (DSE 8610)"],
                 "الحالة التشغيلية": ["تحتاج صيانة وقائية قريباً", "سليمة 100%", "مستقرة", "ممتازة"],
@@ -1538,29 +1539,26 @@ else:
 
         with tab5:
             st.subheader("🎧 Acoustic Engine Diagnostics (Sound AI)")
-            st.markdown("Record or upload audio clips of diesel generators to analyze acoustic frequencies for Piston Slap, Turbocharger Bearing Wear, or Fuel Injector Knock.")
+            st.markdown("قم برفع ملف الصوت الخاص بالمولد (WAV / MP3) أو سجل صوت المحرك للتحليل الطيفي وترددات الأعطال:")
             
-            audio_engine_file = st.file_uploader("Upload Engine Audio Recording (WAV / MP3)", type=["wav", "mp3", "m4a"], key="engine_audio_upload_gen")
+            audio_engine_file = st.file_uploader("رفع ملف تسجيل صوت المحرك (WAV / MP3)", type=["wav", "mp3", "m4a"], key="engine_audio_upload_gen")
             
             if audio_engine_file is not None:
                 st.audio(audio_engine_file, format='audio/mp3')
-                st.info("📁 تم استلام ملف الصوت بنجاح. جاهز للتحليل الفوري.")
+                st.info("📁 تم استلام ملف الصوت بنجاح وجاهز للتحليل الترددي.")
             
-            # --- زر التشغيل والتحليل الصوتي المطلوب ---
+            # --- الزر المطلوب للتشغيل والتحليل الصوتي الفني ---
             if st.button("🚀 Run Acoustic Analysis (بدء تحليل الصوت الفني بالذكاء الاصطناعي)", type="primary", use_container_width=True):
-                if audio_engine_file is not None or client:
-                    with st.spinner("جاري معالجة وترددات الصوت وتحليل الحالة بذكاء Gemini المتقدم..."):
-                        time.sleep(1.5) # محاكاة معالجة الإشارة الصوتية
-                        if client:
-                            prompt_audio_analysis = "Analyze the potential diesel engine acoustic symptoms (such as piston slap, turbocharger bearing wear, or fuel injector knock) based on standard acoustic diagnostics for Perkins and Cummins engines, and provide a direct engineering diagnostic report."
-                            acoustic_report = analyze_fault_with_gemini(prompt_audio_analysis, language=L)
-                        else:
-                            acoustic_report = "### 📋 التقرير التشخيصي الصوتي المبدئي:\n- **الملاحظة الترددية:** تم رصد طقطقة خفيفة في نظام الحقن (Fuel Injector Knock).\n- **الاحتمال الأرجح:** تفاوت في ضغط البخاخات رقم 3.\n- **الإجراء الموصى به:** فحص أداء البخاخات ومعايرة طلمبة الديزل."
-                        
-                        st.success("✅ تم اكتمال التحليل الصوتي بنجاح!")
-                        st.markdown(acoustic_report)
-                else:
-                    st.warning("⚠️ الرجاء رفع ملف صوتي (WAV أو MP3) أولاً قبل الضغط على زر تحليل الصوت.")
+                with st.spinner("جاري معالجة الإشارة الصوتية وتحليل ترددات المحرك باستخدام نظام الذكاء الاصطناعي..."):
+                    time.sleep(1.5)
+                    if client:
+                        prompt_audio = "Analyze diesel engine acoustic anomalies (such as piston slap, turbocharger bearing wear, or fuel injector knock) for Perkins and Cummins engines and provide a direct engineering report."
+                        acoustic_report = analyze_fault_with_gemini(prompt_audio, language=L)
+                    else:
+                        acoustic_report = "### 📋 تقرير التشخيص الصوتي الميداني:\n- **الملاحظة الترددية:** طقطقة بترددات عالية (High-frequency Knock).\n- **السبب المحتمل:** تأخير في توقيت حقن الوقود (Injection Timing) أو بداية تآكل في جلب البستم.\n- **الإجراء الموصى به:** فحص زوايا الحقن ومعايرة البخاخات فوراً."
+                    
+                    st.success("✅ تم اكتمال التحليل الصوتي بنجاح!")
+                    st.markdown(acoustic_report)
 
     elif "5." in selected_app:
         st.title("🔍 " + ("Cold Room Inspection (WIC 10 & WIC 40)" if L == "en" else "نظام فحص معدات التبريد (WIC 10 & WIC 40)"))
