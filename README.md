@@ -1,3 +1,7 @@
+<p align="center"><img src="IMG-20261014-WA4576.jpg" width="100%" /></p>
+
+<p align="center"><img src="IMG-20261014-WA4576.jpg" width="220" style="border-radius:50%" /></p>
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/osmanadamaddoma/osmanadamaddoma/main/banner-real-face.png" width="100%" />
 </p>
