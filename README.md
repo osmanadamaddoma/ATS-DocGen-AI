@@ -8,9 +8,7 @@
 أنا عثمان، 20 سنة في الميدان بين مولدات CAT 3000kW وغرف تبريد Porkka الفنلندية في أمدرمان. حولت كل هذه الخبرة إلى نظام ذكاء صناعي واحد.
 
 📍 Omdurman → KSA, UAE, Qatar | 📲 +249922562846
-<p align="center">
-  <img src="IMG-20261014-WA4675.jpg" width="100%" style="border-radius:15px" />
-</p>
+
 
 <h1 align="center">Osman A. | ATS Industrial Intelligence</h1>
 <p align="center">
