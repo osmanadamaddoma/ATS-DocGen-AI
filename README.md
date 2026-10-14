@@ -3,6 +3,36 @@
 </p>
 
 <h1 align="center">Osman A. | ATS Industrial Intelligence</h1>
+
+<p align="center">
+  <b>🏭 20+ Years Field Engineer → Built AI from Omdurman for GCC Factories</b><br>
+  ⚡ CAT 3516C 3000kW | Perkins | Cummins | DSE 8610/7320 Sync Expert<br>
+  <i>"I don't build apps. I build Industrial Operating Systems that save $50k/year in fuel & downtime."</i>
+</p>
+
+<p align="center">
+  <img src="IMG-20261014-WA4675.jpg" width="220" style="border-radius:50%; border:5px solid #ef4444" />
+</p>
+
+<p align="center">
+  <a href="https://ats-docgen-ai-mmvq4yws2dqhuwhzktrhw8.streamlit.app">
+  <img src="https://img.shields.io/badge/🔴_LIVE_DEMO-ATS_Suite-red?style=for-the-badge" />
+  </a>
+</p>
+
+### 🔴 LIVE DEMO: https://ats-docgen-ai-mmvq4yws2dqhuwhzktrhw8.streamlit.app
+### 🎁 Code: `TRIAL-7DAYS`
+
+> **هل مصنعك لا يزال يدير المولدات بالدفتر؟**
+
+أنا عثمان، 20 سنة في الميدان بين مولدات CAT 3000kW وغرف تبريد Porkka الفنلندية في أمدرمان. حولت كل هذه الخبرة إلى نظام ذكاء صناعي واحد.
+
+📍 Omdurman → KSA, UAE, Qatar | 📲 +249922562846
+<p align="center">
+  <img src="IMG-20261014-WA4675.jpg" width="100%" style="border-radius:15px" />
+</p>
+
+<h1 align="center">Osman A. | ATS Industrial Intelligence</h1>
 <p align="center">
   <b>🏭 20+ Years Field Engineer → Built AI from Omdurman for GCC Factories</b><br>
   ⚡ CAT 3516C 3000kW | Perkins | Cummins | DSE 8610/7320 Sync Expert
