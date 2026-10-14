@@ -184,9 +184,8 @@ def play_audio(text, lang='en', loop=False):
     except Exception:
         logger.exception("Audio playback failed")
         st.warning("Audio playback is temporarily unavailable.")
-@st.cache_data(ttl=3600, show_spinner=False)
 def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
-    """AI call function with high pressure error handling (503), retries, and bilingual support"""
+    """Call Gemini without caching failures, with actionable provider diagnostics."""
     if not client:
         return "⚠️ GEMINI_API_KEY not found." if language == "en" else "⚠ لم يتم العثور على مفتاح GEMINI_API_KEY."
     lang_instr = "Respond in English." if language == "en" else "Write the response in clear and direct technical Arabic."
@@ -203,12 +202,28 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
             return response.text
         except Exception as e:
             err_msg = str(e)
-            if "503" in err_msg or "UNAVAILABLE" in err_msg:
+            err_upper = err_msg.upper()
+            if "503" in err_msg or "UNAVAILABLE" in err_upper:
                 if attempt < max_retries - 1:
-                    time.sleep(2)
+                    time.sleep(2 ** attempt)
                     continue
                 else:
                     return "⚠️ High server load (503). Please retry in a few seconds." if language == "en" else "⚠️ الخادم يمر بضغط عالٍ حالياً (503). يرجى المحاولة مرة أخرى."
+            if any(token in err_upper for token in ("401", "403", "UNAUTHENTICATED", "PERMISSION_DENIED", "API KEY")):
+                logger.exception("Gemini authentication/permission failure")
+                return ("❌ Gemini API key is invalid, missing, or does not have permission for this model."
+                        if language == "en" else
+                        "❌ مفتاح Gemini مفقود أو غير صحيح أو لا يملك صلاحية استخدام هذا النموذج.")
+            if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_upper or "QUOTA" in err_upper:
+                logger.exception("Gemini quota/rate-limit failure")
+                return ("⚠️ Gemini quota or rate limit reached. Check billing/quota and try again later."
+                        if language == "en" else
+                        "⚠️ تم بلوغ حد الاستخدام أو الحصة في Gemini. تحقق من الحصة وحاول لاحقًا.")
+            if any(token in err_upper for token in ("TIMEOUT", "TIMED OUT", "CONNECTION", "DNS")):
+                logger.exception("Gemini network failure")
+                return ("⚠️ Could not connect to Gemini. Check the deployment network and try again."
+                        if language == "en" else
+                        "⚠️ تعذر الاتصال بخدمة Gemini. تحقق من اتصال بيئة النشر وحاول مرة أخرى.")
             logger.exception("Gemini request failed")
             return ("❌ AI service error. Please try again later." if language == "en"
                     else "❌ حدث خطأ في خدمة الذكاء الاصطناعي. يرجى المحاولة لاحقًا.")
