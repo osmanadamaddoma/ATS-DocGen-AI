@@ -406,7 +406,7 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perk
     co2_kg = liters * 2.68
     return round(liters, 1), round(co2_kg, 1), round(sfc, 3), round(eff, 1)
 # =========================================================
-# 2. Unified Subscription System and Packages (with Cookie Management)
+# 2. Unified Subscription System and Packages (with Cookie Management & Robust Code Extraction)
 # =========================================================
 CLIENTS_DATABASE = {
     "ADDOMA-2026-PRO": {
@@ -432,15 +432,16 @@ ADMIN_CODES = ["ADDOMA-2026-PRO"]
 if supabase:
     try:
         res_load = supabase.table("subscriptions").select("*").execute()
-        for row in res_load.data:
-            c = str(row.get("code","")).strip().upper()
-            if c:
-                CLIENTS_DATABASE[c] = {
-                    "name": row.get("client_name", "Client"),
-                    "plan": row.get("plan", "Monthly"),
-                    "start_date": row.get("start_date", datetime.now().strftime("%Y-%m-%d")),
-                    "duration_days": int(row.get("duration_days", 30)),
-                }
+        if res_load and hasattr(res_load, "data") and res_load.data:
+            for row in res_load.data:
+                c = str(row.get("code","")).strip().upper()
+                if c:
+                    CLIENTS_DATABASE[c] = {
+                        "name": row.get("client_name", "Client"),
+                        "plan": row.get("plan", "Monthly"),
+                        "start_date": row.get("start_date", datetime.now().strftime("%Y-%m-%d")),
+                        "duration_days": int(row.get("duration_days", 30)),
+                    }
     except Exception as e:
         print(f"Load subscriptions error: {e}")
 def get_cookie_manager():
@@ -471,20 +472,21 @@ if final_saved and not st.session_state.authenticated:
         if supabase:
             try:
                 res = supabase.table("subscriptions").select("*").execute()
-                for row in res.data:
-                    c = str(row.get("code","")).strip().upper()
-                    if c == clean_saved:
-                        CLIENTS_DATABASE[c] = {
-                            "name": row.get("client_name", "Client"),
-                            "plan": row.get("plan", "Monthly"),
-                            "start_date": row.get("start_date", datetime.now().strftime("%Y-%m-%d")),
-                            "duration_days": int(row.get("duration_days", 30)),
-                        }
-                        st.session_state.authenticated = True
-                        st.session_state.active_code = c
-                        st.session_state.user_email = CLIENTS_DATABASE[c]["name"]
-                        st.session_state.role = "admin" if c in ADMIN_CODES else "client"
-                        break
+                if res and hasattr(res, "data") and res.data:
+                    for row in res.data:
+                        c = str(row.get("code","")).strip().upper()
+                        if c == clean_saved:
+                            CLIENTS_DATABASE[c] = {
+                                "name": row.get("client_name", "Client"),
+                                "plan": row.get("plan", "Monthly"),
+                                "start_date": row.get("start_date", datetime.now().strftime("%Y-%m-%d")),
+                                "duration_days": int(row.get("duration_days", 30)),
+                            }
+                            st.session_state.authenticated = True
+                            st.session_state.active_code = c
+                            st.session_state.user_email = CLIENTS_DATABASE[c]["name"]
+                            st.session_state.role = "admin" if c in ADMIN_CODES else "client"
+                            break
             except:
                 pass
 # =========================================================
@@ -570,15 +572,16 @@ if not st.session_state.authenticated:
         if supabase:
             try:
                 res_reload = supabase.table("subscriptions").select("*").execute()
-                for row in res_reload.data:
-                    c = str(row.get("code","")).strip().upper()
-                    if c:
-                        CLIENTS_DATABASE[c] = {
-                            "name": row.get("client_name", "Client"),
-                            "plan": row.get("plan", "Monthly"),
-                            "start_date": row.get("start_date", datetime.now().strftime("%Y-%m-%d")),
-                            "duration_days": int(row.get("duration_days", 30)),
-                        }
+                if res_reload and hasattr(res_reload, "data") and res_reload.data:
+                    for row in res_reload.data:
+                        c = str(row.get("code","")).strip().upper()
+                        if c:
+                            CLIENTS_DATABASE[c] = {
+                                "name": row.get("client_name", "Client"),
+                                "plan": row.get("plan", "Monthly"),
+                                "start_date": row.get("start_date", datetime.now().strftime("%Y-%m-%d")),
+                                "duration_days": int(row.get("duration_days", 30)),
+                            }
             except Exception as e:
                 print(f"Reload before check error: {e}")
         clean_code = user_code.strip().upper()
@@ -1398,7 +1401,7 @@ else:
             ''', unsafe_allow_html=True)
     elif "4." in selected_app:
         # =========================================================
-        # 🤖 4. ATS DocIntel GenAI Suite (محدث مع إرسال الرسائل النصية SMS والتشخيص الصوتي)
+        # 🤖 4. ATS DocIntel GenAI Suite (محدث مع إرسال الرسائل النصية والتشخيص الصوتي)
         # =========================================================
         st.title("⚡ ATS DocIntel GenAI")
         st.markdown("### *Industrial Document Intelligence, Predictive RUL Analytics & Acoustic Sound Diagnostics Suite*")
@@ -1426,7 +1429,7 @@ else:
             st.markdown("---")
             st.info("💡 **نظام التشغيل:** ATS DocIntel متصل بقاعدة بيانات المحركات وغرف التبريد لتحليل الحالة الفورية وإرسال التنبيهات.")
         
-        # الواجهة الرئيسية مقسمة إلى 5 تبويبات (Tabs) تشمل تحليل RUL، المستندات، الإنذارات، استهلاك الوقود، والتشخيص الصوتي
+        # الواجهة الرئيسية مقسمة إلى 5 تبويبات (Tabs)
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "📊 تحليل التشخيص والعمر الافتراضي (RUL)", 
             "📑 مستندات الذكاء الاصطناعي (NLP & QR Reader)", 
@@ -1449,7 +1452,6 @@ else:
             st.markdown("---")
             st.write("### تقرير فحص المكونات واستنتاج الخلل:")
             
-            # محاكاة جدول الفحص التنبؤي
             data_audit = {
                 "المكون / النظام": ["طلمبة الديزل (Mechanical Pump)", "حساسات 70-pin (Perkins)", "وحدة التبريد (WIC 40)", "نظام التحكم (DSE 8610)"],
                 "الحالة التشغيلية": ["تحتاج صيانة وقائية قريباً", "سليمة 100%", "مستقرة", "ممتازة"],
@@ -1547,7 +1549,6 @@ else:
                 st.audio(audio_engine_file, format='audio/mp3')
                 st.info("📁 تم استلام ملف الصوت بنجاح وجاهز للتحليل الترددي.")
             
-            # --- الزر المطلوب للتشغيل والتحليل الصوتي الفني ---
             if st.button("🚀 Run Acoustic Analysis (بدء تحليل الصوت الفني بالذكاء الاصطناعي)", type="primary", use_container_width=True):
                 with st.spinner("جاري معالجة الإشارة الصوتية وتحليل ترددات المحرك باستخدام نظام الذكاء الاصطناعي..."):
                     time.sleep(1.5)
