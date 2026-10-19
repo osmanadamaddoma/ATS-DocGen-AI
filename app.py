@@ -37,6 +37,10 @@ if os.path.exists("IMG-20261019-WA2581.jpg"):
     st.image("IMG-20261019-WA2581.jpg", use_container_width=True)
 else:
     st.error(f"الملف غير موجود! الملفات الموجودة: {os.listdir('.')}")
+if os.path.exists("55f2de10-cb78-11f1-bb83-0befc85ac94b.mp4"):
+    st.video("55f2de10-cb78-11f1-bb83-0befc85ac94b.mp4")
+else:
+    st.warning("الفيديو غير موجود في المستودع")
 # Try importing barcode reading library
 try:
     from pyzbar.pyzbar import decode as decode_qr
