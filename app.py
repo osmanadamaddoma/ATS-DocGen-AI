@@ -1661,27 +1661,5 @@ else:
                 elif load_percentage > 90:
                     st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
 import streamlit as st
-import os
-
-st.set_page_config(page_title="ATS-DocGen-AI", layout="wide")
-
-st.markdown("<h1 style='text-align: center;'>ATS ENG | Power Engineer</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: gray;'>Diesel Power Station - Kuwait | We Adapt Smart Solutions with GAI Tools</h3>", unsafe_allow_html=True)
-st.divider()
-
-# الصورة
-if os.path.exists("IMG-20261019-WA2581.jpg"):
-    st.image("IMG-20261019-WA2581.jpg", use_container_width=True)
-
-# الفيديو
-st.subheader("📹 Field Demo - Cummins Diesel Power Station")
-col1, col2, col3 = st.columns([1, 3, 1])
-with col2:
-    if os.path.exists("55f2de10-cb78-11f1-bb83-0befc85ac94b.mp4"):
-        st.video("55f2de10-cb78-11f1-bb83-0befc85ac94b.mp4")
-        st.caption("ATS Power Station - Smart Monitoring with AI")
-
-# --- التنبيه في آخر الصفحة ---
-st.divider()
+st.title("Test")
 st.error("🔒 ACTIVATION REQUIRED: To get your activation code, please contact WhatsApp: +249 9922562846")
-st.markdown("[📲 Click here to contact on WhatsApp](https://wa.me/2499922562846)")
