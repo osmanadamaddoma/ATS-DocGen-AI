@@ -32,8 +32,11 @@ except ImportError:
 try:
     from influxdb_client import InfluxDBClient
 except ImportError:
+    import os
+if os.path.exists("IMG-20261019-WA2581.jpg"):
     st.image("IMG-20261019-WA2581.jpg", use_container_width=True)
-    InfluxDBClient = None
+else:
+    st.error(f"الملف غير موجود! الملفات الموجودة: {os.listdir('.')}")
 # Try importing barcode reading library
 try:
     from pyzbar.pyzbar import decode as decode_qr
