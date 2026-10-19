@@ -1660,3 +1660,7 @@ else:
                     st.warning(f"⚠️ Warning: The generator is running at a very low load ({load_percentage:.1f}%). This leads to incomplete combustion in {gen_model_calc} engines and unburnt oil accumulation (Wet Stacking).")
                 elif load_percentage > 90:
                     st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
+# --- تنبيه التفعيل تحت الفيديو ---
+st.divider()
+st.error("🔒 ACTIVATION REQUIRED: To get your activation code, please contact WhatsApp: +249 9922562846")
+st.markdown("[📲 Click here to contact on WhatsApp](https://wa.me/2499922562846)")
