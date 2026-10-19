@@ -1,11 +1,4 @@
-import streamlit as st
 
-# --- حارس يفتح بنفس كود التفعيل الأساسي ---
-if not st.session_state.get("authenticated", False):
-    st.error("🔒 Analytics مقفول - يجب تفعيل البرنامج الرئيسي أولاً")
-    st.warning("ارجع للصفحة الرئيسية وأدخل كود التفعيل نفسه")
-    st.page_link("app.py", label="⬅️ ارجع للصفحة الرئيسية للتفعيل", icon="🔑")
-    st.stop()
 # --- نهاية الحارس - سيفتح تلقائيا بنفس الكود ---
 import streamlit as st
 import time
