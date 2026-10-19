@@ -1664,7 +1664,3 @@ else:
 st.divider()
 st.error("🔒 ACTIVATION REQUIRED: To get your activation code, please contact WhatsApp: +249 9922562846")
 st.markdown("[📲 Click here to contact on WhatsApp](https://wa.me/2499922562846)")
-# --- التنبيه في آخر الصفحة ---
-st.divider()
-st.error("🔒 ACTIVATION REQUIRED: To get your activation code, please contact WhatsApp: +249 9922562846")
-st.markdown("[📲 Click here to contact on WhatsApp](https://wa.me/2499922562846)")
