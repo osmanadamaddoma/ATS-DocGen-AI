@@ -1,12 +1,12 @@
-#import streamlit as st
 import streamlit as st
 
-# --- حارس التفعيل - النسخة الصحيحة ---
-if not st.session_state.get("activated", False):
-    st.error("🔒 هذه الميزة مقفولة - Analytics يحتاج كود تفعيل")
-    st.link_button("📲 احصل على كود التفعيل", "https://wa.me/2499922562846")
+# --- حارس يفتح بنفس كود التفعيل الأساسي ---
+if not st.session_state.get("authenticated", False):
+    st.error("🔒 Analytics مقفول - يجب تفعيل البرنامج الرئيسي أولاً")
+    st.warning("ارجع للصفحة الرئيسية وأدخل كود التفعيل نفسه")
+    st.page_link("app.py", label="⬅️ ارجع للصفحة الرئيسية للتفعيل", icon="🔑")
     st.stop()
-# --- نهاية الحارس ---
+# --- نهاية الحارس - سيفتح تلقائيا بنفس الكود ---
 # من هنا يبدأ كود Analytics الأصلي -*- coding: utf-8 -*-
 import os
 import io
