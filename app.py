@@ -32,6 +32,7 @@ except ImportError:
 try:
     from influxdb_client import InfluxDBClient
 except ImportError:
+    st.image("IMG-20261019-WA2581.jpg", use_container_width=True)
     InfluxDBClient = None
 # Try importing barcode reading library
 try:
