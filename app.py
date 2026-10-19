@@ -41,6 +41,10 @@ if os.path.exists("55f2de10-cb78-11f1-bb83-0befc85ac94b.mp4"):
     st.video("55f2de10-cb78-11f1-bb83-0befc85ac94b.mp4")
 else:
     st.warning("الفيديو غير موجود في المستودع")
+st.divider()
+st.error("🔒 ACTIVATION REQUIRED: To get your activation code, please contact WhatsApp: +249 9922562846")
+st.link_button("📲 Contact on WhatsApp", "https://wa.me/2499922562846")
+st.divider()
 # Try importing barcode reading library
 try:
     from pyzbar.pyzbar import decode as decode_qr
@@ -1661,6 +1665,4 @@ else:
                 elif load_percentage > 90:
                     st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
 
-st.divider()
-st.error("🔒 ACTIVATION REQUIRED: To get your activation code, please contact WhatsApp: +249 9922562846")
-st.markdown("[📲 Click here to contact on WhatsApp](https://wa.me/2499922562846)")
+
