@@ -43,7 +43,7 @@ else:
     st.warning("الفيديو غير موجود في المستودع")
 st.divider()
 st.error("🔒 ACTIVATION REQUIRED: To get your activation code, please contact WhatsApp: +249 9922562846")
-st.link_button("📲 Contact on WhatsApp", "https://wa.me/2499922562846")
+st.link_button("📲 Contact on WhatsApp", "https://wa.me/249922562846")
 st.divider()
 # Try importing barcode reading library
 try:
