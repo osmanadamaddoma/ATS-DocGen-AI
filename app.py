@@ -1664,7 +1664,7 @@ if load_percentage < 50:
     st.warning(f"⚠️ War")
 elif load_percentage > 90:
     st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
-INTEGRATION ADDED 2026-10-21 ===
+# === ATS VIDEO INTEGRATION ADDED 2026-10-21 ===
 ATS_VIDEOS = {
      "VIDEO_ID_1": "https://www.youtube.com/embed/REPLACE_WITH_ID_1",
      "VIDEO_ID_2": "https://www.youtube.com/embed/REPLACE_WITH_ID_2",
