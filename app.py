@@ -72,11 +72,11 @@ if "sites_data" not in st.session_state:
     st.session_state.sites_data = {
         "(Main Menu)": {
             "Main Site - (Sub Site)": {
-                "address": "                   ",
-                "technician_name": "                  ",
-                "technician_whatsapp": "                 ",
+                "address": " ",
+                "technician_name": " ",
+                "technician_whatsapp": " ",
                 "generators": {
-                    "  ": {
+                    " ": {
                         "model": "Perkins 410 kVA",
                         "run_hours": 700.0,
                         "target": 940.0,
@@ -94,7 +94,7 @@ if "sites_data" not in st.session_state:
                             "ambient_temp": 43.0
                         }
                     },
-                    "  ": {
+                    " ": {
                         "model": "Cummins 250 kVA",
                         "run_hours": 1200.0,
                         "target": 1500.0,
@@ -124,8 +124,8 @@ if "daily_logs" not in st.session_state:
             "timestamp": f"{today_str} 08:30:00",
             "date": today_str,
             "site": "Khartoum (Main Menu)",
-            "generator": "   ",
-            "technician": "                 ",
+            "generator": " ",
+            "technician": " ",
             "run_hours": 700.0,
             "v_measured": 398.0,
             "oil_press": 4.5,
@@ -173,12 +173,7 @@ def play_audio(text, lang='en', loop=False):
         audio_bytes = audio_data.getvalue()
         if loop:
             b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
-            audio_html = f"""
-                <audio autoplay loop controls style="width: 100%;">
-                    <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
-                    Your browser does not support audio playback.
-                </audio>
-            """
+            audio_html = f""" <audio autoplay loop controls style="width: 100%;"> <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3"> Your browser does not support audio playback. </audio> """
             st.components.v1.html(audio_html, height=60)
         else:
             audio_data.seek(0)
@@ -191,19 +186,7 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
     if not client:
         return "⚠️ GEMINI_API_KEY not found." if language == "en" else "⚠ لم يتم العثور على مفتاح GEMINI_API_KEY."
     lang_instr = "Respond in English." if language == "en" else "اكتب الإجابة بلغة عربية تقنية واضحة ومباشرة."
-    prompt = f"""
-    You are an expert industrial consulting engineer specializing in generators, DSE control panels (DSE 7320, DSE 8610 MKII), Perkins & Cummins engines, and cooling systems.
-    Fault Code / Alarm: "{fault_code}"
-    Catalog Context:
-    \"\"\"
-    {context_text if context_text else "No specific catalog excerpt."}
-    \"\"\"
-    Provide a professional diagnostic report with:
-    1. Technical Explanation / Fault Nature.
-    2. Top 3 Probable Causes.
-    3. Sequential Field Corrective Actions.
-    {lang_instr}
-    """
+    prompt = f""" You are an expert industrial consulting engineer specializing in generators, DSE control panels (DSE 7320, DSE 8610 MKII), Perkins & Cummins engines, and cooling systems. Fault Code / Alarm: "{fault_code}" Catalog Context: \"\"\" {context_text if context_text else "No specific catalog excerpt."} \"\"\" Provide a professional diagnostic report with: 1. Technical Explanation / Fault Nature. 2. Top 3 Probable Causes. 3. Sequential Field Corrective Actions. {lang_instr} """
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -230,14 +213,7 @@ def sanitize_latin_only(text):
     clean_text = re.sub(r"[^\x00-\x7F]+", "", text).strip()
     return clean_text if clean_text else "N/A"
 class ComprehensivePDF(FPDF):
-    def __init__(
-        self,
-        title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT",
-        logo_path=None,
-        site_address="N/A",
-        main_site="N/A",
-        sub_site="N/A",
-    ):
+    def __init__( self, title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT", logo_path=None, site_address="N/A", main_site="N/A", sub_site="N/A", ):
         super().__init__()
         self.report_title = title_text
         self.logo_path = logo_path
@@ -320,12 +296,7 @@ def fetch_live_iot_data():
         cfg = st.secrets["influxdb"]
         client_iot = InfluxDBClient(url=cfg["url"], token=cfg["token"], org=cfg["org"])
         query_api = client_iot.query_api()
-        flux_query = f'''
-        from(bucket: "{cfg["bucket"]}")
-            |> range(start: -30m)
-            |> filter(fn: (r) => r["_measurement"] == "generator_01")
-            |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-        '''
+        flux_query = f''' from(bucket: "{cfg["bucket"]}") |> range(start: -30m) |> filter(fn: (r) => r["_measurement"] == "generator_01") |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value") '''
         df_db = query_api.query_data_frame(flux_query)
         if not df_db.empty:
             df_db['_time'] = pd.to_datetime(df_db['_time'])
@@ -508,12 +479,7 @@ with st.sidebar:
     st.markdown("---")
     # App Branding & Profile Card Header
     st.markdown(
-        """
-        <div style="background: linear-gradient(135deg, #182b49 0%, #2c3e50 100%); padding: 15px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <h3 style="margin: 0; font-size: 18px; color: #f8f9fa;">ATS ENGINEERING</h3>
-            <p style="margin: 5px 0 0 0; font-size: 12px; color: #adb5bd;">Addoma Trading Services Suite</p>
-        </div>
-        """,
+        """ <div style="background: linear-gradient(135deg, #182b49 0%, #2c3e50 100%); padding: 15px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"> <h3 style="margin: 0; font-size: 18px; color: #f8f9fa;">ATS ENGINEERING</h3> <p style="margin: 5px 0 0 0; font-size: 12px; color: #adb5bd;">Addoma Trading Services Suite</p> </div> """,
         unsafe_allow_html=True
     )
     
@@ -522,12 +488,7 @@ with st.sidebar:
     # Professional Bio Section inside Sidebar Expander or Box
     with st.expander("📌 System & Engineer Profile", expanded=True):
         st.markdown(
-            """
-            **Lead Consultant:** Eng. Osman Adam Addoma  
-            **Expertise:** Power Systems, Gensets Synchronization, & Industrial Refrigeration (WIC Systems).  
-            **Core Tech:** Python, Streamlit, Supabase, InfluxDB, & Gemini AI Diagnostics.  
-            **Mission:** Delivering cutting-edge electromechanical solutions, predictive maintenance, and smart IoT operational control.
-            """,
+            """ **Lead Consultant:** Eng. Osman Adam Addoma **Expertise:** Power Systems, Gensets Synchronization, & Industrial Refrigeration (WIC Systems). **Core Tech:** Python, Streamlit, Supabase, InfluxDB, & Gemini AI Diagnostics. **Mission:** Delivering cutting-edge electromechanical solutions, predictive maintenance, and smart IoT operational control. """,
             unsafe_allow_html=True
         )
         
@@ -668,13 +629,21 @@ if input_code in CLIENTS_DATABASE:
         if "code" in st.query_params:
             del st.query_params["code"]
         st.stop()
-
-# ======= إضافة شرط قفل التطبيق الصارم في حال انتهاء الصلاحية =======
 if not is_pro or days_left <= 0:
-    st.error("⚠️ انتهت صلاحية اشتراكك أو أن الأيام المتبقية انتهت (0 days). يرجى التفعيل أو التواصل عبر واتساب للمتابعة.")
+    st.error('🚨 **تنبيه هام:** انتهت صلاحية اشتراكك التجريبي أو المدفوع (عدد الأيام المتبقية: 0 أيام). تم إيقاف الوصول إلى التطبيق.')
+    st.info('📲 لتجديد الاشتراك وتفعيل النظام فوراً، يرجى التواصل عبر واتساب: +249 9922562846')
+    st.link_button('📲 تواصل عبر واتساب للتفعيل', 'https://wa.me/249922562846')
+    if st.button('🚪 تسجيل الخروج لإدخال كود جديد'):
+        st.session_state.authenticated = False
+        if 'active_code' in st.session_state:
+            del st.session_state['active_code']
+        try:
+            cookie_manager.delete('activation_code_v5')
+            cookie_manager.delete('activation_code')
+        except:
+            pass
+        st.rerun()
     st.stop()
-# ====================================================================
-
 st.sidebar.divider()
 st.sidebar.markdown(TXT["app_selection"])
 def on_app_change():
@@ -1034,13 +1003,7 @@ else:
                 encoded_alarm_wa = urllib.parse.quote(active_alarm_text)
                 alarm_wa_link = f"https://wa.me/{tech_w_num}?text={encoded_alarm_wa}"
                 
-                st.markdown(f'''
-                    <a href="{alarm_wa_link}" target="_blank">
-                        <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; margin-bottom:10px;">
-                            💬 Send Instant WhatsApp Alarm to Responsible Tech ({tech_w_name})
-                        </button>
-                    </a>
-                ''', unsafe_allow_html=True)
+                st.markdown(f''' <a href="{alarm_wa_link}" target="_blank"> <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; margin-bottom:10px;"> 💬 Send Instant WhatsApp Alarm to Responsible Tech ({tech_w_name}) </button> </a> ''', unsafe_allow_html=True)
             parts_key = f"parts_{selected_main_site}_{selected_sub_site}_{selected_gen}"
             if parts_key not in st.session_state:
                 st.session_state[parts_key] = [
@@ -1370,20 +1333,14 @@ else:
             reminder_msg = f"Addoma Maintenance Reminder: Please register daily genset logs for ({today_str})."
             encoded_msg = urllib.parse.quote(reminder_msg)
             whatsapp_url = f"https://wa.me/{tech_phone}?text={encoded_msg}"
-            st.markdown(f'''
-                <a href="{whatsapp_url}" target="_blank">
-                    <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">
-                        💬 Send WhatsApp Reminder
-                    </button>
-                </a>
-            ''', unsafe_allow_html=True)
+            st.markdown(f''' <a href="{whatsapp_url}" target="_blank"> <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;"> 💬 Send WhatsApp Reminder </button> </a> ''', unsafe_allow_html=True)
             
         with tab_mgr3:
             st.subheader("⚙️ Gensets and Machinery Predictive Maintenance Link & Smart WhatsApp Alarms")
             st.markdown("Monitor default operating hours rates and automatically generate smart text WhatsApp messages:")
             
-            default_tech_name = "                         "
-            default_whatsapp_num = "                       "
+            default_tech_name = " "
+            default_whatsapp_num = " "
             if 'selected_main_site' in locals() and 'selected_sub_site' in locals() and selected_main_site and selected_sub_site:
                 site_info = st.session_state.sites_data.get(selected_main_site, {}).get(selected_sub_site, {})
                 default_tech_name = site_info.get("technician_name", default_tech_name)
@@ -1408,13 +1365,7 @@ else:
             encoded_smart_msg = urllib.parse.quote(smart_message_input)
             smart_whatsapp_url = f"https://wa.me/{target_whatsapp_num}?text={encoded_smart_msg}"
             
-            st.markdown(f'''
-                <a href="{smart_whatsapp_url}" target="_blank">
-                    <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;">
-                        💬 Send Automatic Smart WhatsApp Alert & Alarm Message to Tech ({assigned_tech_display})
-                    </button>
-                </a>
-            ''', unsafe_allow_html=True)
+            st.markdown(f''' <a href="{smart_whatsapp_url}" target="_blank"> <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;"> 💬 Send Automatic Smart WhatsApp Alert & Alarm Message to Tech ({assigned_tech_display}) </button> </a> ''', unsafe_allow_html=True)
     elif "4." in selected_app:
         # =========================================================
         # 🤖 4. ATS DocIntel GenAI Suite (محدث مع إرسال الرسائل النصية والتشخيص الصوتي)
@@ -1476,6 +1427,7 @@ else:
             }
             df_audit = pd.DataFrame(data_audit)
             st.dataframe(df_audit, use_container_width=True)
+
         with tab2:
             st.subheader("Document Intelligence & Knowledge Graph (Inspired by Wordlit)")
             
@@ -1494,6 +1446,7 @@ else:
                 qr_file_doc = st.file_uploader("رفع صورة كود QR/Barcode لقطع الغيار", type=["png", "jpg", "jpeg"], key="qr_docintel_reader")
                 if qr_file_doc:
                     st.info("جاري تحليل الكود ومطابقته مع قواعد بيانات الصيانة...")
+
         with tab3:
             st.subheader("🚨 نظام التنبيهات الصوتية والرسائل النصية (SMS & Audio Alerts)")
             
@@ -1523,18 +1476,13 @@ else:
                         else:
                             st.error("الرجاء التحقق من أرقام الهواتف المدخلة.")
                 with col_btn_sms2:
-                    st.markdown(f'''
-                        <a href="{sms_uri}" target="_blank">
-                            <button style="background-color:#007BFF; color:white; border:none; padding:8px 16px; border-radius:5px; cursor:pointer; font-weight:bold; width:100%; margin-top:2px;">
-                                📱 إرسال عبر تطبيق الهاتف (SMS)
-                            </button>
-                        </a>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f''' <a href="{sms_uri}" target="_blank"> <button style="background-color:#007BFF; color:white; border:none; padding:8px 16px; border-radius:5px; cursor:pointer; font-weight:bold; width:100%; margin-top:2px;"> 📱 إرسال عبر تطبيق الهاتف (SMS) </button> </a> ''', unsafe_allow_html=True)
                         
             with col_b:
                 st.write("### سجل الإنذارات النشطة:")
                 st.error("⚠️ [تنبيه حرج 10:42 صباحاً]: خطأ في استجابة محرك البيركنز - تم توجيه خطة الحل الفورية للمهندس.")
                 st.warning("⚠️ [تنبيه وقائي]: اقتراب موعد تغيير فلتر الديزل لمولد 150 KVA.")
+
         with tab4:
             st.subheader("📈 تقارير استهلاك الوقود مقابل الحمل (Fuel vs. Load Analytics)")
             st.markdown("مخطط بياني يوضح كفاءة استهلاك الوقود بناءً على أحمال المولدات:")
@@ -1551,6 +1499,7 @@ else:
             ax.legend()
             
             st.pyplot(fig)
+
         with tab5:
             st.subheader("🎧 Acoustic Engine Diagnostics (Sound AI)")
             st.markdown("قم برفع ملف الصوت الخاص بالمولد (WAV / MP3) أو سجل صوت المحرك للتحليل الطيفي وترددات الأعطال:")
@@ -1572,6 +1521,7 @@ else:
                     
                     st.success("✅ تم اكتمال التحليل الصوتي بنجاح!")
                     st.markdown(acoustic_report)
+
     elif "5." in selected_app:
         st.title("🔍 " + ("Cold Room Inspection (WIC 10 & WIC 40)" if L == "en" else "نظام فحص معدات التبريد (WIC 10 & WIC 40)"))
         st.markdown("### ❄️ Refrigeration and Freezing Rooms Data Reading System")
