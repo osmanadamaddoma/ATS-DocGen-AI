@@ -160,7 +160,6 @@ if create_client:
         st.info("💡 Supabase keys not found. Please add them (SUPABASE_URL and SUPABASE_KEY) in st.secrets.")
 else:
     st.warning("⚠️ Supabase library is not installed. Please install it using pip install supabase")
-
 # Updated audio function with dual language support, mute option, and continuous loop for alarms
 def play_audio(text, lang='en', loop=False):
     """Convert text to speech using gTTS and play if mute is not active with loop support"""
@@ -181,7 +180,6 @@ def play_audio(text, lang='en', loop=False):
             st.audio(audio_data, format='audio/mp3', autoplay=True)
     except Exception as e:
         st.error(f"Audio playback error: {e}")
-
 @st.cache_data(ttl=3600)
 def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
     """AI call function with high pressure error handling (503), retries, and bilingual support"""
@@ -206,7 +204,6 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
                 else:
                     return "⚠️ High server load (503). Please retry in a few seconds." if language == "en" else "⚠️ الخادم يمر بضغط عالٍ حالياً (503). يرجى المحاولة مرة أخرى."
             return f"❌ Error: {err_msg}"
-
 # =========================================================
 # 1. System Helper Functions and Comprehensive PDF Report Design
 # =========================================================
@@ -215,7 +212,6 @@ def sanitize_latin_only(text):
         text = str(text)
     clean_text = re.sub(r"[^\x00-\x7F]+", "", text).strip()
     return clean_text if clean_text else "N/A"
-
 class ComprehensivePDF(FPDF):
     def __init__( self, title_text="INDUSTRIAL MAINTENANCE & DIAGNOSTIC REPORT", logo_path=None, site_address="N/A", main_site="N/A", sub_site="N/A", ):
         super().__init__()
@@ -277,7 +273,6 @@ class ComprehensivePDF(FPDF):
             f"Page {self.page_no()} | Generated Date: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Site: {sanitize_latin_only(self.site_address)}",
             align="C",
         )
-
 # =========================================================
 # 1.5 Live Database and IoT Integration Functions
 # =========================================================
@@ -309,7 +304,6 @@ def fetch_live_iot_data():
         return pd.DataFrame()
     except Exception:
         return pd.DataFrame()
-
 # =========================================================
 # 1.8 Smart Engineering Tools and Calculators
 # =========================================================
@@ -319,7 +313,6 @@ def calculate_cable_voltage_drop(current_a, distance_m, cable_mm2, cos_phi=0.85)
     v_drop = (math.sqrt(3) * current_a * distance_m * rho_copper * cos_phi) / cable_mm2
     v_drop_pct = (v_drop / 400.0) * 100
     return round(v_drop, 2), round(v_drop_pct, 2)
-
 def get_fuel_table_from_csv(uploaded_csv=None):
     """Read fuel table from uploaded CSV file or use internal table"""
     default_table = {
@@ -358,7 +351,6 @@ def get_fuel_table_from_csv(uploaded_csv=None):
             print(f"CSV parse error: {e}")
             return default_table
     return default_table
-
 def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perkins", kw_capacity=None, fuel_table=None):
     """Estimate diesel consumption and emissions - smart version reading from CSV table based on load percentage and engine type"""
     if fuel_table is None:
@@ -396,7 +388,6 @@ def calculate_fuel_consumption_and_emissions(kw_load, run_hours, gen_model="Perk
     liters = kw_load * sfc * run_hours
     co2_kg = liters * 2.68
     return round(liters, 1), round(co2_kg, 1), round(sfc, 3), round(eff, 1)
-
 # =========================================================
 # 2. Unified Subscription System and Packages (with Cookie Management & Robust Code Extraction)
 # =========================================================
@@ -436,12 +427,10 @@ if supabase:
                     }
     except Exception as e:
         print(f"Load subscriptions error: {e}")
-
 def get_cookie_manager():
     if "cookie_manager" not in st.session_state:
         st.session_state["cookie_manager"] = stx.CookieManager(key="my_cookie_manager_persistent_final_v3")
     return st.session_state["cookie_manager"]
-
 cookie_manager = get_cookie_manager()
 query_params = st.query_params
 code_from_url = query_params.get("code", None)
@@ -452,11 +441,9 @@ try:
         saved_code = cookie_manager.get(cookie="activation_code")
 except:
     saved_code = None
-
 final_saved = code_from_url if code_from_url else saved_code
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-
 if final_saved and not st.session_state.authenticated:
     clean_saved = str(final_saved).strip().upper()
     if clean_saved in CLIENTS_DATABASE:
@@ -485,24 +472,28 @@ if final_saved and not st.session_state.authenticated:
                             break
             except:
                 pass
-
 # =========================================================
 # Professional Sidebar Profile & System Description Design
 # =========================================================
 with st.sidebar:
     st.markdown("---")
+    # App Branding & Profile Card Header
     st.markdown(
         """ <div style="background: linear-gradient(135deg, #182b49 0%, #2c3e50 100%); padding: 15px; border-radius: 10px; color: white; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"> <h3 style="margin: 0; font-size: 18px; color: #f8f9fa;">ATS ENGINEERING</h3> <p style="margin: 5px 0 0 0; font-size: 12px; color: #adb5bd;">Addoma Trading Services Suite</p> </div> """,
         unsafe_allow_html=True
     )
+    
     st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Professional Bio Section inside Sidebar Expander or Box
     with st.expander("📌 System & Engineer Profile", expanded=True):
         st.markdown(
             """ **Lead Consultant:** Eng. Osman Adam Addoma **Expertise:** Power Systems, Gensets Synchronization, & Industrial Refrigeration (WIC Systems). **Core Tech:** Python, Streamlit, Supabase, InfluxDB, & Gemini AI Diagnostics. **Mission:** Delivering cutting-edge electromechanical solutions, predictive maintenance, and smart IoT operational control. """,
             unsafe_allow_html=True
         )
+        
     st.markdown("---")
-
+# --- Language Selection Option in Sidebar ---
 st.sidebar.subheader("🌐 Language")
 selected_lang = st.sidebar.radio("Select Language:", ["Arabic (العربية)", "English"], index=1 if st.session_state.lang == "en" else 0)
 st.session_state.lang = "en" if "English" in selected_lang else "ar"
@@ -547,31 +538,67 @@ TXT = {
         "choose_app": "Select System Module:"
     }
 }[L]
-
-with st.sidebar:
-    st.header(TXT["nav_header"])
-    st.success(TXT["nav_status"])
-    st.write("---")
-    if st.button(TXT["btn_chat"], use_container_width=True):
-        st.session_state.current_page = "chat"
-    if st.button(TXT["btn_dashboard"], use_container_width=True):
-        st.session_state.current_page = "dashboard"
-    if st.button(TXT["btn_apps"], use_container_width=True):
-        st.session_state.current_page = "main_apps"
-    st.write("---")
-    if st.button(TXT["btn_logout"], type="primary", use_container_width=True):
-        st.session_state.authenticated = False
-        try:
-            cookie_manager.delete("activation_code_v5")
-            cookie_manager.delete("activation_code")
-        except:
-            pass
-        if "code" in st.query_params:
-            del st.query_params["code"]
-        if "active_code" in st.session_state:
-            del st.session_state["active_code"]
-        st.rerun()
-
+if not st.session_state.authenticated:
+    st.title(TXT["title"])
+    user_code = st.sidebar.text_input(TXT["code_input"], type="password")
+    if st.sidebar.button(TXT["btn_activate"]):
+        if supabase:
+            try:
+                res_reload = supabase.table("subscriptions").select("*").execute()
+                if res_reload and hasattr(res_reload, "data") and res_reload.data:
+                    for row in res_reload.data:
+                        c = str(row.get("code","")).strip().upper()
+                        if c:
+                            CLIENTS_DATABASE[c] = {
+                                "name": row.get("client_name", "Client"),
+                                "plan": row.get("plan", "Monthly"),
+                                "start_date": row.get("start_date", datetime.now().strftime("%Y-%m-%d")),
+                                "duration_days": int(row.get("duration_days", 30)),
+                            }
+            except Exception as e:
+                print(f"Reload before check error: {e}")
+        clean_code = user_code.strip().upper()
+        if clean_code in CLIENTS_DATABASE:
+            st.session_state.authenticated = True
+            st.session_state.active_code = clean_code
+            st.session_state.user_email = CLIENTS_DATABASE[clean_code]["name"]
+            st.session_state.role = "admin" if clean_code in ADMIN_CODES else "client"
+            expires_at = datetime.now() + timedelta(days=365)
+            try:
+                cookie_manager.set("activation_code_v5", clean_code, expires_at=expires_at)
+                cookie_manager.set("activation_code", clean_code, expires_at=expires_at)
+            except:
+                pass
+            st.query_params["code"] = clean_code
+            st.rerun()
+        else:
+            st.sidebar.error(TXT["invalid_code"])
+    st.warning(TXT["warning_auth"])
+    st.stop()
+else:
+    with st.sidebar:
+        st.header(TXT["nav_header"])
+        st.success(TXT["nav_status"])
+        st.write("---")
+        if st.button(TXT["btn_chat"], use_container_width=True):
+            st.session_state.current_page = "chat"
+        if st.button(TXT["btn_dashboard"], use_container_width=True):
+            st.session_state.current_page = "dashboard"
+        if st.button(TXT["btn_apps"], use_container_width=True):
+            st.session_state.current_page = "main_apps"
+        st.write("---")
+        if st.button(TXT["btn_logout"], type="primary", use_container_width=True):
+            st.session_state.authenticated = False
+            try:
+                cookie_manager.delete("activation_code_v5")
+                cookie_manager.delete("activation_code")
+            except:
+                pass
+            if "code" in st.query_params:
+                del st.query_params["code"]
+            if "active_code" in st.session_state:
+                del st.session_state["active_code"]
+            st.rerun()
 input_code = st.session_state.get("active_code", "")
 is_pro = False
 client_name = "Visitor"
@@ -592,14 +619,35 @@ if input_code in CLIENTS_DATABASE:
         st.sidebar.markdown(f"**{TXT['plan']}** {plan_type}")
         st.sidebar.markdown(f"**{TXT['remaining']}** {days_left} {TXT['days']}")
     else:
-        is_pro = False
-        days_left = 0
-
+        st.sidebar.error(f"❌ License expired on ({expiry_dt}).")
+        st.session_state.authenticated = False
+        try:
+            cookie_manager.delete("activation_code_v5")
+            cookie_manager.delete("activation_code")
+        except:
+            pass
+        if "code" in st.query_params:
+            del st.query_params["code"]
+        st.stop()
+if not is_pro or days_left <= 0:
+    st.error('🚨 **تنبيه هام:** انتهت صلاحية اشتراكك التجريبي أو المدفوع (عدد الأيام المتبقية: 0 أيام). تم إيقاف الوصول إلى التطبيق.')
+    st.info('📲 لتجديد الاشتراك وتفعيل النظام فوراً، يرجى التواصل عبر واتساب: +249 9922562846')
+    st.link_button('📲 تواصل عبر واتساب للتفعيل', 'https://wa.me/249922562846')
+    if st.button('🚪 تسجيل الخروج لإدخال كود جديد'):
+        st.session_state.authenticated = False
+        if 'active_code' in st.session_state:
+            del st.session_state['active_code']
+        try:
+            cookie_manager.delete('activation_code_v5')
+            cookie_manager.delete('activation_code')
+        except:
+            pass
+        st.rerun()
+    st.stop()
 st.sidebar.divider()
 st.sidebar.markdown(TXT["app_selection"])
 def on_app_change():
     st.session_state.current_page = "main_apps"
-
 apps_list_ar = [
     "⚙️ 1. الصيانة التنبؤية والمولدات (شامل التقارير)",
     "🎛️ 2. غرفة التحكم والتشغيل عن بُعد (Remote Control Center)",
@@ -616,39 +664,12 @@ apps_list_en = [
     "🔍 5. Equipment Inspection (WIC & Heavy Duty)",
     "🧮 6. Smart Electrical & Carbon Calculator"
 ]
-
 selected_app = st.sidebar.radio(
     TXT["choose_app"],
     apps_list_ar if L == "ar" else apps_list_en,
     on_change=on_app_change
 )
 st.sidebar.divider()
-
-# شرط فتح القسم الأول (الصيانة التنبؤية والمولدات) مجاناً للجميع وبدون قيود تفعيل
-is_maintenance_predictive = ("1." in selected_app or "الصيانة التنبؤية" in selected_app)
-
-if not is_maintenance_predictive and (not is_pro or days_left <= 0):
-    st.error('🚨 **تنبيه هام:** هذه الميزة تتطلب كود تفعيل واشتراك ساري الصلاحية (انتهت الصلاحية أو لم يتم إدخال كود).')
-    st.info('📲 لتجديد الاشتراك وتفعيل النظام فوراً، يرجى التواصل عبر واتساب: +249 9922562846')
-    st.link_button('📲 تواصل عبر واتساب للتفعيل', 'https://wa.me/249922562846')
-    
-    st.subheader("🔐 إدخال كود التفعيل لتشغيل الأقسام الأخرى")
-    entered_code = st.text_input("Activation Code:", type="password")
-    if st.button("تفعيل الكود"):
-        clean_c = entered_code.strip().upper()
-        if clean_c in CLIENTS_DATABASE:
-            st.session_state.authenticated = True
-            st.session_state.active_code = clean_c
-            try:
-                cookie_manager.set("activation_code_v5", clean_c, expires_at=datetime.now() + timedelta(days=365))
-            except Exception:
-                pass
-            st.success("✅ تم التفعيل بنجاح!")
-            st.rerun()
-        else:
-            st.error("❌ كود التفعيل غير صحيح.")
-    st.stop()
-
 @st.dialog("📝 Edit Generator & Calibration Data" if L == "en" else "📝 إدخال وتعديل بيانات المولد والمعايرة")
 def edit_generator_modal(main_site, sub_site, gen_key):
     gen_data = st.session_state.sites_data[main_site][sub_site]["generators"][gen_key]
@@ -708,6 +729,7 @@ def edit_generator_modal(main_site, sub_site, gen_key):
                     "ambient_temp": ambient_t
                 }
             }
+            # Automatically save data to Supabase upon modification
             if supabase:
                 try:
                     payload = {
@@ -738,7 +760,6 @@ def edit_generator_modal(main_site, sub_site, gen_key):
             })
             st.success("✅ Saved successfully and synced to Supabase!")
             st.rerun()
-
 if st.session_state.current_page == "chat":
     st.title("🤖 " + ("Smart AI Assistant" if L == "en" else "المساعد الذكي الهندسي"))
     st.caption("Addoma Trading Services - Industrial AI Engine")
@@ -776,7 +797,7 @@ elif st.session_state.current_page == "dashboard":
     st.info("Continuous telemetry tracking powered by InfluxDB & Smart Analytics.")
 else:
     if "1." in selected_app:
-        st.title("⚙️ " + ("Predictive Maintenance & Genset Monitoring" if L == "en" else "نظام الصيانة التنبؤية ومراقبة المولدات"))
+        st.title("⚙️ " + ("Predictive Maintenance & Gensets" if L == "en" else "نظام الصيانة التنبؤية ومراقبة المولدات"))
         col_top_audio1, col_top_audio2 = st.columns([3, 1])
         with col_top_audio2:
             mute_label = "🔇 Mute" if not st.session_state.audio_muted else "🔊 Unmute"
@@ -792,6 +813,7 @@ else:
             site_name = st.text_input("Site Name [e.g., Kafouri Factory]:", key="site_name_input")
             site_address = st.text_input("Detailed Site Address:", key="site_add_input")
             
+            # Responsible technician or maintenance engineer data
             st.markdown("### Responsible Technician or Maintenance Engineer Data")
             col_tech_f1, col_tech_f2 = st.columns(2)
             assigned_technician_name = col_tech_f1.text_input("Responsible Technician/Engineer Name:", value="Eng. Osman Adam Addoma", key="new_site_tech_name")
@@ -829,6 +851,7 @@ else:
                                 "calib_elec": {"v_nominal": 400.0, "v_measured": 400.0, "freq_nominal": 50.0, "freq_measured": 50.0, "current_max": 200.0, "current_measured": 100.0, "pf": 0.8, "ct_ratio": "200/5"},
                                 "calib_engine": {"oil_press_bar": 4.0, "coolant_temp_c": 80.0, "rpm": 1500.0, "battery_v": 24.0, "ambient_temp": 43.0}
                             }
+                            # Save data to Supabase as well
                             if supabase:
                                 try:
                                     supabase.table("generators_data").upsert({
@@ -845,7 +868,6 @@ else:
                     st.rerun()
                 else:
                     st.error("Please enter at least the geographical region address and site name.")
-
         st.markdown("### 📌 Select Current Working Site")
         main_sites = list(st.session_state.sites_data.keys())
         col_site1, col_site2 = st.columns(2)
@@ -880,6 +902,7 @@ else:
                 if st.button("📝 Open Calibration Modal"):
                     edit_generator_modal(selected_main_site, selected_sub_site, selected_gen)
             
+            # Generator data and titles editing list
             with st.expander("🛠️ Edit Generator Data Titles and Supabase Update", expanded=False):
                 st.markdown(f"**Register and Edit Generator Data: {selected_gen}**")
                 gen_info_edit = st.session_state.sites_data[selected_main_site][selected_sub_site]["generators"][selected_gen]
@@ -971,6 +994,7 @@ else:
                     st.error(f"🚨 {msg}")
                 play_audio(". ".join(alarm_messages), loop=True)
                 
+                # Link alarm bell directly to responsible technician's WhatsApp number for instant smart WhatsApp generation
                 site_meta = st.session_state.sites_data[selected_main_site][selected_sub_site]
                 tech_w_num = site_meta.get("technician_whatsapp", "249912345678")
                 tech_w_name = site_meta.get("technician_name", "Responsible Technician")
@@ -980,7 +1004,6 @@ else:
                 alarm_wa_link = f"https://wa.me/{tech_w_num}?text={encoded_alarm_wa}"
                 
                 st.markdown(f''' <a href="{alarm_wa_link}" target="_blank"> <button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; margin-bottom:10px;"> 💬 Send Instant WhatsApp Alarm to Responsible Tech ({tech_w_name}) </button> </a> ''', unsafe_allow_html=True)
-
             parts_key = f"parts_{selected_main_site}_{selected_sub_site}_{selected_gen}"
             if parts_key not in st.session_state:
                 st.session_state[parts_key] = [
@@ -1020,7 +1043,6 @@ else:
                 st.session_state[parts_key] = new_data
                 st.success("Updated Maintenance Schedule!")
                 st.rerun()
-
             processed_rows = []
             bar_colors = []
             for idx, row in pd.DataFrame(st.session_state[parts_key]).iterrows():
@@ -1345,26 +1367,36 @@ else:
             
             st.markdown(f''' <a href="{smart_whatsapp_url}" target="_blank"> <button style="background-color:#25D366; color:white; border:none; padding:12px 24px; border-radius:5px; cursor:pointer; font-size:16px; font-weight:bold; width:100%;"> 💬 Send Automatic Smart WhatsApp Alert & Alarm Message to Tech ({assigned_tech_display}) </button> </a> ''', unsafe_allow_html=True)
     elif "4." in selected_app:
+        # =========================================================
+        # 🤖 4. ATS DocIntel GenAI Suite (محدث مع إرسال الرسائل النصية والتشخيص الصوتي)
+        # =========================================================
         st.title("⚡ ATS DocIntel GenAI")
         st.markdown("### *Industrial Document Intelligence, Predictive RUL Analytics & Acoustic Sound Diagnostics Suite*")
         st.markdown("---")
+        # أدوات القوائم المنسدلة ورفع الملفات الجانبية الخاصة بـ DocIntel
         with st.sidebar:
             st.header("📂 لوحة المدخلات الذكية")
             st.markdown("رفع الكتالوجات (PDF) وصور المعدات للمقارنة والتحليل:")
             
+            # رفع الكتالوجات الفنية
             uploaded_manuals = st.file_uploader(
                 "رفع كتالوجات الصيانة (PDF)", 
                 type=["pdf", "txt", "docx"],
                 accept_multiple_files=True,
                 key="docintel_manuals_uploader"
             )
+            
             st.markdown("---")
+            
+            # مقارنة صور القطع (التالفة مقابل الصالحة)
             st.subheader("🔍 مقارنة صور القطع")
             healthy_img = st.file_uploader("صورة القطعة السليمة (المرجعية)", type=["jpg", "png", "jpeg"], key="healthy_docintel")
             damaged_img = st.file_uploader("صورة القطعة التالفة (من الميدان)", type=["jpg", "png", "jpeg"], key="damaged_docintel")
+            
             st.markdown("---")
             st.info("💡 **نظام التشغيل:** ATS DocIntel متصل بقاعدة بيانات المحركات وغرف التبريد لتحليل الحالة الفورية وإرسال التنبيهات.")
         
+        # الواجهة الرئيسية مقسمة إلى 5 تبويبات (Tabs)
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "📊 تحليل التشخيص والعمر الافتراضي (RUL)", 
             "📑 مستندات الذكاء الاصطناعي (NLP & QR Reader)", 
@@ -1376,14 +1408,17 @@ else:
         with tab1:
             st.subheader("Evaluation & Remaining Useful Life (RUL) Assessment")
             col1, col2, col3 = st.columns(3)
+            
             with col1:
                 st.metric(label="حالة الماكينة العامة", value="92%", delta="مستقرة")
             with col2:
                 st.metric(label="العمر المتبقي لقطع الغيار (RUL)", value="450 ساعة تشغيل", delta="-30 ساعة هذا الأسبوع")
             with col3:
                 st.metric(label="درجة كفاءة التزامن (DSE)", value="98.5%", delta="+1.2%")
+                
             st.markdown("---")
             st.write("### تقرير فحص المكونات واستنتاج الخلل:")
+            
             data_audit = {
                 "المكون / النظام": ["طلمبة الديزل (Mechanical Pump)", "حساسات 70-pin (Perkins)", "وحدة التبريد (WIC 40)", "نظام التحكم (DSE 8610)"],
                 "الحالة التشغيلية": ["تحتاج صيانة وقائية قريباً", "سليمة 100%", "مستقرة", "ممتازة"],
@@ -1394,6 +1429,7 @@ else:
             st.dataframe(df_audit, use_container_width=True)
         with tab2:
             st.subheader("Document Intelligence & Knowledge Graph (Inspired by Wordlit)")
+            
             col_doc1, col_doc2 = st.columns(2)
             with col_doc1:
                 if uploaded_manuals:
@@ -1403,6 +1439,7 @@ else:
                     st.info("🤖 نموذج الذكاء الاصطناعي يقوم الآن بتحليل الكتالوجات لمطابقة أرقام القطع وأكواد الأعطال الخاصة بـ Perkins أو معدات WIC.")
                 else:
                     st.warning("الرجاء رفع كتالوجات الصيانة بصيغة PDF من الشريط الجانبي لبدء تحليل النصوص واستخراج الروابط الفنية.")
+            
             with col_doc2:
                 st.subheader("📷 قارئ الباروكود وأكواد QR الميدانية")
                 qr_file_doc = st.file_uploader("رفع صورة كود QR/Barcode لقطع الغيار", type=["png", "jpg", "jpeg"], key="qr_docintel_reader")
@@ -1410,6 +1447,7 @@ else:
                     st.info("جاري تحليل الكود ومطابقته مع قواعد بيانات الصيانة...")
         with tab3:
             st.subheader("🚨 نظام التنبيهات الصوتية والرسائل النصية (SMS & Audio Alerts)")
+            
             col_a, col_b = st.columns(2)
             with col_a:
                 st.write("### إعدادات إرسال التنبيهات للمهندس الميداني:")
@@ -1425,6 +1463,7 @@ else:
                 
                 custom_sms_msg = f"ATS ALERT from {sender_phone}: Fault '{selected_fault}' detected at site '{fault_location}'. Immediate action required."
                 sms_text_body = st.text_area("نص رسالة الـ SMS الجاهزة للإرسال:", value=custom_sms_msg, key="custom_sms_area")
+                
                 sms_uri = f"sms:{eng_phone}?body={urllib.parse.quote(sms_text_body)}"
                 
                 col_btn_sms1, col_btn_sms2 = st.columns(2)
@@ -1436,6 +1475,7 @@ else:
                             st.error("الرجاء التحقق من أرقام الهواتف المدخلة.")
                 with col_btn_sms2:
                     st.markdown(f''' <a href="{sms_uri}" target="_blank"> <button style="background-color:#007BFF; color:white; border:none; padding:8px 16px; border-radius:5px; cursor:pointer; font-weight:bold; width:100%; margin-top:2px;"> 📱 إرسال عبر تطبيق الهاتف (SMS) </button> </a> ''', unsafe_allow_html=True)
+                        
             with col_b:
                 st.write("### سجل الإنذارات النشطة:")
                 st.error("⚠️ [تنبيه حرج 10:42 صباحاً]: خطأ في استجابة محرك البيركنز - تم توجيه خطة الحل الفورية للمهندس.")
@@ -1443,23 +1483,29 @@ else:
         with tab4:
             st.subheader("📈 تقارير استهلاك الوقود مقابل الحمل (Fuel vs. Load Analytics)")
             st.markdown("مخطط بياني يوضح كفاءة استهلاك الوقود بناءً على أحمال المولدات:")
+            
             fig, ax = plt.subplots(figsize=(10, 4))
             loads = np.array([20, 40, 60, 80, 100])
-            fuel_consumption = np.array([12, 22, 35, 52, 75])
+            fuel_consumption = np.array([12, 22, 35, 52, 75])  # لتر/ساعة
+            
             ax.plot(loads, fuel_consumption, marker='o', color='#1f77b4', linewidth=2.5, label='استهلاك الوقود الفعلي (L/h)')
             ax.set_title('منحنى استهلاك الوقود مقابل الأحمال (%)', fontsize=12, fontweight='bold')
             ax.set_xlabel('نسبة الحمل (%)')
             ax.set_ylabel('معدل الاستهلاك (لتر/ساعة)')
             ax.grid(True, linestyle='--', alpha=0.6)
             ax.legend()
+            
             st.pyplot(fig)
         with tab5:
             st.subheader("🎧 Acoustic Engine Diagnostics (Sound AI)")
             st.markdown("قم برفع ملف الصوت الخاص بالمولد (WAV / MP3) أو سجل صوت المحرك للتحليل الطيفي وترددات الأعطال:")
+            
             audio_engine_file = st.file_uploader("رفع ملف تسجيل صوت المحرك (WAV / MP3)", type=["wav", "mp3", "m4a"], key="engine_audio_upload_gen")
+            
             if audio_engine_file is not None:
                 st.audio(audio_engine_file, format='audio/mp3')
                 st.info("📁 تم استلام ملف الصوت بنجاح وجاهز للتحليل الترددي.")
+            
             if st.button("🚀 Run Acoustic Analysis (بدء تحليل الصوت الفني بالذكاء الاصطناعي)", type="primary", use_container_width=True):
                 with st.spinner("جاري معالجة الإشارة الصوتية وتحليل ترددات المحرك باستخدام نظام الذكاء الاصطناعي..."):
                     time.sleep(1.5)
@@ -1468,11 +1514,13 @@ else:
                         acoustic_report = analyze_fault_with_gemini(prompt_audio, language=L)
                     else:
                         acoustic_report = "### 📋 تقرير التشخيص الصوتي الميداني:\n- **الملاحظة الترددية:** طقطقة بترددات عالية (High-frequency Knock).\n- **السبب المحتمل:** تأخير في توقيت حقن الوقود (Injection Timing) أو بداية تآكل في جلب البستم.\n- **الإجراء الموصى به:** فحص زوايا الحقن ومعايرة البخاخات فوراً."
+                    
                     st.success("✅ تم اكتمال التحليل الصوتي بنجاح!")
                     st.markdown(acoustic_report)
     elif "5." in selected_app:
         st.title("🔍 " + ("Cold Room Inspection (WIC 10 & WIC 40)" if L == "en" else "نظام فحص معدات التبريد (WIC 10 & WIC 40)"))
         st.markdown("### ❄️ Refrigeration and Freezing Rooms Data Reading System")
+        
         col_wic1, col_wic2 = st.columns(2)
         wic_unit = col_wic1.radio("Select cold room unit to inspect:", ["WIC 10 Cold Room Model", "WIC 40 Cold Room Model"])
         controller_type = col_wic2.selectbox("Controller Type Used:", ["Emerson", "Dixell"])
@@ -1495,35 +1543,44 @@ else:
                 st.error(f"🚨 System alarm registered: {alarm_code}. It will be forwarded to the AI assistant for analysis.")
     elif "6." in selected_app:
         st.title("🧮 " + ("Smart Electrical & Carbon Calculator" if L == "en" else "الحاسبة الهندسية للكهرباء والانبعاثات"))
+        
         tab_calc1, tab_calc2 = st.tabs(["⚡ Cable Voltage Drop", "⛽ Fuel & Emissions"])
+        
         with tab_calc1:
             st.subheader("⚡ 3-Phase Cable Voltage Drop Calculator")
             c1, c2, c3 = st.columns(3)
             i_amp = c1.number_input("Required Current (Amperes):", value=250.0)
             dist_m = c2.number_input("Cable Length (Meters):", value=120.0)
             c_size = c3.selectbox("Cable Size (mm²):", [35, 50, 70, 95, 120, 150, 185, 240, 300], index=4)
+            
             v_drop, v_drop_pct = calculate_cable_voltage_drop(i_amp, dist_m, c_size)
+            
             m_col1, m_col2 = st.columns(2)
             m_col1.metric("Calculated Voltage Drop", f"{v_drop} V")
             m_col2.metric("Voltage Drop Percentage", f"{v_drop_pct} %")
+            
             if v_drop_pct > 4.0:
                 st.error("⚠️ Warning: Voltage drop percentage exceeds standard allowable limit (4%)! Please increase cable size.")
             else:
                 st.success("✅ Cable size is excellent and within safe engineering limits.")
         with tab_calc2:
             st.subheader("⛽ Link Load Data to Fuel Consumption and Emissions")
+            
             uploaded_csv_calc = st.file_uploader("Upload your fuel table (Optional - CSV):", type=["csv"], key="fuel_csv_calc")
             fuel_table_loaded = get_fuel_table_from_csv(uploaded_csv_calc)
+            
             col_c1, col_c2 = st.columns(2)
             gen_model_calc = col_c1.selectbox("Generator Model:", ["Perkins", "Cummins", "CAT"])
             pump_type = col_c2.selectbox("Fuel Pump System Type:", [
                 "Standard Core Diesel Pump (Mechanical)", 
                 "Electronic Injection (MEUI/ECM)"
             ])
+            
             col_c3, col_c4, col_c5 = st.columns(3)
             kw_capacity = col_c3.number_input("Total Generator Capacity (kW):", value=150.0, step=10.0)
             current_load_kw = col_c4.number_input("Enter and Edit Current Generator Load (kW):", value=100.0)
             run_hours_calc = col_c5.number_input("Run Hours to Estimate:", value=10.0)
+            
             if st.button("📊 Link Load Data and Calculate Consumption", type="primary"):
                 liters, co2, sfc, eff = calculate_fuel_consumption_and_emissions(
                     kw_load=current_load_kw,
@@ -1532,16 +1589,20 @@ else:
                     kw_capacity=kw_capacity,
                     fuel_table=fuel_table_loaded
                 )
+                
                 if "Mechanical" in pump_type:
                     liters = round(liters * 1.05, 1)
                     co2 = round(co2 * 1.05, 1)
                     st.info("💡 Note: Consumption reading adjusted due to the use of a mechanical core fuel pump system.")
+                
                 st.success("Data linked and consumption calculated successfully based on instantaneous load!")
+                
                 calc_res1, calc_res2, calc_res3, calc_res4 = st.columns(4)
                 calc_res1.metric("Total Fuel Consumed", f"{liters} Liters")
                 calc_res2.metric("CO2 Emissions", f"{co2} kg")
                 calc_res3.metric("Specific Fuel Consumption (SFC)", f"{sfc} L/kWh")
                 calc_res4.metric("Genset Efficiency at this Load", f"{eff} %")
+                
                 load_percentage = (current_load_kw / kw_capacity) * 100 if kw_capacity > 0 else 0
                 if load_percentage < 50:
                     st.warning(f"⚠️ Warning: The generator is running at a very low load ({load_percentage:.1f}%). This leads to incomplete combustion in {gen_model_calc} engines and unburnt oil accumulation (Wet Stacking).")
