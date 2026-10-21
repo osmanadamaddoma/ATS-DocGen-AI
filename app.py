@@ -668,9 +668,13 @@ if input_code in CLIENTS_DATABASE:
         if "code" in st.query_params:
             del st.query_params["code"]
         st.stop()
-if not is_pro:
-    st.warning(TXT["warning_auth"])
+
+# ======= إضافة شرط قفل التطبيق الصارم في حال انتهاء الصلاحية =======
+if not is_pro or days_left <= 0:
+    st.error("⚠️ انتهت صلاحية اشتراكك أو أن الأيام المتبقية انتهت (0 days). يرجى التفعيل أو التواصل عبر واتساب للمتابعة.")
     st.stop()
+# ====================================================================
+
 st.sidebar.divider()
 st.sidebar.markdown(TXT["app_selection"])
 def on_app_change():
@@ -1472,7 +1476,6 @@ else:
             }
             df_audit = pd.DataFrame(data_audit)
             st.dataframe(df_audit, use_container_width=True)
-
         with tab2:
             st.subheader("Document Intelligence & Knowledge Graph (Inspired by Wordlit)")
             
@@ -1491,7 +1494,6 @@ else:
                 qr_file_doc = st.file_uploader("رفع صورة كود QR/Barcode لقطع الغيار", type=["png", "jpg", "jpeg"], key="qr_docintel_reader")
                 if qr_file_doc:
                     st.info("جاري تحليل الكود ومطابقته مع قواعد بيانات الصيانة...")
-
         with tab3:
             st.subheader("🚨 نظام التنبيهات الصوتية والرسائل النصية (SMS & Audio Alerts)")
             
@@ -1533,7 +1535,6 @@ else:
                 st.write("### سجل الإنذارات النشطة:")
                 st.error("⚠️ [تنبيه حرج 10:42 صباحاً]: خطأ في استجابة محرك البيركنز - تم توجيه خطة الحل الفورية للمهندس.")
                 st.warning("⚠️ [تنبيه وقائي]: اقتراب موعد تغيير فلتر الديزل لمولد 150 KVA.")
-
         with tab4:
             st.subheader("📈 تقارير استهلاك الوقود مقابل الحمل (Fuel vs. Load Analytics)")
             st.markdown("مخطط بياني يوضح كفاءة استهلاك الوقود بناءً على أحمال المولدات:")
@@ -1550,7 +1551,6 @@ else:
             ax.legend()
             
             st.pyplot(fig)
-
         with tab5:
             st.subheader("🎧 Acoustic Engine Diagnostics (Sound AI)")
             st.markdown("قم برفع ملف الصوت الخاص بالمولد (WAV / MP3) أو سجل صوت المحرك للتحليل الطيفي وترددات الأعطال:")
@@ -1572,7 +1572,6 @@ else:
                     
                     st.success("✅ تم اكتمال التحليل الصوتي بنجاح!")
                     st.markdown(acoustic_report)
-
     elif "5." in selected_app:
         st.title("🔍 " + ("Cold Room Inspection (WIC 10 & WIC 40)" if L == "en" else "نظام فحص معدات التبريد (WIC 10 & WIC 40)"))
         st.markdown("### ❄️ Refrigeration and Freezing Rooms Data Reading System")
