@@ -191,7 +191,7 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model="Gemini-3.8-flash",
+                model="gemini-3.8-flash",
                 contents=prompt,
             )
             return response.text
