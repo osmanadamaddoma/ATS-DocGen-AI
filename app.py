@@ -1660,12 +1660,12 @@ else:
                 calc_res4.metric("Genset Efficiency at this Load", f"{eff} %")
                 
                 load_percentage = (current_load_kw / kw_capacity) * 100 if kw_capacity > 0 else 0
-                if load_percentage < 50:
-                    st.warning(f"⚠️ Warning: The generator is running at a very low load ({load_percentage:.1f}%). This leads to incomplete combustion in {gen_model_calc} engines and unburnt oil accumulation (Wet Stacking).")
-                elif load_percentage > 90:
-                
-                st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.") 
-# === ATS VIDEO INTEGRATION ADDED 2026-10-21 ===
+                    load_percentage = (curr
+    if load_percentage < 50:
+        st.warning(f"⚠️ War")
+    elif load_percentage > 90:
+        st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
+                INTEGRATION ADDED 2026-10-21 ===
 ATS_VIDEOS = {
      "VIDEO_ID_1": "https://www.youtube.com/embed/REPLACE_WITH_ID_1",
      "VIDEO_ID_2": "https://www.youtube.com/embed/REPLACE_WITH_ID_2",
