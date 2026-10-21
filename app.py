@@ -1659,7 +1659,7 @@ else:
                 calc_res3.metric("Specific Fuel Consumption (SFC)", f"{sfc} L/kWh")
                 calc_res4.metric("Genset Efficiency at this Load", f"{eff} %")
 load_percentage = (current_load_kw / kw_capacity) * 100 if kw_capacity > 0 else 0
-load_percentage = (curr
+load_percentage = curr
 if load_percentage < 50:
 st.warning(f"⚠️ War")
 elif load_percentage > 90:
