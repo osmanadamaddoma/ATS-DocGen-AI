@@ -208,7 +208,7 @@ def analyze_fault_with_gemini(fault_code, context_text="", language="en"):
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-2.0-flash",
                 contents=prompt,
             )
             return response.text
@@ -1663,6 +1663,14 @@ else:
                 if load_percentage < 50:
                     st.warning(f"⚠️ Warning: The generator is running at a very low load ({load_percentage:.1f}%). This leads to incomplete combustion in {gen_model_calc} engines and unburnt oil accumulation (Wet Stacking).")
                 elif load_percentage > 90:
-                    st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
+                st.warning(f"⚠️ Notice: The generator is running at a very high load approaching maximum capacity ({load_percentage:.1f}%). Please monitor engine temperature continuously.")
+                1667: 
+1668: # === ATS VIDEO INTEGRATION ADDED 2026-10-21 ===
+1669: ATS_VIDEOS = {
+1670:     "VIDEO_ID_1": "https://www.youtube.com/embed/REPLACE_WITH_ID_1",
+1671:     "VIDEO_ID_2": "https://www.youtube.com/embed/REPLACE_WITH_ID_2",
+1672:     "VIDEO_ID_3": "https://www.youtube.com/embed/REPLACE_WITH_ID_3",
+1673: }
+1674: # Supabase Oct30 GRANT: grant select on public.table to anon; grant select,insert,update,delete to authenticated; to service_role;
 
 
