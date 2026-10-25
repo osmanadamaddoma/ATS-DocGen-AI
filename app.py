@@ -20,7 +20,6 @@ import requests
 from fpdf import FPDF
 import pdfplumber
 import streamlit as st
-unsafe_allow_html=True)
 import extra_streamlit_components as stx  # Cookie management library added
 from google import genai
 from gtts import gTTS
