@@ -20,6 +20,7 @@ import requests
 from fpdf import FPDF
 import pdfplumber
 import streamlit as st
+<meta name="google-site-verification" content="s3917MXqa6MAM_axQ-z04vnnDoBMetSO-bCV-hTujyA" />
 import extra_streamlit_components as stx  # Cookie management library added
 from google import genai
 from gtts import gTTS
