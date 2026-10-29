@@ -67,8 +67,8 @@ class AdvancedMotorWindingEngine:
         return pd.DataFrame(phase_distribution)
 
     def generate_stator_plot(self, df_map):
-        """رسم تخطيطي هندسي تنفيذي شامل وواضح للملفات، المجاري، والأقطاب مع أطراف البدايات والنهايات"""
-        fig, ax = plt.subplots(figsize=(10, 10))
+        """رسم مخطط هندسي تنفيذي احترافي وواضح للملفات، المجاري والأقطاب"""
+        fig, ax = plt.subplots(figsize=(9, 9))
         ax.set_aspect('equal')
         ax.axis('off')
         
@@ -76,7 +76,7 @@ class AdvancedMotorWindingEngine:
         r_slot = 3.5
         r_outer = 4.0
         
-        # رسم حلقات الستاتور الأساسية
+        # رسم حلقات الستاتور
         ax.add_patch(plt.Circle((0, 0), r_inner, color='#2c3e50', fill=False, linewidth=3))
         ax.add_patch(plt.Circle((0, 0), r_outer, color='#2c3e50', fill=False, linewidth=3))
         
@@ -88,7 +88,7 @@ class AdvancedMotorWindingEngine:
         
         angles = np.deg2rad(df_map["Mechanical Angle (deg)"].values - 90)
         
-        # رسم المجاري وترقيمها بوضوح تام
+        # رسم المجاري وترقيمها
         for i, row in df_map.iterrows():
             angle = angles[i]
             x_in, y_in = r_inner * np.cos(angle), r_inner * np.sin(angle)
@@ -98,9 +98,8 @@ class AdvancedMotorWindingEngine:
             
             x_s, y_s = r_slot * np.cos(angle), r_slot * np.sin(angle)
             color = phase_colors.get(row["Phase"], '#7f8c8d')
-            ax.scatter(x_s, y_s, c=color, s=60, zorder=4, edgecolors='black', linewidths=0.6)
+            ax.scatter(x_s, y_s, c=color, s=55, zorder=4, edgecolors='black', linewidths=0.6)
             
-            # ترقيم المجاري داخل الحلقة الداخلية
             xt, yt = 2.3 * np.cos(angle), 2.3 * np.sin(angle)
             font_size = 6 if self.slots > 36 else 8
             ax.text(xt, yt, str(row["Slot No"]), fontsize=font_size, ha='center', va='center', fontweight='bold', color='#2c3e50')
@@ -114,23 +113,23 @@ class AdvancedMotorWindingEngine:
                 ang1 = angles[idx1]
                 ang2 = angles[idx2]
                 
-                r_loop = r_outer + 0.5 + ((i // max(1, self.q_val)) % 4) * 0.3
+                r_loop = r_outer + 0.4 + ((i // max(1, self.q_val)) % 3) * 0.25
                 
-                t_arc = np.linspace(ang1, ang2, 40)
+                t_arc = np.linspace(ang1, ang2, 30)
                 if abs(ang1 - ang2) > np.pi:
-                    t_arc = np.linspace(ang1, ang2 + 2*np.pi if ang2 < ang1 else ang2 - 2*np.pi, 40)
+                    t_arc = np.linspace(ang1, ang2 + 2*np.pi if ang2 < ang1 else ang2 - 2*np.pi, 30)
                 
                 arc_x = r_loop * np.cos(t_arc)
                 arc_y = r_loop * np.sin(t_arc)
                 
                 color = phase_colors.get(row["Phase"], '#7f8c8d')
-                ax.plot(arc_x, arc_y, color=color, linewidth=1.5, alpha=0.9)
+                ax.plot(arc_x, arc_y, color=color, linewidth=1.4, alpha=0.9)
 
-        # رسم مربعات أطراف الأقطاب والبدايات والنهايات (Us, Ue, Vs, Ve, Ws, We) حول المحيط
+        # رسم الأقطاب والبدايات والنهايات (Us, Ue, Vs, Ve, Ws, We) حول المحيط
         for p_idx in range(self.poles):
             p_angle = (p_idx * 2 * np.pi / self.poles) - np.pi/2 + (np.pi / self.poles)
             
-            label_r = r_outer + 2.2
+            label_r = r_outer + 2.1
             lx = label_r * np.cos(p_angle)
             ly = label_r * np.sin(p_angle)
             
@@ -139,12 +138,13 @@ class AdvancedMotorWindingEngine:
                          f"Vs{p_idx+1} ●──● Ve{p_idx+1}\n" \
                          f"Ws{p_idx+1} ●──● We{p_idx+1}"
             
-            ax.text(lx, ly, term_label, fontsize=8, fontweight='bold', ha='center', va='center',
-                    bbox=dict(boxstyle='round,pad=0.6', facecolor='#ffffff', edgecolor='#2c3e50', alpha=0.95))
+            ax.text(lx, ly, term_label, fontsize=7.5, fontweight='bold', ha='center', va='center',
+                    bbox=dict(boxstyle='round,pad=0.5', facecolor='#ffffff', edgecolor='#2c3e50', alpha=0.95))
 
-        ax.set_xlim(-7.5, 7.5)
-        ax.set_ylim(-7.5, 7.5)
-        ax.set_title("مخطط لف المحرك الهندسي التنفيذي المعتمد (Stator Winding & Terminals Blueprint)", fontsize=12, fontweight='bold', pad=25, color='#2c3e50')
+        ax.set_xlim(-7.0, 7.0)
+        ax.set_ylim(-7.0, 7.0)
+        ax.set_title("مخطط لف المحرك الهندسي التنفيذي المعتمد (Stator Winding & Terminals Blueprint)", fontsize=11, fontweight='bold', pad=20, color='#2c3e50')
+        
         return fig
 
 # ==========================================
@@ -213,6 +213,7 @@ def main():
         df_map = engine.generate_detailed_pole_map()
         fig = engine.generate_stator_plot(df_map)
         st.pyplot(fig)
+        plt.close(fig) # إغلاق الرسمة لتفريغ الذاكرة وضمان العرض السليم
 
         st.subheader("🗺️ خريطة توزيع المجاري والأقطاب التفصيلية:")
         st.dataframe(df_map, use_container_width=True)
