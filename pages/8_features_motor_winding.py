@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import streamlit as st
+import matplotlib.pyplot as plt
 
 # ==========================================
 # 1. وحدة لف المحركات المتقدمة (Motor Winding Engine)
@@ -67,6 +68,21 @@ class AdvancedMotorWindingEngine:
             
         return pd.DataFrame(phase_distribution)
 
+    def generate_stator_plot(self, df_map):
+        """رسم مخطط بصري قطبي دائري يوضح توزيع المجاري والأوجه"""
+        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw={'projection': 'polar'})
+        theta = np.deg2rad(df_map["Mechanical Angle (deg)"])
+        r = np.ones_like(theta) * 10
+        
+        phase_colors = {'U (Phase A)': '#ff4b4b', 'V (Phase B)': '#00cc66', 'W (Phase C)': '#3399ff'}
+        colors = [phase_colors.get(p, '#888888') for p in df_map["Phase"]]
+        
+        ax.scatter(theta, r, c=colors, s=120, edgecolors='black', linewidths=1.2, zorder=3)
+        ax.set_rticks([])
+        ax.grid(True, linestyle='--', alpha=0.6)
+        ax.set_title("مخطط توزيع المجاري والأقطاب (Stator Winding Map)", va='bottom', fontsize=12, fontweight='bold')
+        return fig
+
 # ==========================================
 # 2. وحدة التزامن والمزامنة للمولدات (Synchronization)
 # ==========================================
@@ -128,8 +144,12 @@ def main():
         st.subheader("📊 النتائج الحسابية وخصائص اللف:")
         st.json(params)
         
+        st.subheader("🎨 الرسم البصري التوضيحي للمجاري والأقطاب (Stator Diagram):")
+        df_map = engine.generate_detailed_pole_map()
+        fig = engine.generate_stator_plot(df_map)
+        st.pyplot(fig)
+
         st.subheader("🗺️ خريطة توزيع المجاري والأقطاب التفصيلية:")
-        df_map = engine.generate_pole_map = engine.generate_detailed_pole_map()
         st.dataframe(df_map, use_container_width=True)
 
     elif app_mode == "2. وحدة التزامن والمزامنة للمولدات (Sync)":
