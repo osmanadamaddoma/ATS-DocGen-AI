@@ -65,20 +65,18 @@ class AdvancedMotorWindingEngine:
         return pd.DataFrame(phase_distribution)
 
     def generate_stator_plot(self, df_map):
-        """رسم تخطيطي هندسي احترافي ودقيق للمحرك (Stator & Winding Overhang Simulation)"""
-        fig, ax = plt.subplots(figsize=(10, 10))
+        """رسم هندسي تفصيلي حقيقي لملفات الستاتور، المجاري، الأقطاب، والبدايات والنهايات (Us, Ue, Vs, Ve, Ws, We)"""
+        fig, ax = plt.subplots(figsize=(11, 11))
         ax.set_aspect('equal')
         ax.axis('off')
         
-        # دوائر الستاتور الأساسية
-        r_inner = 3.0
-        r_slot = 3.5
-        r_outer = 4.0
+        r_inner = 3.2
+        r_slot = 3.7
+        r_outer = 4.2
         
-        circle_inner = plt.Circle((0, 0), r_inner, color='#2c3e50', fill=False, linewidth=2.5)
-        circle_outer = plt.Circle((0, 0), r_outer, color='#2c3e50', fill=False, linewidth=2.5)
-        ax.add_patch(circle_inner)
-        ax.add_patch(circle_outer)
+        # رسم هيكل الستاتور الداخلي والخارجي
+        ax.add_patch(plt.Circle((0, 0), r_inner, color='#2c3e50', fill=False, linewidth=3))
+        ax.add_patch(plt.Circle((0, 0), r_outer, color='#2c3e50', fill=False, linewidth=3))
         
         phase_colors = {
             'U (Phase A)': '#e74c3c',  # أحمر
@@ -86,74 +84,74 @@ class AdvancedMotorWindingEngine:
             'W (Phase C)': '#2980b9'   # أزرق
         }
         
-        angles = np.deg2rad(df_map["Mechanical Angle (deg)"].values - 90) # البدء من الأعلى
+        angles = np.deg2rad(df_map["Mechanical Angle (deg)"].values - 90)
         
-        # رسم المجاري والأرقام بداخل الدائرة الداخلية
+        # رسم المجاري وترقيمها
         for i, row in df_map.iterrows():
             angle = angles[i]
-            x_in = r_inner * np.cos(angle)
-            y_in = r_inner * np.sin(angle)
-            x_out = r_outer * np.cos(angle)
-            y_out = r_outer * np.sin(angle)
+            x_in, y_in = r_inner * np.cos(angle), r_inner * np.sin(angle)
+            x_out, y_out = r_outer * np.cos(angle), r_outer * np.sin(angle)
             
-            # خط فاصل للمجرى
-            ax.plot([x_in, x_out], [y_in, y_out], color='#bdc3c7', linewidth=1)
+            ax.plot([x_in, x_out], [y_in, y_out], color='#95a5a6', linewidth=1.2)
             
-            # نقطة المجرى الملونة
-            x_s = r_slot * np.cos(angle)
-            y_s = r_slot * np.sin(angle)
+            x_s, y_s = r_slot * np.cos(angle), r_slot * np.sin(angle)
             color = phase_colors.get(row["Phase"], '#7f8c8d')
-            ax.scatter(x_s, y_s, c=color, s=45, zorder=4, edgecolors='black', linewidths=0.5)
+            ax.scatter(x_s, y_s, c=color, s=55, zorder=4, edgecolors='black', linewidths=0.6)
             
-            # ترقم المجاري في المركز بشكل منظم
-            r_text = 2.2
-            xt = r_text * np.cos(angle)
-            yt = r_text * np.sin(angle)
-            ax.text(xt, yt, str(row["Slot No"]), fontsize=7, ha='center', va='center', fontweight='bold', color='#34495e')
+            # أرقام المجاري الداخلية
+            xt, yt = 2.4 * np.cos(angle), 2.4 * np.sin(angle)
+            ax.text(xt, yt, str(row["Slot No"]), fontsize=6.5, ha='center', va='center', fontweight='bold', color='#2c3e50')
 
-        # رسم أقواس خطوات الملفات (Coil Overhangs) بدقة هندسية غير متداخلة
+        # رسم ملفات الأقطاب والأقواس المتداخلة (Coil Groups & Spans)
         span = int(self.slots / self.poles)
+        q_coils = int(self.slots / (self.poles * self.phases))
+        
         for i, row in df_map.iterrows():
-            if i % max(1, int(self.slots / (self.poles * self.phases))) == 0:
+            if i % max(1, q_coils) == 0:
                 idx1 = i
                 idx2 = (i + span) % self.slots
                 
                 ang1 = angles[idx1]
                 ang2 = angles[idx2]
                 
-                # إنشاء قوس بيضاوي خارجي يربط بين جانبي الملف
-                mid_ang = (ang1 + ang2) / 2
-                if abs(ang1 - ang2) > np.pi:
-                    mid_ang += np.pi
+                # تدرج طبقات اللف المتداخلة (Concentric Layers) لتبدو كملفات حقيقية
+                layer_offset = ((i // q_coils) % 3) * 0.25
+                r_curve = r_outer + 0.5 + layer_offset
                 
-                r_arc = r_outer + 0.8 + (i % 3) * 0.3 # تدرج نصف القطر لمنع التداخل
-                
-                # نقاط القوس
-                t = np.linspace(ang1, ang2, 30)
-                if abs(ang1 - ang2) > np.pi:
-                    t = np.linspace(ang1, ang2 + 2*np.pi if ang2 < ang1 else ang2 - 2*np.pi, 30)
-                
-                arc_x = (r_outer + 0.5) * np.cos(t)
-                arc_y = (r_outer + 0.5) * np.sin(t)
+                # رسم خطوط التوصيل للملفات بين المجاري
+                x1, y1 = r_outer * np.cos(ang1), r_outer * np.sin(ang1)
+                x2, y2 = r_outer * np.cos(ang2), r_outer * np.sin(ang2)
                 
                 color = phase_colors.get(row["Phase"], '#7f8c8d')
-                ax.plot(arc_x, arc_y, color=color, linewidth=1.2, alpha=0.8, linestyle='-')
+                
+                # رسم قوس انحنائي يمثل حزمة الملف (Coil Overhang)
+                t_arc = np.linspace(ang1, ang2, 40)
+                if abs(ang1 - ang2) > np.pi:
+                    t_arc = np.linspace(ang1, ang2 + 2*np.pi if ang2 < ang1 else ang2 - 2*np.pi, 40)
+                
+                arc_x = r_curve * np.cos(t_arc)
+                arc_y = r_curve * np.sin(t_arc)
+                ax.plot(arc_x, arc_y, color=color, linewidth=1.5, alpha=0.85)
 
-        # تسميات أطراف الأقطاب والبدايات والنهايات (Us, Ue, Vs, Ve, Ws, We)
+        # إضافة بيانات الأقطاب والبدايات والنهايات (Us, Ue, Vs, Ve, Ws, We) لكل قطب
         for p_idx in range(self.poles):
             p_angle = (p_idx * 2 * np.pi / self.poles) - np.pi/2 + (np.pi / self.poles)
             
-            label_r = r_outer + 2.2
+            label_r = r_outer + 1.8
             lx = label_r * np.cos(p_angle)
             ly = label_r * np.sin(p_angle)
             
-            term_text = f"Pole {p_idx+1}\nUs{p_idx+1}/Ue{p_idx+1}\nVs{p_idx+1}/Ve{p_idx+1}\nWs{p_idx+1}/We{p_idx+1}"
-            ax.text(lx, ly, term_text, fontsize=8, fontweight='bold', ha='center', va='center',
-                    bbox=dict(boxstyle='round,pad=0.4', facecolor='#ecf0f1', edgecolor='#bdc3c7', alpha=0.9))
+            pole_text = f"Pole {p_idx+1} [N/S]\n" \
+                        f"Us{p_idx+1} ●───● Ue{p_idx+1}\n" \
+                        f"Vs{p_idx+1} ●───● Ve{p_idx+1}\n" \
+                        f"Ws{p_idx+1} ●───● We{p_idx+1}"
+            
+            ax.text(lx, ly, pole_text, fontsize=8, fontweight='bold', ha='center', va='center',
+                    bbox=dict(boxstyle='round,pad=0.5', facecolor='#f8f9f9', edgecolor='#bdc3c7', alpha=0.95))
 
-        ax.set_xlim(-7.0, 7.0)
-        ax.set_ylim(-7.0, 7.0)
-        ax.set_title("مخطط لف المحرك التفاعلي الهندسي الحقيقي (Stator Winding & Terminals Layout)", fontsize=13, fontweight='bold', pad=20, color='#2c3e50')
+        ax.set_xlim(-7.5, 7.5)
+        ax.set_ylim(-7.5, 7.5)
+        ax.set_title("مخطط لف المحرك الهندسي التنفيذي المعتمد (Stator Winding & Terminals Blueprint)", fontsize=13, fontweight='bold', pad=25, color='#2c3e50')
         return fig
 
 # ==========================================
@@ -216,7 +214,7 @@ def main():
         st.subheader("📊 النتائج الحسابية وخصائص اللف:")
         st.json(params)
         
-        st.subheader("🎨 الرسم الهندسي والتخطيطي المحاكي للمجاري، الأقطاب والأطراف (Stator Winding Simulation):")
+        st.subheader("🎨 المخطط الهندسي التنفيذي للملفات، المجاري وأطراف الأقطاب (Winding Blueprint):")
         df_map = engine.generate_detailed_pole_map()
         fig = engine.generate_stator_plot(df_map)
         st.pyplot(fig)
