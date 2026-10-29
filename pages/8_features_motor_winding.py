@@ -30,24 +30,8 @@ class WindingCADEngine:
     def get_connections_and_leads(self):
         connections = []
         leads = []
-        p_pairs = self.poles / 2
         
-        if "Lap" in self.winding_type:
-            is_double = "Double" in self.winding_type
-            for i in range(self.Z):
-                color = self.get_phase_color(i)
-                next_idx = (i + self.Y) % self.Z
-                connections.append((i, next_idx, color, is_double))
-                if i % int(max(1, self.Z/12)) == 0:
-                    leads.append({'slot': i, 'label': f"L_{i+1}", 'color': color, 'is_start': True})
-                    
-        elif "Wave" in self.winding_type:
-            for i in range(self.Z):
-                color = self.get_phase_color(i)
-                next_idx = (i + self.Y) % self.Z
-                connections.append((i, next_idx, color, True))
-                
-        elif "Grouped" in self.winding_type:
+        if "Grouped" in self.winding_type:
             groups_per_phase = self.poles
             phase_names = ['U', 'V', 'W']
             phase_colors = ['#d63031', '#00b894', '#0984e3']
@@ -78,10 +62,19 @@ class WindingCADEngine:
                             s2 = (s1 + self.Y) % self.Z
                             
                         connections.append((s1, s2, color, False))
+        else:
+            for i in range(self.Z):
+                color = self.get_phase_color(i)
+                next_idx = (i + self.Y) % self.Z
+                is_double = "Double" in self.winding_type
+                connections.append((i, next_idx, color, is_double))
+                if i % int(max(1, self.Z/12)) == 0:
+                    leads.append({'slot': i, 'label': f"L_{i+1}", 'color': color, 'is_start': True})
+                    
         return connections, leads
 
     def generate_matplotlib_diagram(self):
-        """توليد الرسم الهندسي الدائري المتطابق تماماً لمعايير Winding CAD Pro"""
+        """توليد الرسم الهندسي الدائري بأقواس ناعمة مطابقة تماماً لـ Winding CAD Pro"""
         fig, ax = plt.subplots(figsize=(9, 9))
         ax.set_aspect('equal')
         ax.axis('off')
@@ -112,7 +105,7 @@ class WindingCADEngine:
 
         connections, leads = self.get_connections_and_leads()
 
-        # رسم أقواس التوصيل للملفات
+        # رسم أقواس الملفات بشكل منحني وناعم (Smooth Arcs)
         for s1, s2, color, is_double in connections:
             x_start, y_start, ang_start = slot_positions[s1]
             x_end, y_end, ang_end = slot_positions[s2]
@@ -123,15 +116,21 @@ class WindingCADEngine:
             mid_angle = ang_start + diff / 2.0
             
             span = min((s2 - s1) % self.Z, (s1 - s2) % self.Z)
-            r_apex = r_outer + 0.3 + (span * 0.03)
+            r_apex = r_outer + 0.35 + (span * 0.025)
             
-            x_mid = r_apex * math.cos(mid_angle)
-            y_mid = r_apex * math.sin(mid_angle)
+            # توليد نقاط قوس ناعم (Smooth Curve Interpolation)
+            theta_curve = np.linspace(ang_start, ang_end, 30)
+            if abs(ang_start - ang_end) > math.pi:
+                theta_curve = np.linspace(ang_start, ang_end + 2*math.pi if ang_end < ang_start else ang_end - 2*math.pi, 30)
             
-            style_line = '--' if is_double else '-'
-            ax.plot([x_start, x_mid, x_end], [y_start, y_mid, y_end], color=color, linewidth=1.5, linestyle=style_line, alpha=0.85)
+            r_curve = np.linspace(r_outer, r_apex, 15).tolist() + np.linspace(r_apex, r_outer, 15).tolist()
+            if len(r_curve) == 30:
+                curve_x = r_curve * np.cos(theta_curve)
+                curve_y = r_curve * np.sin(theta_curve)
+                style_line = '--' if is_double else '-'
+                ax.plot(curve_x, curve_y, color=color, linewidth=1.5, linestyle=style_line, alpha=0.9)
 
-        # رسم الأطراف والبدايات والنهايات (Leads)
+        # رسم الأطراف والبدايات والنهايات حول المحيط الخارجي
         if leads:
             for lead in leads:
                 slot_idx = lead['slot']
@@ -152,17 +151,17 @@ class WindingCADEngine:
                 ax.plot([x_start_lead, x_end_lead], [y_start_lead, y_end_lead], color=color, linewidth=1.5, linestyle=style_line)
                 
                 marker_face = color if is_start else 'black'
-                ax.scatter(x_end_lead, y_end_lead, c=marker_face, edgecolors=color, s=30, zorder=5)
+                ax.scatter(x_end_lead, y_end_lead, c=marker_face, edgecolors=color, s=35, zorder=5)
                 
-                text_radius = r_outer + lead_length + 0.3
+                text_radius = r_outer + lead_length + 0.35
                 x_text = text_radius * math.cos(angle_rad)
                 y_text = text_radius * math.sin(angle_rad)
                 
                 text_color = color if is_start else "#2d3436"
                 ax.text(x_text, y_text, label, color=text_color, fontsize=8, fontweight='bold', ha='center', va='center')
 
-        ax.set_xlim(-6.5, 6.5)
-        ax.set_ylim(-6.5, 6.5)
+        ax.set_xlim(-6.8, 6.8)
+        ax.set_ylim(-6.8, 6.8)
         ax.set_title("Winding CAD Pro - Stator Winding & Terminals Blueprint", fontsize=12, fontweight='bold', pad=15, color='#2c3e50')
         return fig
 
@@ -237,7 +236,7 @@ def main():
             "Sub-Style": style
         })
         
-        st.subheader("🎨 المخطط الهندسي التنفيذي المطابق لـ Winding CAD Pro:")
+        st.subheader("🎨 المخطط الهندسي التنفيذي المطابق تماماً لـ Winding CAD Pro:")
         fig = engine.generate_matplotlib_diagram()
         st.pyplot(fig)
         plt.close(fig)
