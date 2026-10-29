@@ -19,17 +19,14 @@ class AdvancedMotorWindingEngine:
         slots_per_pole = self.slots / self.poles
         slots_per_pole_phase = self.slots / (self.poles * self.phases)
         
-        # حساب خطوة اللف النظرية والعملية للخطوة الكسرية
         ideal_coil_span = slots_per_pole
         if self.pitch_type == "Fractional Pitch":
-            # تقريب خطوة اللف لخطوة كسرية عملية (مثلاً تقليل خطوة واحدة لتخفيف التوافقية)
             practical_coil_span = int(np.floor(ideal_coil_span))
             pitch_factor = np.sin((practical_coil_span / ideal_coil_span) * (np.pi / 2))
         else:
             practical_coil_span = int(round(ideal_coil_span))
             pitch_factor = 1.0
 
-        # إعدادات الوصلات الخارجية (مثلاً 24 طرفاً للأطراف والبدايات للمحركات الكبيرة)
         terminal_connections = "24 External Jumper Connections (Multi-Parallel / Star-Delta)" if self.slots >= 48 else "Standard Terminal Configuration (6 Terminals)"
 
         results = {
@@ -54,7 +51,6 @@ class AdvancedMotorWindingEngine:
             phase_idx = (s - 1) % self.phases
             phase_name = ['U (Phase A)', 'V (Phase B)', 'W (Phase C)'][phase_idx] if self.phases == 3 else f"Phase {phase_idx+1}"
             
-            # تحديد ما إذا كان المجرى يقع في منطقة قطب شمالي أو جنوبي (Consequent / Alternating)
             pole_zone = int(((s - 1) / self.slots) * self.poles) + 1
             magnetic_polarity = "North (N)" if pole_zone % 2 != 0 else "South (S)"
             
@@ -69,18 +65,61 @@ class AdvancedMotorWindingEngine:
         return pd.DataFrame(phase_distribution)
 
     def generate_stator_plot(self, df_map):
-        """رسم مخطط بصري قطبي دائري يوضح توزيع المجاري والأوجه"""
-        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw={'projection': 'polar'})
-        theta = np.deg2rad(df_map["Mechanical Angle (deg)"])
-        r = np.ones_like(theta) * 10
+        """رسم مخطط هندسي دائري محاكي حقيقي للمحرك مع المجاري، الأقطاب، ووصلات الملفات والبدايات والنهايات"""
+        fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
         
-        phase_colors = {'U (Phase A)': '#ff4b4b', 'V (Phase B)': '#00cc66', 'W (Phase C)': '#3399ff'}
-        colors = [phase_colors.get(p, '#888888') for p in df_map["Phase"]]
+        angles = np.deg2rad(df_map["Mechanical Angle (deg)"])
         
-        ax.scatter(theta, r, c=colors, s=120, edgecolors='black', linewidths=1.2, zorder=3)
         ax.set_rticks([])
-        ax.grid(True, linestyle='--', alpha=0.6)
-        ax.set_title("مخطط توزيع المجاري والأقطاب (Stator Winding Map)", va='bottom', fontsize=12, fontweight='bold')
+        ax.grid(False)
+        ax.spines['polar'].set_visible(False)
+        
+        r_slot = 1.0
+        r_inner = 0.7
+        r_outer = 1.3
+        
+        phase_colors = {
+            'U (Phase A)': '#ff4b4b',  # أحمر
+            'V (Phase B)': '#00cc66',  # أخضر
+            'W (Phase C)': '#3399ff'   # أزرق
+        }
+        
+        for i, row in df_map.iterrows():
+            theta = angles[i]
+            phase = row["Phase"]
+            color = phase_colors.get(phase, '#888888')
+            
+            ax.plot([theta, theta], [r_inner, r_outer], color='#333333', linewidth=0.8, zorder=2)
+            ax.scatter(theta, r_slot, c=color, s=40, zorder=4, edgecolors='black', linewidths=0.5)
+            ax.text(theta, 0.5, str(row["Slot No"]), fontsize=7, ha='center', va='center', rotation=np.rad2deg(theta)-90, fontweight='bold', color='#222222')
+
+        span = int(self.slots / self.poles)
+        for i, row in df_map.iterrows():
+            if i % max(1, int(self.slots / (self.poles * self.phases))) == 0:
+                theta1 = angles[i]
+                target_idx = (i + span) % self.slots
+                theta2 = angles[target_idx]
+                phase = row["Phase"]
+                color = phase_colors.get(phase, '#888888')
+                
+                t_arc = np.linspace(theta1, theta2, 30)
+                r_arc = np.linspace(r_outer, r_outer + 0.5, 15).tolist() + np.linspace(r_outer + 0.5, r_outer, 15).tolist()
+                if len(r_arc) == 30:
+                    ax.plot(t_arc, r_arc, color=color, linewidth=1.0, alpha=0.8, linestyle='-', zorder=3)
+
+        for p_idx in range(self.poles):
+            angle_pos = np.deg2rad((p_idx * 360.0 / self.poles) + (360.0 / (2 * self.poles)))
+            ax.text(angle_pos, r_outer + 0.7, f"Us{p_idx+1}", color='#ff4b4b', fontsize=9, fontweight='bold', ha='center', va='center')
+            ax.text(angle_pos + 0.05, r_outer + 0.9, f"Ue{p_idx+1}", color='#ff4b4b', fontsize=8, ha='center', va='center', style='italic')
+            
+            ax.text(angle_pos + 0.2, r_outer + 0.7, f"Vs{p_idx+1}", color='#00cc66', fontsize=9, fontweight='bold', ha='center', va='center')
+            ax.text(angle_pos + 0.25, r_outer + 0.9, f"Ve{p_idx+1}", color='#00cc66', fontsize=8, ha='center', va='center', style='italic')
+
+            ax.text(angle_pos + 0.4, r_outer + 0.7, f"Ws{p_idx+1}", color='#3399ff', fontsize=9, fontweight='bold', ha='center', va='center')
+            ax.text(angle_pos + 0.45, r_outer + 0.9, f"We{p_idx+1}", color='#3399ff', fontsize=8, ha='center', va='center', style='italic')
+
+        ax.set_rmax(r_outer + 1.2)
+        ax.set_title("مخطط لف المحرك التفاعلي الحقيقي (Stator Winding Simulation & Terminals)", va='bottom', fontsize=13, fontweight='bold', pad=20)
         return fig
 
 # ==========================================
@@ -92,10 +131,9 @@ class GeneratorSyncEngine:
         self.v2 = gen2_voltage
         self.f1 = gen1_freq
         self.f2 = gen2_freq
-        self.d_theta = phase_angle_diff  # فرق الوجه بالدرجات
+        self.d_theta = phase_angle_diff
 
     def evaluate_synchronization(self):
-        """التحقق من شروط التزامن المتوازي للمولدات (Parallel Connection)"""
         voltage_diff = abs(self.v1 - self.v2)
         freq_diff = abs(self.f1 - self.f2)
         
@@ -144,7 +182,7 @@ def main():
         st.subheader("📊 النتائج الحسابية وخصائص اللف:")
         st.json(params)
         
-        st.subheader("🎨 الرسم البصري التوضيحي للمجاري والأقطاب (Stator Diagram):")
+        st.subheader("🎨 الرسم البصري الحقيقي للمجاري، الأقطاب، والبدايات والنهايات (Stator Winding Simulation):")
         df_map = engine.generate_detailed_pole_map()
         fig = engine.generate_stator_plot(df_map)
         st.pyplot(fig)
