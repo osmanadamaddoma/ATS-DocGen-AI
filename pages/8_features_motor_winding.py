@@ -7,12 +7,13 @@ import matplotlib.pyplot as plt
 # 1. وحدة لف المحركات المتقدمة (Motor Winding Engine)
 # ==========================================
 class AdvancedMotorWindingEngine:
-    def __init__(self, slots, poles, phases, winding_type="Concentric", pitch_type="Full Pitch"):
+    def __init__(self, slots, poles, phases, winding_type="Concentric", pitch_type="Full Pitch", q_val=6):
         self.slots = slots                  # عدد المجاري (Stator Slots)
         self.poles = poles                  # عدد الأقطاب
         self.phases = phases                # عدد الأوجه (3-Phase)
         self.winding_type = winding_type    # نوع اللف (Concentric / Lap / Wave)
         self.pitch_type = pitch_type        # نوع الخطوة (Full Pitch / Fractional Pitch)
+        self.q_val = q_val                  # عدد الملفات لكل مجموعة (q/Grp)
 
     def calculate_advanced_parameters(self):
         """حسابات هندسية متقدمة تشمل الخطوة الكسرية والأقطاب المتداخلة"""
@@ -30,12 +31,13 @@ class AdvancedMotorWindingEngine:
         terminal_connections = "24 External Jumper Connections (Multi-Parallel / Star-Delta)" if self.slots >= 48 else "Standard Terminal Configuration (6 Terminals)"
 
         results = {
-            "Total Stator Slots": self.slots,
-            "Number of Poles": self.poles,
+            "Total Stator Slots (Z)": self.slots,
+            "Number of Poles (2p)": self.poles,
             "Slots per Pole (q_total)": round(slots_per_pole, 2),
             "Slots per Pole per Phase (q)": round(slots_per_pole_phase, 2),
+            "Coils per Group (q_grp)": self.q_val,
             "Ideal Coil Span": round(ideal_coil_span, 1),
-            "Selected Coil Span": practical_coil_span,
+            "Selected Coil Span (Y)": practical_coil_span,
             "Pitch Factor (Kp)": round(pitch_factor, 3),
             "Winding Style": self.winding_type,
             "Terminal Layout & Jumpers": terminal_connections
@@ -65,7 +67,7 @@ class AdvancedMotorWindingEngine:
         return pd.DataFrame(phase_distribution)
 
     def generate_stator_plot(self, df_map):
-        """رسم تخطيطي هندسي احترافي حقيقي لملفات الستاتور، المجاري، الأقطاب، والأطراف (متموج/قوسي مطابق للمراجع)"""
+        """رسم تخطيطي هندسي تنفيذي احترافي للملفات، المجاري، الأقطاب والأطراف (Us, Ue, Vs, Ve, Ws, We)"""
         fig, ax = plt.subplots(figsize=(10, 10))
         ax.set_aspect('equal')
         ax.axis('off')
@@ -74,14 +76,14 @@ class AdvancedMotorWindingEngine:
         r_slot = 3.5
         r_outer = 4.0
         
-        # رسم حلقات الستاتور
+        # دوائر الستاتور الأساسية
         ax.add_patch(plt.Circle((0, 0), r_inner, color='#2c3e50', fill=False, linewidth=2.5))
         ax.add_patch(plt.Circle((0, 0), r_outer, color='#2c3e50', fill=False, linewidth=2.5))
         
         phase_colors = {
-            'U (Phase A)': '#e74c3c',  # أحمر
-            'V (Phase B)': '#27ae60',  # أخضر
-            'W (Phase C)': '#2980b9'   # أزرق
+            'U (Phase A)': '#d63031',  # أحمر
+            'V (Phase B)': '#00b894',  # أخضر
+            'W (Phase C)': '#0984e3'   # أزرق
         }
         
         angles = np.deg2rad(df_map["Mechanical Angle (deg)"].values - 90)
@@ -92,44 +94,38 @@ class AdvancedMotorWindingEngine:
             x_in, y_in = r_inner * np.cos(angle), r_inner * np.sin(angle)
             x_out, y_out = r_outer * np.cos(angle), r_outer * np.sin(angle)
             
-            ax.plot([x_in, x_out], [y_in, y_out], color='#bdc3c7', linewidth=0.9)
+            ax.plot([x_in, x_out], [y_in, y_out], color='#b2bec3', linewidth=1)
             
             x_s, y_s = r_slot * np.cos(angle), r_slot * np.sin(angle)
             color = phase_colors.get(row["Phase"], '#7f8c8d')
             ax.scatter(x_s, y_s, c=color, s=50, zorder=4, edgecolors='black', linewidths=0.5)
             
-            # ترقيم المجاري الداخلية
             xt, yt = 2.3 * np.cos(angle), 2.3 * np.sin(angle)
-            ax.text(xt, yt, str(row["Slot No"]), fontsize=6.5, ha='center', va='center', fontweight='bold', color='#34495e')
+            font_size = 6 if self.slots > 36 else 8
+            ax.text(xt, yt, str(row["Slot No"]), fontsize=font_size, ha='center', va='center', fontweight='bold', color='#2d3436')
 
-        # رسم حزم الملفات المتداخلة والأقواس المتموجة (Coil Winding Loops)
+        # رسم أقواس الملفات والخطوات المتموجة (Concentric / Grouped Winding Loops)
         span = int(self.slots / self.poles)
-        q_coils = int(self.slots / (self.poles * self.phases))
-        
         for i, row in df_map.iterrows():
-            if i % max(1, q_coils) == 0:
+            if i % max(1, int(self.slots / (self.poles * self.phases))) == 0:
                 idx1 = i
                 idx2 = (i + span) % self.slots
                 ang1 = angles[idx1]
                 ang2 = angles[idx2]
                 
-                # إنشاء حزمة ملفات متموجة (Sine-like Overhang Loops) تحاكي المخططات الحقيقية
                 t = np.linspace(0, np.pi, 50)
-                # إحداثيات القوس الخارجى الذي يربط بين جانبي الملف
-                r_loop = r_outer + 0.6 + ((i // q_coils) % 3) * 0.35
+                r_loop = r_outer + 0.6 + ((i // max(1, self.q_val)) % 3) * 0.35
                 
-                # تحويل إقطابي إلى كارتيزي للقوس المتموج
                 base_x1, base_y1 = r_outer * np.cos(ang1), r_outer * np.sin(ang1)
                 base_x2, base_y2 = r_outer * np.cos(ang2), r_outer * np.sin(ang2)
                 
-                # رسم منحنى تموجي احترافي يربط المجاري
                 curve_x = np.linspace(base_x1, base_x2, 50) + r_loop * 0.3 * np.sin(t)
                 curve_y = np.linspace(base_y1, base_y2, 50) + r_loop * 0.3 * np.cos(t)
                 
                 color = phase_colors.get(row["Phase"], '#7f8c8d')
                 ax.plot(curve_x, curve_y, color=color, linewidth=1.2, alpha=0.85)
 
-        # تسميات أطراف الأقطاب والبدايات والنهايات (Us, Ue, Vs, Ve, Ws, We) حول محيط الستاتور
+        # رسم أطراف البدايات والنهايات للأقطاب (Us, Ue, Vs, Ve, Ws, We)
         for p_idx in range(self.poles):
             p_angle = (p_idx * 2 * np.pi / self.poles) - np.pi/2 + (np.pi / self.poles)
             
@@ -143,11 +139,11 @@ class AdvancedMotorWindingEngine:
                          f"Ws{p_idx+1} ●──● We{p_idx+1}"
             
             ax.text(lx, ly, term_label, fontsize=7.5, fontweight='bold', ha='center', va='center',
-                    bbox=dict(boxstyle='round,pad=0.5', facecolor='#fdfefe', edgecolor='#7f8c8d', alpha=0.95))
+                    bbox=dict(boxstyle='round,pad=0.5', facecolor='#f8f9f9', edgecolor='#7f8c8d', alpha=0.95))
 
         ax.set_xlim(-7.5, 7.5)
         ax.set_ylim(-7.5, 7.5)
-        ax.set_title("مخطط لف المحرك الهندسي التنفيذي الحقيقي (Stator Winding & Terminals Blueprint)", fontsize=12, fontweight='bold', pad=25, color='#2c3e50')
+        ax.set_title("مخطط لف المحرك الهندسي التنفيذي المعتمد (Stator Winding & Terminals Blueprint)", fontsize=12, fontweight='bold', pad=25, color='#2c3e50')
         return fig
 
 # ==========================================
@@ -194,17 +190,19 @@ def main():
     if app_mode == "1. حسابات وخرائط لف المحركات المتقدمة (AC/DC)":
         st.header("⚡ المحاكي الهندسي المتقدم لف المحركات والخطوات الكسرية")
         
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
-            slots = st.number_input("عدد المجاري (Stator Slots)", min_value=12, max_value=144, value=48)
+            slots = st.number_input("Slots (Z)", min_value=12, max_value=144, value=48)
         with col2:
-            poles = st.selectbox("عدد الأقطاب (Poles)", [2, 4, 6, 8, 12], index=1)
+            poles = st.number_input("Poles", min_value=2, max_value=16, step=2, value=4)
         with col3:
-            winding_type = st.selectbox("نوع اللف", ["Concentric (متداخلة)", "Lap Winding (تموجية/طبقات)", "Wave Winding"])
+            winding_type = st.selectbox("Type", ["Grouped (Custom)", "Lap (Single Layer)", "Lap (Double Layer)", "Wave (Sequential)"])
         with col4:
-            pitch_type = st.selectbox("نوع الخطوة", ["Full Pitch (خطوة كاملة)", "Fractional Pitch (خطوة كسرية)"])
+            q_val = st.number_input("q/Grp", min_value=1, max_value=12, value=6)
+        with col5:
+            pitch_type = st.selectbox("Pitch Style", ["Full Pitch (خطوة كاملة)", "Fractional Pitch (خطوة كسرية)"])
 
-        engine = AdvancedMotorWindingEngine(slots=slots, poles=poles, phases=3, winding_type=winding_type, pitch_type=pitch_type)
+        engine = AdvancedMotorWindingEngine(slots=slots, poles=poles, phases=3, winding_type=winding_type, pitch_type=pitch_type, q_val=q_val)
         params = engine.calculate_advanced_parameters()
         
         st.subheader("📊 النتائج الحسابية وخصائص اللف:")
