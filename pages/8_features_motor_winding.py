@@ -67,7 +67,7 @@ class AdvancedMotorWindingEngine:
         return pd.DataFrame(phase_distribution)
 
     def generate_stator_plot(self, df_map):
-        """رسم تخطيطي هندسي تنفيذي نظيف ومرتب للملفات والمجاري والأقطاب دون تقاطعات داخلية"""
+        """رسم تخطيطي هندسي تنفيذي شامل وواضح للملفات، المجاري، والأقطاب مع أطراف البدايات والنهايات"""
         fig, ax = plt.subplots(figsize=(10, 10))
         ax.set_aspect('equal')
         ax.axis('off')
@@ -76,9 +76,9 @@ class AdvancedMotorWindingEngine:
         r_slot = 3.5
         r_outer = 4.0
         
-        # دوائر الستاتور الأساسية
-        ax.add_patch(plt.Circle((0, 0), r_inner, color='#2c3e50', fill=False, linewidth=2.5))
-        ax.add_patch(plt.Circle((0, 0), r_outer, color='#2c3e50', fill=False, linewidth=2.5))
+        # رسم حلقات الستاتور الأساسية
+        ax.add_patch(plt.Circle((0, 0), r_inner, color='#2c3e50', fill=False, linewidth=3))
+        ax.add_patch(plt.Circle((0, 0), r_outer, color='#2c3e50', fill=False, linewidth=3))
         
         phase_colors = {
             'U (Phase A)': '#d63031',  # أحمر
@@ -88,23 +88,24 @@ class AdvancedMotorWindingEngine:
         
         angles = np.deg2rad(df_map["Mechanical Angle (deg)"].values - 90)
         
-        # رسم المجاري وترقيمها بوضوح على المحيط الداخلي
+        # رسم المجاري وترقيمها بوضوح تام
         for i, row in df_map.iterrows():
             angle = angles[i]
             x_in, y_in = r_inner * np.cos(angle), r_inner * np.sin(angle)
             x_out, y_out = r_outer * np.cos(angle), r_outer * np.sin(angle)
             
-            ax.plot([x_in, x_out], [y_in, y_out], color='#b2bec3', linewidth=1)
+            ax.plot([x_in, x_out], [y_in, y_out], color='#7f8c8d', linewidth=1.2)
             
             x_s, y_s = r_slot * np.cos(angle), r_slot * np.sin(angle)
             color = phase_colors.get(row["Phase"], '#7f8c8d')
-            ax.scatter(x_s, y_s, c=color, s=45, zorder=4, edgecolors='black', linewidths=0.5)
+            ax.scatter(x_s, y_s, c=color, s=60, zorder=4, edgecolors='black', linewidths=0.6)
             
-            xt, yt = 2.4 * np.cos(angle), 2.4 * np.sin(angle)
-            font_size = 5.5 if self.slots > 36 else 7
-            ax.text(xt, yt, str(row["Slot No"]), fontsize=font_size, ha='center', va='center', fontweight='bold', color='#2d3436')
+            # ترقيم المجاري داخل الحلقة الداخلية
+            xt, yt = 2.3 * np.cos(angle), 2.3 * np.sin(angle)
+            font_size = 6 if self.slots > 36 else 8
+            ax.text(xt, yt, str(row["Slot No"]), fontsize=font_size, ha='center', va='center', fontweight='bold', color='#2c3e50')
 
-        # رسم أقواس الملفات الخارجية بشكل هندسي نقي ومنتظم (Concentric Overhang Arcs)
+        # رسم حزم الملفات والأقواس الخارجية لكل قطب
         span = int(self.slots / self.poles)
         for i, row in df_map.iterrows():
             if i % max(1, int(self.slots / (self.poles * self.phases))) == 0:
@@ -113,30 +114,19 @@ class AdvancedMotorWindingEngine:
                 ang1 = angles[idx1]
                 ang2 = angles[idx2]
                 
-                # حساب زوايا القوس الخارجي بسلاسة دون اختراق المركز
-                step_diff = abs(idx2 - idx1)
-                if step_diff > self.slots / 2:
-                    step_diff = self.slots - step_diff
+                r_loop = r_outer + 0.5 + ((i // max(1, self.q_val)) % 4) * 0.3
                 
-                r_loop = r_outer + 0.4 + ((i // max(1, self.q_val)) % 4) * 0.25
-                
-                # رسم قوس دائري خارجي نظيف يربط المجاري ببعضها
-                mid_ang = (ang1 + ang2) / 2
+                t_arc = np.linspace(ang1, ang2, 40)
                 if abs(ang1 - ang2) > np.pi:
-                    mid_ang += np.pi
+                    t_arc = np.linspace(ang1, ang2 + 2*np.pi if ang2 < ang1 else ang2 - 2*np.pi, 40)
                 
-                # رسم خط منحني خارجي سلس
-                arc_theta = np.linspace(ang1, ang2, 30)
-                if abs(ang1 - ang2) > np.pi:
-                    arc_theta = np.linspace(ang1, ang2 + 2*np.pi if ang2 < ang1 else ang2 - 2*np.pi, 30)
-                
-                arc_x = r_loop * np.cos(arc_theta)
-                arc_y = r_loop * np.sin(arc_theta)
+                arc_x = r_loop * np.cos(t_arc)
+                arc_y = r_loop * np.sin(t_arc)
                 
                 color = phase_colors.get(row["Phase"], '#7f8c8d')
-                ax.plot(arc_x, arc_y, color=color, linewidth=1.2, alpha=0.9, linestyle='-')
+                ax.plot(arc_x, arc_y, color=color, linewidth=1.5, alpha=0.9)
 
-        # تنظيم مربعات أطراف الأقطاب والبدايات والنهايات (Us, Ue, Vs, Ve, Ws, We) حول المحيط الخارجي
+        # رسم مربعات أطراف الأقطاب والبدايات والنهايات (Us, Ue, Vs, Ve, Ws, We) حول المحيط
         for p_idx in range(self.poles):
             p_angle = (p_idx * 2 * np.pi / self.poles) - np.pi/2 + (np.pi / self.poles)
             
@@ -149,12 +139,12 @@ class AdvancedMotorWindingEngine:
                          f"Vs{p_idx+1} ●──● Ve{p_idx+1}\n" \
                          f"Ws{p_idx+1} ●──● We{p_idx+1}"
             
-            ax.text(lx, ly, term_label, fontsize=7.5, fontweight='bold', ha='center', va='center',
-                    bbox=dict(boxstyle='round,pad=0.5', facecolor='#ffffff', edgecolor='#b2bec3', alpha=0.95))
+            ax.text(lx, ly, term_label, fontsize=8, fontweight='bold', ha='center', va='center',
+                    bbox=dict(boxstyle='round,pad=0.6', facecolor='#ffffff', edgecolor='#2c3e50', alpha=0.95))
 
         ax.set_xlim(-7.5, 7.5)
         ax.set_ylim(-7.5, 7.5)
-        ax.set_title("مخطط لف المحرك الهندسي التنفيذي المعتمد (Clean Stator Winding & Terminals Blueprint)", fontsize=11, fontweight='bold', pad=20, color='#2c3e50')
+        ax.set_title("مخطط لف المحرك الهندسي التنفيذي المعتمد (Stator Winding & Terminals Blueprint)", fontsize=12, fontweight='bold', pad=25, color='#2c3e50')
         return fig
 
 # ==========================================
@@ -219,7 +209,7 @@ def main():
         st.subheader("📊 النتائج الحسابية وخصائص اللف:")
         st.json(params)
         
-        st.subheader("🎨 المخطط الهندسي التنفيذي النظيف للملفات، المجاري وأطراف الأقطاب (Winding Blueprint):")
+        st.subheader("🎨 المخطط الهندسي التنفيذي للملفات، المجاري وأطراف الأقطاب (Winding Blueprint):")
         df_map = engine.generate_detailed_pole_map()
         fig = engine.generate_stator_plot(df_map)
         st.pyplot(fig)
