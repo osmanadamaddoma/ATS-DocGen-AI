@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import math
 
 # ==========================================
-# 1. محرك Winding CAD Pro الهندسي المطابق تماماً
+# 1. محرك Winding CAD Pro الهندسي المتقدم
 # ==========================================
 class WindingCADEngine:
     def __init__(self, Z, poles, winding_type, Y, q_val, style):
@@ -74,15 +74,15 @@ class WindingCADEngine:
         return connections, leads
 
     def generate_matplotlib_diagram(self):
-        """توليد الرسم الدائري بأقواس انحنائية ناعمة ومنسقة تطابق Winding CAD Pro"""
+        """توليد الرسم الدائري مع مسافات واسعة ومفصولة بوضوح لكل قوس ملف"""
         fig, ax = plt.subplots(figsize=(10, 10))
         ax.set_aspect('equal')
         ax.axis('off')
         
-        R = 3.8
+        R = 3.5
         r_inner = R * 0.70
         r_outer = R
-        r_text = R * 0.53
+        r_text = R * 0.52
         
         # رسم حلقات الستاتور الأساسية
         ax.add_patch(plt.Circle((0, 0), r_outer, color='#2d3436', fill=False, linewidth=2.5))
@@ -106,7 +106,7 @@ class WindingCADEngine:
 
         connections, leads = self.get_connections_and_leads()
 
-        # رسم الأقواس المنحنية والناعمة للملفات (Smooth Overhang Arcs)
+        # رسم الأقواس المنحنية بمسافات متباعدة وواضحة جداً (Expanded Concentric Spacing)
         for s1, s2, color, coil_idx in connections:
             x_start, y_start, ang_start = slot_positions[s1]
             x_end, y_end, ang_end = slot_positions[s2]
@@ -116,8 +116,8 @@ class WindingCADEngine:
             if diff < -math.pi: diff += 2 * math.pi
             mid_angle = ang_start + diff / 2.0
             
-            # تباعد الطبقات للخارج بمنع التشابك
-            r_apex = r_outer + 0.3 + (coil_idx * 0.07)
+            # زيادة نصف قطر القوس بفجوات كبيرة وواضحة لتسهيل الفرز البصري
+            r_apex = r_outer + 0.6 + (coil_idx * 0.22)
             
             theta_curve = np.linspace(ang_start, ang_end, 40)
             if abs(ang_start - ang_end) > math.pi:
@@ -127,9 +127,9 @@ class WindingCADEngine:
             if len(r_curve) == 40:
                 curve_x = r_curve * np.cos(theta_curve)
                 curve_y = r_curve * np.sin(theta_curve)
-                ax.plot(curve_x, curve_y, color=color, linewidth=1.1, alpha=0.85)
+                ax.plot(curve_x, curve_y, color=color, linewidth=1.3, alpha=0.9)
 
-        # رسم الأطراف والبدايات والنهايات حول المحيط الخارجي بوضوح تام
+        # رسم الأطراف والبدايات والنهايات في مساحة خارجية واسعة
         if leads:
             for lead in leads:
                 slot_idx = lead['slot']
@@ -138,7 +138,7 @@ class WindingCADEngine:
                 x_start_lead = r_outer * math.cos(angle_rad)
                 y_start_lead = r_outer * math.sin(angle_rad)
                 
-                lead_length = 1.0
+                lead_length = 2.0  # مسافة أطول وأكثر وضوحاً للأطراف
                 x_end_lead = (r_outer + lead_length) * math.cos(angle_rad)
                 y_end_lead = (r_outer + lead_length) * math.sin(angle_rad)
                 
@@ -147,21 +147,21 @@ class WindingCADEngine:
                 is_start = lead['is_start']
                 
                 style_line = (0, (2, 2)) if not is_start else '-'
-                ax.plot([x_start_lead, x_end_lead], [y_start_lead, y_end_lead], color=color, linewidth=1.2, linestyle=style_line)
+                ax.plot([x_start_lead, x_end_lead], [y_start_lead, y_end_lead], color=color, linewidth=1.3, linestyle=style_line)
                 
                 marker_face = color if is_start else 'black'
-                ax.scatter(x_end_lead, y_end_lead, c=marker_face, edgecolors=color, s=30, zorder=5)
+                ax.scatter(x_end_lead, y_end_lead, c=marker_face, edgecolors=color, s=35, zorder=5)
                 
-                text_radius = r_outer + lead_length + 0.3
+                text_radius = r_outer + lead_length + 0.35
                 x_text = text_radius * math.cos(angle_rad)
                 y_text = text_radius * math.sin(angle_rad)
                 
                 text_color = color if is_start else "#2d3436"
                 ax.text(x_text, y_text, label, color=text_color, fontsize=8, fontweight='bold', ha='center', va='center')
 
-        ax.set_xlim(-6.5, 6.5)
-        ax.set_ylim(-6.5, 6.5)
-        ax.set_title("Winding CAD Pro - Exact Match Blueprint", fontsize=12, fontweight='bold', pad=15, color='#2c3e50')
+        ax.set_xlim(-8.0, 8.0)
+        ax.set_ylim(-8.0, 8.0)
+        ax.set_title("Winding CAD Pro - Expanded Clear Blueprint", fontsize=12, fontweight='bold', pad=20, color='#2c3e50')
         return fig
 
 # ==========================================
@@ -235,7 +235,7 @@ def main():
             "Sub-Style": style
         })
         
-        st.subheader("🎨 المخطط الهندسي التنفيذي المطابق تماماً لصورة Winding CAD Pro:")
+        st.subheader("🎨 المخطط الهندسي التنفيذي الواضح والمتباعد الأقواس:")
         fig = engine.generate_matplotlib_diagram()
         st.pyplot(fig)
         plt.close(fig)
