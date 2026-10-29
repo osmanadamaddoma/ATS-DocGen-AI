@@ -2,172 +2,188 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
+import math
 
 # ==========================================
-# 1. وحدة لف المحركات المتقدمة (Motor Winding Engine)
+# 1. محرك Winding CAD Pro الهندسي المتقدم
 # ==========================================
-class AdvancedMotorWindingEngine:
-    def __init__(self, slots, poles, phases, winding_type="Concentric", pitch_type="Full Pitch", q_val=6):
-        self.slots = slots                  # عدد المجاري (Stator Slots)
-        self.poles = poles                  # عدد الأقطاب
-        self.phases = phases                # عدد الأوجه (3-Phase)
-        self.winding_type = winding_type    # نوع اللف (Concentric / Lap / Wave)
-        self.pitch_type = pitch_type        # نوع الخطوة (Full Pitch / Fractional Pitch)
-        self.q_val = q_val                  # عدد الملفات لكل مجموعة (q/Grp)
+class WindingCADEngine:
+    def __init__(self, Z, poles, winding_type, Y, q_val, style):
+        self.Z = Z                      # عدد المجاري (Slots)
+        self.poles = poles              # عدد الأقطاب (Poles)
+        self.winding_type = winding_type # نوع اللف
+        self.Y = Y                      # خطوة اللف (Step)
+        self.q_val = q_val              # عدد الملفات لكل مجموعة (q/Grp)
+        self.style = style              # نمط اللف (Concentric / Equal)
 
-    def calculate_advanced_parameters(self):
-        """حسابات هندسية متقدمة تشمل الخطوة الكسرية والأقطاب المتداخلة"""
-        slots_per_pole = self.slots / self.poles
-        slots_per_pole_phase = self.slots / (self.poles * self.phases)
-        
-        ideal_coil_span = slots_per_pole
-        if self.pitch_type == "Fractional Pitch":
-            practical_coil_span = int(np.floor(ideal_coil_span))
-            pitch_factor = np.sin((practical_coil_span / ideal_coil_span) * (np.pi / 2))
+    def get_phase_color(self, slot_idx):
+        p_pairs = self.poles / 2
+        alpha_e = p_pairs * 360.0 / self.Z
+        theta_e = (slot_idx * alpha_e) % 360.0
+        if 0 <= theta_e < 60 or 180 <= theta_e < 240:
+            return '#d63031'       # أحمر (U)
+        elif 60 <= theta_e < 120 or 240 <= theta_e < 300:
+            return '#0984e3'       # أزرق (W)
         else:
-            practical_coil_span = int(round(ideal_coil_span))
-            pitch_factor = 1.0
+            return '#00b894'       # أخضر (V)
 
-        terminal_connections = "24 External Jumper Connections (Multi-Parallel / Star-Delta)" if self.slots >= 48 else "Standard Terminal Configuration (6 Terminals)"
-
-        results = {
-            "Total Stator Slots (Z)": self.slots,
-            "Number of Poles (2p)": self.poles,
-            "Slots per Pole (q_total)": round(slots_per_pole, 2),
-            "Slots per Pole per Phase (q)": round(slots_per_pole_phase, 2),
-            "Coils per Group (q_grp)": self.q_val,
-            "Ideal Coil Span": round(ideal_coil_span, 1),
-            "Selected Coil Span (Y)": practical_coil_span,
-            "Pitch Factor (Kp)": round(pitch_factor, 3),
-            "Winding Style": self.winding_type,
-            "Terminal Layout & Jumpers": terminal_connections
-        }
-        return results
-
-    def generate_detailed_pole_map(self):
-        """توليد خريطة تفصيلية لتوزيع المجاري والأقطاب والخطوات المتداخلة"""
-        phase_distribution = []
-        slot_angle = 360.0 / self.slots
+    def get_connections_and_leads(self):
+        connections = []
+        leads = []
+        p_pairs = self.poles / 2
         
-        for s in range(1, self.slots + 1):
-            phase_idx = (s - 1) % self.phases
-            phase_name = ['U (Phase A)', 'V (Phase B)', 'W (Phase C)'][phase_idx] if self.phases == 3 else f"Phase {phase_idx+1}"
+        if "Lap" in self.winding_type:
+            is_double = "Double" in self.winding_type
+            for i in range(self.Z):
+                color = self.get_phase_color(i)
+                next_idx = (i + self.Y) % self.Z
+                connections.append((i, next_idx, color, is_double))
+                if i % int(max(1, self.Z/12)) == 0:
+                    leads.append({'slot': i, 'label': f"L_{i+1}", 'color': color, 'is_start': True})
+                    
+        elif "Wave" in self.winding_type:
+            for i in range(self.Z):
+                color = self.get_phase_color(i)
+                next_idx = (i + self.Y) % self.Z
+                connections.append((i, next_idx, color, True))
+                
+        elif "Grouped" in self.winding_type:
+            groups_per_phase = self.poles
+            phase_names = ['U', 'V', 'W']
+            phase_colors = ['#d63031', '#00b894', '#0984e3']
             
-            pole_zone = int(((s - 1) / self.slots) * self.poles) + 1
-            magnetic_polarity = "North (N)" if pole_zone % 2 != 0 else "South (S)"
-            
-            phase_distribution.append({
-                "Slot No": s,
-                "Phase": phase_name,
-                "Pole Zone": pole_zone,
-                "Polarity": magnetic_polarity,
-                "Mechanical Angle (deg)": round(s * slot_angle, 1)
-            })
-            
-        return pd.DataFrame(phase_distribution)
+            for phase_idx, color in enumerate(phase_colors):
+                phase_start_slot = int(round((self.Z / 3.0) * phase_idx))
+                p_name = phase_names[phase_idx]
+                
+                for p in range(groups_per_phase):
+                    group_start = (phase_start_slot + p * int(round(self.Z / self.poles))) % self.Z
+                    
+                    if "Concentric" in self.style:
+                        lead_s = (group_start - (self.q_val - 1)) % self.Z
+                        lead_e = (group_start + self.Y + (self.q_val - 1)) % self.Z
+                    else:
+                        lead_s = group_start % self.Z
+                        lead_e = (group_start + (self.q_val - 1) + self.Y) % self.Z
+                        
+                    leads.append({'slot': lead_s, 'label': f"{p_name}s{p+1}", 'color': color, 'is_start': True})
+                    leads.append({'slot': lead_e, 'label': f"{p_name}e{p+1}", 'color': color, 'is_start': False})
+                    
+                    for i in range(self.q_val):
+                        if "Concentric" in self.style:
+                            s1 = (group_start - i) % self.Z
+                            s2 = (group_start + self.Y + i) % self.Z
+                        else:
+                            s1 = (group_start + i) % self.Z
+                            s2 = (s1 + self.Y) % self.Z
+                            
+                        connections.append((s1, s2, color, False))
+        return connections, leads
 
-    def generate_stator_plot(self, df_map):
-        """رسم مخطط هندسي تنفيذي احترافي وواضح للملفات، المجاري والأقطاب"""
+    def generate_matplotlib_diagram(self):
+        """توليد الرسم الهندسي الدائري المتطابق تماماً لمعايير Winding CAD Pro"""
         fig, ax = plt.subplots(figsize=(9, 9))
         ax.set_aspect('equal')
         ax.axis('off')
         
-        r_inner = 3.0
-        r_slot = 3.5
-        r_outer = 4.0
+        R = 4.0
+        r_inner = R * 0.70
+        r_outer = R
+        r_text = R * 0.52
         
-        # رسم حلقات الستاتور
-        ax.add_patch(plt.Circle((0, 0), r_inner, color='#2c3e50', fill=False, linewidth=3))
-        ax.add_patch(plt.Circle((0, 0), r_outer, color='#2c3e50', fill=False, linewidth=3))
+        # رسم الحلقات الأساسية للستاتور
+        ax.add_patch(plt.Circle((0, 0), r_outer, color='#2d3436', fill=False, linewidth=2.5))
+        ax.add_patch(plt.Circle((0, 0), r_inner, color='#2d3436', fill=False, linewidth=1.5))
         
-        phase_colors = {
-            'U (Phase A)': '#d63031',  # أحمر
-            'V (Phase B)': '#00b894',  # أخضر
-            'W (Phase C)': '#0984e3'   # أزرق
-        }
-        
-        angles = np.deg2rad(df_map["Mechanical Angle (deg)"].values - 90)
-        
-        # رسم المجاري وترقيمها
-        for i, row in df_map.iterrows():
-            angle = angles[i]
-            x_in, y_in = r_inner * np.cos(angle), r_inner * np.sin(angle)
-            x_out, y_out = r_outer * np.cos(angle), r_outer * np.sin(angle)
+        slot_positions = []
+        for i in range(self.Z):
+            angle_rad = math.radians((i * 360.0 / self.Z) - 90)
+            x1 = r_inner * math.cos(angle_rad)
+            y1 = r_inner * math.sin(angle_rad)
+            x2 = r_outer * math.cos(angle_rad)
+            y2 = r_outer * math.sin(angle_rad)
             
-            ax.plot([x_in, x_out], [y_in, y_out], color='#7f8c8d', linewidth=1.2)
+            slot_positions.append((x2, y2, angle_rad))
+            ax.plot([x1, x2], [y1, y2], color='#b2bec3', linewidth=1.5)
             
-            x_s, y_s = r_slot * np.cos(angle), r_slot * np.sin(angle)
-            color = phase_colors.get(row["Phase"], '#7f8c8d')
-            ax.scatter(x_s, y_s, c=color, s=55, zorder=4, edgecolors='black', linewidths=0.6)
-            
-            xt, yt = 2.3 * np.cos(angle), 2.3 * np.sin(angle)
-            font_size = 6 if self.slots > 36 else 8
-            ax.text(xt, yt, str(row["Slot No"]), fontsize=font_size, ha='center', va='center', fontweight='bold', color='#2c3e50')
+            xt = r_text * math.cos(angle_rad)
+            yt = r_text * math.sin(angle_rad)
+            ax.text(xt, yt, str(i + 1), fontsize=7, ha='center', va='center', fontweight='bold', color='black')
 
-        # رسم حزم الملفات والأقواس الخارجية لكل قطب
-        span = int(self.slots / self.poles)
-        for i, row in df_map.iterrows():
-            if i % max(1, int(self.slots / (self.poles * self.phases))) == 0:
-                idx1 = i
-                idx2 = (i + span) % self.slots
-                ang1 = angles[idx1]
-                ang2 = angles[idx2]
-                
-                r_loop = r_outer + 0.4 + ((i // max(1, self.q_val)) % 3) * 0.25
-                
-                t_arc = np.linspace(ang1, ang2, 30)
-                if abs(ang1 - ang2) > np.pi:
-                    t_arc = np.linspace(ang1, ang2 + 2*np.pi if ang2 < ang1 else ang2 - 2*np.pi, 30)
-                
-                arc_x = r_loop * np.cos(t_arc)
-                arc_y = r_loop * np.sin(t_arc)
-                
-                color = phase_colors.get(row["Phase"], '#7f8c8d')
-                ax.plot(arc_x, arc_y, color=color, linewidth=1.4, alpha=0.9)
+        connections, leads = self.get_connections_and_leads()
 
-        # رسم الأقطاب والبدايات والنهايات (Us, Ue, Vs, Ve, Ws, We) حول المحيط
-        for p_idx in range(self.poles):
-            p_angle = (p_idx * 2 * np.pi / self.poles) - np.pi/2 + (np.pi / self.poles)
+        # رسم أقواس التوصيل للملفات
+        for s1, s2, color, is_double in connections:
+            x_start, y_start, ang_start = slot_positions[s1]
+            x_end, y_end, ang_end = slot_positions[s2]
             
-            label_r = r_outer + 2.1
-            lx = label_r * np.cos(p_angle)
-            ly = label_r * np.sin(p_angle)
+            diff = (ang_end - ang_start) % (2 * math.pi)
+            if diff > math.pi: diff -= 2 * math.pi
+            if diff < -math.pi: diff += 2 * math.pi
+            mid_angle = ang_start + diff / 2.0
             
-            term_label = f"Pole {p_idx+1} [N/S]\n" \
-                         f"Us{p_idx+1} ●──● Ue{p_idx+1}\n" \
-                         f"Vs{p_idx+1} ●──● Ve{p_idx+1}\n" \
-                         f"Ws{p_idx+1} ●──● We{p_idx+1}"
+            span = min((s2 - s1) % self.Z, (s1 - s2) % self.Z)
+            r_apex = r_outer + 0.3 + (span * 0.03)
             
-            ax.text(lx, ly, term_label, fontsize=7.5, fontweight='bold', ha='center', va='center',
-                    bbox=dict(boxstyle='round,pad=0.5', facecolor='#ffffff', edgecolor='#2c3e50', alpha=0.95))
+            x_mid = r_apex * math.cos(mid_angle)
+            y_mid = r_apex * math.sin(mid_angle)
+            
+            style_line = '--' if is_double else '-'
+            ax.plot([x_start, x_mid, x_end], [y_start, y_mid, y_end], color=color, linewidth=1.5, linestyle=style_line, alpha=0.85)
 
-        ax.set_xlim(-7.0, 7.0)
-        ax.set_ylim(-7.0, 7.0)
-        ax.set_title("مخطط لف المحرك الهندسي التنفيذي المعتمد (Stator Winding & Terminals Blueprint)", fontsize=11, fontweight='bold', pad=20, color='#2c3e50')
-        
+        # رسم الأطراف والبدايات والنهايات (Leads)
+        if leads:
+            for lead in leads:
+                slot_idx = lead['slot']
+                angle_rad = math.radians((slot_idx * 360.0 / self.Z) - 90)
+                
+                x_start_lead = r_outer * math.cos(angle_rad)
+                y_start_lead = r_outer * math.sin(angle_rad)
+                
+                lead_length = 1.2
+                x_end_lead = (r_outer + lead_length) * math.cos(angle_rad)
+                y_end_lead = (r_outer + lead_length) * math.sin(angle_rad)
+                
+                color = lead['color']
+                label = lead['label']
+                is_start = lead['is_start']
+                
+                style_line = (0, (2, 2)) if not is_start else '-'
+                ax.plot([x_start_lead, x_end_lead], [y_start_lead, y_end_lead], color=color, linewidth=1.5, linestyle=style_line)
+                
+                marker_face = color if is_start else 'black'
+                ax.scatter(x_end_lead, y_end_lead, c=marker_face, edgecolors=color, s=30, zorder=5)
+                
+                text_radius = r_outer + lead_length + 0.3
+                x_text = text_radius * math.cos(angle_rad)
+                y_text = text_radius * math.sin(angle_rad)
+                
+                text_color = color if is_start else "#2d3436"
+                ax.text(x_text, y_text, label, color=text_color, fontsize=8, fontweight='bold', ha='center', va='center')
+
+        ax.set_xlim(-6.5, 6.5)
+        ax.set_ylim(-6.5, 6.5)
+        ax.set_title("Winding CAD Pro - Stator Winding & Terminals Blueprint", fontsize=12, fontweight='bold', pad=15, color='#2c3e50')
         return fig
 
 # ==========================================
-# 2. وحدة التزامن والمزامنة للمولدات (Synchronization)
+# 2. وحدة التزامن للمولدات (Generator Sync Engine)
 # ==========================================
 class GeneratorSyncEngine:
-    def __init__(self, gen1_voltage, gen2_voltage, gen1_freq, gen2_freq, phase_angle_diff):
-        self.v1 = gen1_voltage
-        self.v2 = gen2_voltage
-        self.f1 = gen1_freq
-        self.f2 = gen2_freq
-        self.d_theta = phase_angle_diff
+    def __init__(self, v1, v2, f1, f2, angle):
+        self.v1 = v1
+        self.v2 = v2
+        self.f1 = f1
+        self.f2 = f2
+        self.d_theta = angle
 
     def evaluate_synchronization(self):
         voltage_diff = abs(self.v1 - self.v2)
         freq_diff = abs(self.f1 - self.f2)
-        
         v_ok = voltage_diff <= (0.05 * self.v1)
         f_ok = freq_diff <= 0.1
         angle_ok = abs(self.d_theta) <= 5.0
-        
         status = "SAFE TO SYNCHRONIZE (Parallel Close)" if (v_ok and f_ok and angle_ok) else "LOCK OUT - CONDITIONS NOT MET"
-        
         return {
             "Voltage Difference (V)": round(voltage_diff, 2),
             "Frequency Difference (Hz)": round(freq_diff, 2),
@@ -183,17 +199,17 @@ def main():
     
     st.sidebar.title("🛠️ لوحة تحكم المجمع الصناعي")
     app_mode = st.sidebar.selectbox("اختر القسم الفني:", [
-        "1. حسابات وخرائط لف المحركات المتقدمة (AC/DC)",
+        "1. حسابات وخرائط لف المحركات المتقدمة (Winding CAD Pro)",
         "2. وحدة التزامن والمزامنة للمولدات (Sync)",
         "3. إدارة وتوسيع أقسام الصيانة التنبؤية"
     ])
 
-    if app_mode == "1. حسابات وخرائط لف المحركات المتقدمة (AC/DC)":
-        st.header("⚡ المحاكي الهندسي المتقدم لف المحركات والخطوات الكسرية")
+    if app_mode == "1. حسابات وخرائط لف المحركات المتقدمة (Winding CAD Pro)":
+        st.header("⚡ محاكي Winding CAD Pro الهندسي المتقدم لف المحركات")
         
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
-            slots = st.number_input("Slots (Z)", min_value=12, max_value=144, value=48)
+            Z = st.number_input("Slots (Z)", min_value=12, max_value=144, value=48)
         with col2:
             poles = st.number_input("Poles", min_value=2, max_value=16, step=2, value=4)
         with col3:
@@ -201,33 +217,38 @@ def main():
         with col4:
             q_val = st.number_input("q/Grp", min_value=1, max_value=12, value=6)
         with col5:
-            pitch_type = st.selectbox("Pitch Style", ["Full Pitch (خطوة كاملة)", "Fractional Pitch (خطوة كسرية)"])
+            Y = st.number_input("Step (Y)", min_value=1, max_value=36, value=8)
 
-        engine = AdvancedMotorWindingEngine(slots=slots, poles=poles, phases=3, winding_type=winding_type, pitch_type=pitch_type, q_val=q_val)
-        params = engine.calculate_advanced_parameters()
+        style = st.selectbox("Style", ["Concentric (+2 Step)", "Equal Pitch"])
+
+        engine = WindingCADEngine(Z=Z, poles=poles, winding_type=winding_type, Y=Y, q_val=q_val, style=style)
+        
+        p_pairs = poles / 2
+        alpha_e = (p_pairs * 360.0) / Z
         
         st.subheader("📊 النتائج الحسابية وخصائص اللف:")
-        st.json(params)
+        st.json({
+            "Total Stator Slots (Z)": Z,
+            "Number of Poles": poles,
+            "Slots per Pole (q_total)": round(Z / poles, 2),
+            "Electrical Angle (αe)": round(alpha_e, 2),
+            "Step (Y)": Y,
+            "Winding Style": winding_type,
+            "Sub-Style": style
+        })
         
-        st.subheader("🎨 المخطط الهندسي التنفيذي للملفات، المجاري وأطراف الأقطاب (Winding Blueprint):")
-        df_map = engine.generate_detailed_pole_map()
-        fig = engine.generate_stator_plot(df_map)
+        st.subheader("🎨 المخطط الهندسي التنفيذي المطابق لـ Winding CAD Pro:")
+        fig = engine.generate_matplotlib_diagram()
         st.pyplot(fig)
-        plt.close(fig) # إغلاق الرسمة لتفريغ الذاكرة وضمان العرض السليم
-
-        st.subheader("🗺️ خريطة توزيع المجاري والأقطاب التفصيلية:")
-        st.dataframe(df_map, use_container_width=True)
+        plt.close(fig)
 
     elif app_mode == "2. وحدة التزامن والمزامنة للمولدات (Sync)":
         st.header("🔄 نظام المزامنة والربط المتوازي للمولدات (Parallel Generators)")
-        
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("### Busbar / Generator 1")
             v1 = st.number_input("جهد المصدر الأول (V)", value=400.0)
             f1 = st.number_input("تردد المصدر الأول (Hz)", value=50.0)
         with col2:
-            st.markdown("### Incoming Generator 2")
             v2 = st.number_input("جهد المولد الداخل (V)", value=401.0)
             f2 = st.number_input("تردد المولد الداخل (Hz)", value=50.0)
             angle = st.slider("فرق الزاوية (Phase Angle 𝚫θ)", -30.0, 30.0, 1.5)
@@ -235,26 +256,15 @@ def main():
         sync_engine = GeneratorSyncEngine(v1, v2, f1, f2, angle)
         sync_results = sync_engine.evaluate_synchronization()
         
-        st.subheader("🚦 تقرير حالة التزامن (Synchronization Report):")
         if "SAFE" in sync_results["Synchronization Status"]:
             st.success(f"حالة المزامنة: {sync_results['Synchronization Status']}")
         else:
             st.error(f"حالة المزامنة: {sync_results['Synchronization Status']}")
-        
         st.json(sync_results)
 
     elif app_mode == "3. إدارة وتوسيع أقسام الصيانة التنبؤية":
         st.header("🧩 إدارة وتوسيع الأقسام البرمجية للمجمع الصناعي")
         st.info("منصة معيارية مجهزة لربط خوارزميات الذكاء الاصطناعي، بيانات الاهتزازات، وتحليل أداء محركات الديزل ومولدات CAT وCummins.")
-        
-        new_module_name = st.text_input("اسم القسم البرمجي الجديد المراد إضافته:")
-        module_category = st.selectbox("تصنيف القسم:", ["تحليل الاهتزازات (Vibration Analysis)", "مراقبة نظام الوقود (Fuel System Diagnostics)", "العمر الإنتبائي المتبقي (RUL Estimation)"])
-        
-        if st.button("تفعيل وهيكلة القسم الجديد في المنظومة"):
-            if new_module_name:
-                st.success(f"تم إنشاء وتكامل القسم [{new_module_name}] تحت تصنيف ({module_category}) بنجاح داخل هيكل المنظومة!")
-            else:
-                st.warning("الرجاء إدخال اسم القسم الجديد.")
 
 if __name__ == "__main__":
     main()
