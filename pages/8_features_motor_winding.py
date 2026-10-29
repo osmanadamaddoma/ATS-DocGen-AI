@@ -65,61 +65,95 @@ class AdvancedMotorWindingEngine:
         return pd.DataFrame(phase_distribution)
 
     def generate_stator_plot(self, df_map):
-        """رسم مخطط هندسي دائري محاكي حقيقي للمحرك مع المجاري، الأقطاب، ووصلات الملفات والبدايات والنهايات"""
-        fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
+        """رسم تخطيطي هندسي احترافي ودقيق للمحرك (Stator & Winding Overhang Simulation)"""
+        fig, ax = plt.subplots(figsize=(10, 10))
+        ax.set_aspect('equal')
+        ax.axis('off')
         
-        angles = np.deg2rad(df_map["Mechanical Angle (deg)"])
+        # دوائر الستاتور الأساسية
+        r_inner = 3.0
+        r_slot = 3.5
+        r_outer = 4.0
         
-        ax.set_rticks([])
-        ax.grid(False)
-        ax.spines['polar'].set_visible(False)
-        
-        r_slot = 1.0
-        r_inner = 0.7
-        r_outer = 1.3
+        circle_inner = plt.Circle((0, 0), r_inner, color='#2c3e50', fill=False, linewidth=2.5)
+        circle_outer = plt.Circle((0, 0), r_outer, color='#2c3e50', fill=False, linewidth=2.5)
+        ax.add_patch(circle_inner)
+        ax.add_patch(circle_outer)
         
         phase_colors = {
-            'U (Phase A)': '#ff4b4b',  # أحمر
-            'V (Phase B)': '#00cc66',  # أخضر
-            'W (Phase C)': '#3399ff'   # أزرق
+            'U (Phase A)': '#e74c3c',  # أحمر
+            'V (Phase B)': '#27ae60',  # أخضر
+            'W (Phase C)': '#2980b9'   # أزرق
         }
         
+        angles = np.deg2rad(df_map["Mechanical Angle (deg)"].values - 90) # البدء من الأعلى
+        
+        # رسم المجاري والأرقام بداخل الدائرة الداخلية
         for i, row in df_map.iterrows():
-            theta = angles[i]
-            phase = row["Phase"]
-            color = phase_colors.get(phase, '#888888')
+            angle = angles[i]
+            x_in = r_inner * np.cos(angle)
+            y_in = r_inner * np.sin(angle)
+            x_out = r_outer * np.cos(angle)
+            y_out = r_outer * np.sin(angle)
             
-            ax.plot([theta, theta], [r_inner, r_outer], color='#333333', linewidth=0.8, zorder=2)
-            ax.scatter(theta, r_slot, c=color, s=40, zorder=4, edgecolors='black', linewidths=0.5)
-            ax.text(theta, 0.5, str(row["Slot No"]), fontsize=7, ha='center', va='center', rotation=np.rad2deg(theta)-90, fontweight='bold', color='#222222')
+            # خط فاصل للمجرى
+            ax.plot([x_in, x_out], [y_in, y_out], color='#bdc3c7', linewidth=1)
+            
+            # نقطة المجرى الملونة
+            x_s = r_slot * np.cos(angle)
+            y_s = r_slot * np.sin(angle)
+            color = phase_colors.get(row["Phase"], '#7f8c8d')
+            ax.scatter(x_s, y_s, c=color, s=45, zorder=4, edgecolors='black', linewidths=0.5)
+            
+            # ترقم المجاري في المركز بشكل منظم
+            r_text = 2.2
+            xt = r_text * np.cos(angle)
+            yt = r_text * np.sin(angle)
+            ax.text(xt, yt, str(row["Slot No"]), fontsize=7, ha='center', va='center', fontweight='bold', color='#34495e')
 
+        # رسم أقواس خطوات الملفات (Coil Overhangs) بدقة هندسية غير متداخلة
         span = int(self.slots / self.poles)
         for i, row in df_map.iterrows():
             if i % max(1, int(self.slots / (self.poles * self.phases))) == 0:
-                theta1 = angles[i]
-                target_idx = (i + span) % self.slots
-                theta2 = angles[target_idx]
-                phase = row["Phase"]
-                color = phase_colors.get(phase, '#888888')
+                idx1 = i
+                idx2 = (i + span) % self.slots
                 
-                t_arc = np.linspace(theta1, theta2, 30)
-                r_arc = np.linspace(r_outer, r_outer + 0.5, 15).tolist() + np.linspace(r_outer + 0.5, r_outer, 15).tolist()
-                if len(r_arc) == 30:
-                    ax.plot(t_arc, r_arc, color=color, linewidth=1.0, alpha=0.8, linestyle='-', zorder=3)
+                ang1 = angles[idx1]
+                ang2 = angles[idx2]
+                
+                # إنشاء قوس بيضاوي خارجي يربط بين جانبي الملف
+                mid_ang = (ang1 + ang2) / 2
+                if abs(ang1 - ang2) > np.pi:
+                    mid_ang += np.pi
+                
+                r_arc = r_outer + 0.8 + (i % 3) * 0.3 # تدرج نصف القطر لمنع التداخل
+                
+                # نقاط القوس
+                t = np.linspace(ang1, ang2, 30)
+                if abs(ang1 - ang2) > np.pi:
+                    t = np.linspace(ang1, ang2 + 2*np.pi if ang2 < ang1 else ang2 - 2*np.pi, 30)
+                
+                arc_x = (r_outer + 0.5) * np.cos(t)
+                arc_y = (r_outer + 0.5) * np.sin(t)
+                
+                color = phase_colors.get(row["Phase"], '#7f8c8d')
+                ax.plot(arc_x, arc_y, color=color, linewidth=1.2, alpha=0.8, linestyle='-')
 
+        # تسميات أطراف الأقطاب والبدايات والنهايات (Us, Ue, Vs, Ve, Ws, We)
         for p_idx in range(self.poles):
-            angle_pos = np.deg2rad((p_idx * 360.0 / self.poles) + (360.0 / (2 * self.poles)))
-            ax.text(angle_pos, r_outer + 0.7, f"Us{p_idx+1}", color='#ff4b4b', fontsize=9, fontweight='bold', ha='center', va='center')
-            ax.text(angle_pos + 0.05, r_outer + 0.9, f"Ue{p_idx+1}", color='#ff4b4b', fontsize=8, ha='center', va='center', style='italic')
+            p_angle = (p_idx * 2 * np.pi / self.poles) - np.pi/2 + (np.pi / self.poles)
             
-            ax.text(angle_pos + 0.2, r_outer + 0.7, f"Vs{p_idx+1}", color='#00cc66', fontsize=9, fontweight='bold', ha='center', va='center')
-            ax.text(angle_pos + 0.25, r_outer + 0.9, f"Ve{p_idx+1}", color='#00cc66', fontsize=8, ha='center', va='center', style='italic')
+            label_r = r_outer + 2.2
+            lx = label_r * np.cos(p_angle)
+            ly = label_r * np.sin(p_angle)
+            
+            term_text = f"Pole {p_idx+1}\nUs{p_idx+1}/Ue{p_idx+1}\nVs{p_idx+1}/Ve{p_idx+1}\nWs{p_idx+1}/We{p_idx+1}"
+            ax.text(lx, ly, term_text, fontsize=8, fontweight='bold', ha='center', va='center',
+                    bbox=dict(boxstyle='round,pad=0.4', facecolor='#ecf0f1', edgecolor='#bdc3c7', alpha=0.9))
 
-            ax.text(angle_pos + 0.4, r_outer + 0.7, f"Ws{p_idx+1}", color='#3399ff', fontsize=9, fontweight='bold', ha='center', va='center')
-            ax.text(angle_pos + 0.45, r_outer + 0.9, f"We{p_idx+1}", color='#3399ff', fontsize=8, ha='center', va='center', style='italic')
-
-        ax.set_rmax(r_outer + 1.2)
-        ax.set_title("مخطط لف المحرك التفاعلي الحقيقي (Stator Winding Simulation & Terminals)", va='bottom', fontsize=13, fontweight='bold', pad=20)
+        ax.set_xlim(-7.0, 7.0)
+        ax.set_ylim(-7.0, 7.0)
+        ax.set_title("مخطط لف المحرك التفاعلي الهندسي الحقيقي (Stator Winding & Terminals Layout)", fontsize=13, fontweight='bold', pad=20, color='#2c3e50')
         return fig
 
 # ==========================================
@@ -182,7 +216,7 @@ def main():
         st.subheader("📊 النتائج الحسابية وخصائص اللف:")
         st.json(params)
         
-        st.subheader("🎨 الرسم البصري الحقيقي للمجاري، الأقطاب، والبدايات والنهايات (Stator Winding Simulation):")
+        st.subheader("🎨 الرسم الهندسي والتخطيطي المحاكي للمجاري، الأقطاب والأطراف (Stator Winding Simulation):")
         df_map = engine.generate_detailed_pole_map()
         fig = engine.generate_stator_plot(df_map)
         st.pyplot(fig)
