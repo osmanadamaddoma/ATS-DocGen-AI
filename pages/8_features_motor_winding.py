@@ -61,32 +61,32 @@ class WindingCADEngine:
                             s1 = (group_start + i) % self.Z
                             s2 = (s1 + self.Y) % self.Z
                             
-                        connections.append((s1, s2, color, False))
+                        connections.append((s1, s2, color, i)) # تمرير مؤشر الملف لضبط التباعد
         else:
             for i in range(self.Z):
                 color = self.get_phase_color(i)
                 next_idx = (i + self.Y) % self.Z
                 is_double = "Double" in self.winding_type
-                connections.append((i, next_idx, color, is_double))
+                connections.append((i, next_idx, color, 0 if not is_double else 1))
                 if i % int(max(1, self.Z/12)) == 0:
                     leads.append({'slot': i, 'label': f"L_{i+1}", 'color': color, 'is_start': True})
                     
         return connections, leads
 
     def generate_matplotlib_diagram(self):
-        """توليد الرسم الهندسي الدائري بأقواس ناعمة مطابقة تماماً لـ Winding CAD Pro"""
+        """توليد الرسم الهندسي بخطوط رقيقة، ناعمة، ومرتبة بدقة خالية من التداخل"""
         fig, ax = plt.subplots(figsize=(9, 9))
         ax.set_aspect('equal')
         ax.axis('off')
         
-        R = 4.0
-        r_inner = R * 0.70
+        R = 3.8
+        r_inner = R * 0.72
         r_outer = R
-        r_text = R * 0.52
+        r_text = R * 0.54
         
-        # رسم الحلقات الأساسية للستاتور
-        ax.add_patch(plt.Circle((0, 0), r_outer, color='#2d3436', fill=False, linewidth=2.5))
-        ax.add_patch(plt.Circle((0, 0), r_inner, color='#2d3436', fill=False, linewidth=1.5))
+        # رسم الحلقات الأساسية للستاتور بدقة
+        ax.add_patch(plt.Circle((0, 0), r_outer, color='#2d3436', fill=False, linewidth=2.0))
+        ax.add_patch(plt.Circle((0, 0), r_inner, color='#2d3436', fill=False, linewidth=1.2))
         
         slot_positions = []
         for i in range(self.Z):
@@ -97,16 +97,17 @@ class WindingCADEngine:
             y2 = r_outer * math.sin(angle_rad)
             
             slot_positions.append((x2, y2, angle_rad))
-            ax.plot([x1, x2], [y1, y2], color='#b2bec3', linewidth=1.5)
+            ax.plot([x1, x2], [y1, y2], color='#b2bec3', linewidth=1.0)
             
             xt = r_text * math.cos(angle_rad)
             yt = r_text * math.sin(angle_rad)
-            ax.text(xt, yt, str(i + 1), fontsize=7, ha='center', va='center', fontweight='bold', color='black')
+            font_sz = 6 if self.Z > 36 else 8
+            ax.text(xt, yt, str(i + 1), fontsize=font_sz, ha='center', va='center', fontweight='bold', color='black')
 
         connections, leads = self.get_connections_and_leads()
 
-        # رسم أقواس الملفات بشكل منحني وناعم (Smooth Arcs)
-        for s1, s2, color, is_double in connections:
+        # رسم الأقواس بخطوط رفيعة ومنسقة (Concentric Spacing Layers)
+        for s1, s2, color, coil_idx in connections:
             x_start, y_start, ang_start = slot_positions[s1]
             x_end, y_end, ang_end = slot_positions[s2]
             
@@ -115,22 +116,20 @@ class WindingCADEngine:
             if diff < -math.pi: diff += 2 * math.pi
             mid_angle = ang_start + diff / 2.0
             
-            span = min((s2 - s1) % self.Z, (s1 - s2) % self.Z)
-            r_apex = r_outer + 0.35 + (span * 0.025)
+            # تباعد طبقات الملفات المتداخلة لمنع التشابك (ترك مسافة دقيقة لكل ملف فرعي)
+            r_apex = r_outer + 0.25 + (coil_idx * 0.08)
             
-            # توليد نقاط قوس ناعم (Smooth Curve Interpolation)
-            theta_curve = np.linspace(ang_start, ang_end, 30)
+            theta_curve = np.linspace(ang_start, ang_end, 35)
             if abs(ang_start - ang_end) > math.pi:
-                theta_curve = np.linspace(ang_start, ang_end + 2*math.pi if ang_end < ang_start else ang_end - 2*math.pi, 30)
+                theta_curve = np.linspace(ang_start, ang_end + 2*math.pi if ang_end < ang_start else ang_end - 2*math.pi, 35)
             
-            r_curve = np.linspace(r_outer, r_apex, 15).tolist() + np.linspace(r_apex, r_outer, 15).tolist()
-            if len(r_curve) == 30:
+            r_curve = np.linspace(r_outer, r_apex, 17).tolist() + np.linspace(r_apex, r_outer, 18).tolist()
+            if len(r_curve) == 35:
                 curve_x = r_curve * np.cos(theta_curve)
                 curve_y = r_curve * np.sin(theta_curve)
-                style_line = '--' if is_double else '-'
-                ax.plot(curve_x, curve_y, color=color, linewidth=1.5, linestyle=style_line, alpha=0.9)
+                ax.plot(curve_x, curve_y, color=color, linewidth=0.9, alpha=0.85)
 
-        # رسم الأطراف والبدايات والنهايات حول المحيط الخارجي
+        # رسم الأطراف والبدايات والنهايات بوضوح ونظام خارجي
         if leads:
             for lead in leads:
                 slot_idx = lead['slot']
@@ -139,7 +138,7 @@ class WindingCADEngine:
                 x_start_lead = r_outer * math.cos(angle_rad)
                 y_start_lead = r_outer * math.sin(angle_rad)
                 
-                lead_length = 1.2
+                lead_length = 0.9
                 x_end_lead = (r_outer + lead_length) * math.cos(angle_rad)
                 y_end_lead = (r_outer + lead_length) * math.sin(angle_rad)
                 
@@ -148,21 +147,21 @@ class WindingCADEngine:
                 is_start = lead['is_start']
                 
                 style_line = (0, (2, 2)) if not is_start else '-'
-                ax.plot([x_start_lead, x_end_lead], [y_start_lead, y_end_lead], color=color, linewidth=1.5, linestyle=style_line)
+                ax.plot([x_start_lead, x_end_lead], [y_start_lead, y_end_lead], color=color, linewidth=1.1, linestyle=style_line)
                 
                 marker_face = color if is_start else 'black'
-                ax.scatter(x_end_lead, y_end_lead, c=marker_face, edgecolors=color, s=35, zorder=5)
+                ax.scatter(x_end_lead, y_end_lead, c=marker_face, edgecolors=color, s=25, zorder=5)
                 
-                text_radius = r_outer + lead_length + 0.35
+                text_radius = r_outer + lead_length + 0.25
                 x_text = text_radius * math.cos(angle_rad)
                 y_text = text_radius * math.sin(angle_rad)
                 
                 text_color = color if is_start else "#2d3436"
-                ax.text(x_text, y_text, label, color=text_color, fontsize=8, fontweight='bold', ha='center', va='center')
+                ax.text(x_text, y_text, label, color=text_color, fontsize=7, fontweight='bold', ha='center', va='center')
 
-        ax.set_xlim(-6.8, 6.8)
-        ax.set_ylim(-6.8, 6.8)
-        ax.set_title("Winding CAD Pro - Stator Winding & Terminals Blueprint", fontsize=12, fontweight='bold', pad=15, color='#2c3e50')
+        ax.set_xlim(-6.0, 6.0)
+        ax.set_ylim(-6.0, 6.0)
+        ax.set_title("Winding CAD Pro - Clean Blueprint Simulation", fontsize=11, fontweight='bold', pad=12, color='#2c3e50')
         return fig
 
 # ==========================================
