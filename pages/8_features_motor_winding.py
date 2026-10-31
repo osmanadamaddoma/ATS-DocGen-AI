@@ -5,16 +5,17 @@ import matplotlib.pyplot as plt
 import math
 
 # ==========================================
-# 1. محرك Winding CAD Pro الهندسي المتقدم (تعديل فصل الأقواس والأقطاب)
+# 1. محرك Winding CAD Pro الهندسي المتقدم (مع دعم تباين خطوات الأقطاب)
 # ==========================================
 class WindingCADProEngine:
-    def __init__(self, Z, poles, winding_type, Y_base, q_val, style):
-        self.Z = Z                      # عدد المجاري (Slots)
-        self.poles = poles              # عدد الأقطاب (Poles)
-        self.winding_type = winding_type # نوع اللف
-        self.Y_base = Y_base            # الخطوة الأساسية (Base Step Y)
-        self.q_val = q_val              # عدد الملفات لكل مجموعة (q/Grp)
-        self.style = style              # نمط اللف
+    def __init__(self, Z, poles, winding_type, Y_base, q_val, style, pole_step_variation):
+        self.Z = Z                              # عدد المجاري (Slots)
+        self.poles = poles                      # عدد الأقطاب (Poles)
+        self.winding_type = winding_type        # نوع اللف
+        self.Y_base = Y_base                    # الخطوة الأساسية (Base Step Y)
+        self.q_val = q_val                      # عدد الملفات لكل مجموعة (q/Grp)
+        self.style = style                      # نمط اللف
+        self.pole_step_variation = pole_step_variation # تباين الخطوات بين الأقطاب
 
     def get_phase_color(self, slot_idx):
         p_pairs = self.poles / 2
@@ -43,12 +44,15 @@ class WindingCADProEngine:
                 for p in range(groups_per_phase):
                     group_start = (phase_start_slot + p * int(round(self.Z / self.poles))) % self.Z
                     
+                    # تطبيق خطوة مخصصة ومتغيرة لكل قطب بناءً على خيار المستخدم
+                    current_Y = self.Y_base + (p * self.pole_step_variation)
+                    
                     if "Concentric" in self.style:
                         lead_s = (group_start - (self.q_val - 1)) % self.Z
-                        lead_e = (group_start + self.Y_base + (self.q_val - 1)) % self.Z
+                        lead_e = (group_start + current_Y + (self.q_val - 1)) % self.Z
                     else:
                         lead_s = group_start % self.Z
-                        lead_e = (group_start + (self.q_val - 1) + self.Y_base) % self.Z
+                        lead_e = (group_start + (self.q_val - 1) + current_Y) % self.Z
                         
                     leads.append({'slot': lead_s, 'label': f"{p_name}s{p+1}", 'color': color, 'is_start': True, 'pole': p+1})
                     leads.append({'slot': lead_e, 'label': f"{p_name}e{p+1}", 'color': color, 'is_start': False, 'pole': p+1})
@@ -56,12 +60,11 @@ class WindingCADProEngine:
                     for i in range(self.q_val):
                         if "Concentric" in self.style:
                             s1 = (group_start - i) % self.Z
-                            s2 = (group_start + self.Y_base + i) % self.Z
+                            s2 = (group_start + current_Y + i) % self.Z
                         else:
                             s1 = (group_start + i) % self.Z
-                            s2 = (s1 + self.Y_base) % self.Z
+                            s2 = (s1 + current_Y) % self.Z
                             
-                        # إضافة معرف القطب (p) لتنظيم مسافات الأقواس المستقلة
                         connections.append((s1, s2, color, i, p))
         else:
             for i in range(self.Z):
@@ -75,7 +78,7 @@ class WindingCADProEngine:
         return connections, leads
 
     def generate_matplotlib_diagram(self):
-        """توليد الرسم الهندسي مع فصل تام ومسافات واسعة لكل قطب مطابقة تماماً للرسم اليدوي"""
+        """توليد الرسم الهندسي الدائري بأقواس متباعدة وفصل كامل للأقطاب"""
         fig, ax = plt.subplots(figsize=(10, 10))
         ax.set_aspect('equal')
         ax.axis('off')
@@ -107,7 +110,7 @@ class WindingCADProEngine:
 
         connections, leads = self.get_connections_and_leads()
 
-        # رسم الأقواس المنحنية مع فصل هندسي واسع لكل قطب لضمان عدم التداخل البصري
+        # رسم الأقواس المنحنية مع تباعد هندسي واسع لكل قطب لمنع التداخل
         for s1, s2, color, coil_idx, pole_idx in connections:
             x_start, y_start, ang_start = slot_positions[s1]
             x_end, y_end, ang_end = slot_positions[s2]
@@ -117,7 +120,6 @@ class WindingCADProEngine:
             if diff < -math.pi: diff += 2 * math.pi
             mid_angle = ang_start + diff / 2.0
             
-            # زيادة فاصل نصف القطر لكل قطب لضمان ظهور الأقواس مفصولة ومنسقة بوضوح
             r_apex = r_outer + 0.45 + (coil_idx * 0.16) + (pole_idx * 0.35)
             
             theta_curve = np.linspace(ang_start, ang_end, 40)
@@ -150,7 +152,7 @@ class WindingCADProEngine:
                 x_start_lead = r_outer * math.cos(angle_rad)
                 y_start_lead = r_outer * math.sin(angle_rad)
                 
-                lead_length = 2.2  # مسافة خارجية واسعة جداً لمنع أي تداخل للأطراف
+                lead_length = 2.2
                 x_end_lead = (r_outer + lead_length) * math.cos(angle_rad)
                 y_end_lead = (r_outer + lead_length) * math.sin(angle_rad)
                 
@@ -173,7 +175,7 @@ class WindingCADProEngine:
 
         ax.set_xlim(-8.5, 8.5)
         ax.set_ylim(-8.5, 8.5)
-        ax.set_title("Winding CAD Pro - Separated Poles Blueprint", fontsize=12, fontweight='bold', pad=20, color='#2c3e50')
+        ax.set_title("Winding CAD Pro - Variable Pole Steps Blueprint", fontsize=12, fontweight='bold', pad=20, color='#2c3e50')
         return fig
 
 # ==========================================
@@ -217,7 +219,7 @@ def main():
     if app_mode == "1. حسابات وخرائط لف المحركات المتقدمة (Winding CAD Pro)":
         st.header("⚡ محاكي Winding CAD Pro الهندسي المتقدم لف المحركات")
         
-        col1, col2, col3, col4, col5 = st.columns(5)
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
         with col1:
             Z = st.number_input("Slots (Z)", min_value=12, max_value=144, value=72)
         with col2:
@@ -228,10 +230,12 @@ def main():
             q_val = st.number_input("q/Grp", min_value=1, max_value=12, value=6)
         with col5:
             Y = st.number_input("Base Step (Y)", min_value=1, max_value=36, value=13)
+        with col6:
+            pole_step_var = st.number_input("Pole Step Var", min_value=0, max_value=5, value=0, help="تدرج خطوة الملفات من قطب لآخر")
 
         style = st.selectbox("Style", ["Concentric (+2 Step)", "Equal Pitch"])
 
-        engine = WindingCADProEngine(Z=Z, poles=poles, winding_type=winding_type, Y_base=Y, q_val=q_val, style=style)
+        engine = WindingCADProEngine(Z=Z, poles=poles, winding_type=winding_type, Y_base=Y, q_val=q_val, style=style, pole_step_variation=pole_step_var)
         
         p_pairs = poles / 2
         alpha_e = (p_pairs * 360.0) / Z
@@ -243,11 +247,12 @@ def main():
             "Slots per Pole (q_total)": round(Z / poles, 2),
             "Electrical Angle (αe)": round(alpha_e, 2),
             "Base Step (Y)": Y,
+            "Pole Step Variation": pole_step_var,
             "Winding Style": winding_type,
             "Sub-Style": style
         })
         
-        st.subheader("🎨 المخطط الهندسي التنفيذي بفصل الأقطاب والأقواس الواسعة:")
+        st.subheader("🎨 المخطط الهندسي التنفيذي بمتغير خطوات الأقطاب:")
         fig = engine.generate_matplotlib_diagram()
         st.pyplot(fig)
         plt.close(fig)
