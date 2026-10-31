@@ -5,17 +5,17 @@ import matplotlib.pyplot as plt
 import math
 
 # ==========================================
-# 1. محرك Winding CAD Pro الهندسي المتقدم (مع دعم تباين خطوات الأقطاب)
+# 1. محرك Winding CAD Pro الهندسي المتقدم (فصل أقطاب الملفات بفصوص مستقلة)
 # ==========================================
 class WindingCADProEngine:
     def __init__(self, Z, poles, winding_type, Y_base, q_val, style, pole_step_variation):
-        self.Z = Z                              # عدد المجاري (Slots)
-        self.poles = poles                      # عدد الأقطاب (Poles)
-        self.winding_type = winding_type        # نوع اللف
-        self.Y_base = Y_base                    # الخطوة الأساسية (Base Step Y)
-        self.q_val = q_val                      # عدد الملفات لكل مجموعة (q/Grp)
-        self.style = style                      # نمط اللف
-        self.pole_step_variation = pole_step_variation # تباين الخطوات بين الأقطاب
+        self.Z = Z                      # عدد المجاري (Slots)
+        self.poles = poles              # عدد الأقطاب (Poles)
+        self.winding_type = winding_type # نوع اللف
+        self.Y_base = Y_base            # الخطوة الأساسية (Base Step Y)
+        self.q_val = q_val              # عدد الملفات لكل مجموعة (q/Grp)
+        self.style = style              # نمط اللف
+        self.pole_step_variation = pole_step_variation # تباين خطوات الأقطاب
 
     def get_phase_color(self, slot_idx):
         p_pairs = self.poles / 2
@@ -44,7 +44,7 @@ class WindingCADProEngine:
                 for p in range(groups_per_phase):
                     group_start = (phase_start_slot + p * int(round(self.Z / self.poles))) % self.Z
                     
-                    # تطبيق خطوة مخصصة ومتغيرة لكل قطب بناءً على خيار المستخدم
+                    # تطبيق خطوة متغيرة لكل قطب بناءً على رغبتك التنفيذية
                     current_Y = self.Y_base + (p * self.pole_step_variation)
                     
                     if "Concentric" in self.style:
@@ -65,6 +65,7 @@ class WindingCADProEngine:
                             s1 = (group_start + i) % self.Z
                             s2 = (s1 + current_Y) % self.Z
                             
+                        # تمرير رقم القطب (p) لضمان عزل وتوزيع مسار الأقواس
                         connections.append((s1, s2, color, i, p))
         else:
             for i in range(self.Z):
@@ -78,7 +79,7 @@ class WindingCADProEngine:
         return connections, leads
 
     def generate_matplotlib_diagram(self):
-        """توليد الرسم الهندسي الدائري بأقواس متباعدة وفصل كامل للأقطاب"""
+        """توليد الرسم الهندسي الدائري بفصوص أقطاب مستقلة ومتباعدة تماماً"""
         fig, ax = plt.subplots(figsize=(10, 10))
         ax.set_aspect('equal')
         ax.axis('off')
@@ -110,7 +111,7 @@ class WindingCADProEngine:
 
         connections, leads = self.get_connections_and_leads()
 
-        # رسم الأقواس المنحنية مع تباعد هندسي واسع لكل قطب لمنع التداخل
+        # رسم الأقواس المنحنية بمدى شعاعي مستقل لكل قطب (Pole Lobes) لمنع التشابك تماماً
         for s1, s2, color, coil_idx, pole_idx in connections:
             x_start, y_start, ang_start = slot_positions[s1]
             x_end, y_end, ang_end = slot_positions[s2]
@@ -120,7 +121,8 @@ class WindingCADProEngine:
             if diff < -math.pi: diff += 2 * math.pi
             mid_angle = ang_start + diff / 2.0
             
-            r_apex = r_outer + 0.45 + (coil_idx * 0.16) + (pole_idx * 0.35)
+            # تخصيص نطاق شعاعي منفصل لكل قطب (Pole Lobe Expansion)
+            r_apex = r_outer + 0.4 + (coil_idx * 0.14) + (pole_idx * 0.30)
             
             theta_curve = np.linspace(ang_start, ang_end, 40)
             if abs(ang_start - ang_end) > math.pi:
@@ -132,7 +134,7 @@ class WindingCADProEngine:
                 curve_y = r_curve * np.sin(theta_curve)
                 ax.plot(curve_x, curve_y, color=color, linewidth=1.3, alpha=0.9)
 
-        # رسم الأطراف والبدايات والنهايات في نطاق واسع للخارج
+        # رسم الأطراف والبدايات والنهايات للخارج بنطاق واسع ومرتب
         if leads:
             slot_counts = {}
             for lead in leads:
@@ -152,7 +154,7 @@ class WindingCADProEngine:
                 x_start_lead = r_outer * math.cos(angle_rad)
                 y_start_lead = r_outer * math.sin(angle_rad)
                 
-                lead_length = 2.2
+                lead_length = 2.0
                 x_end_lead = (r_outer + lead_length) * math.cos(angle_rad)
                 y_end_lead = (r_outer + lead_length) * math.sin(angle_rad)
                 
@@ -173,9 +175,9 @@ class WindingCADProEngine:
                 text_color = color if is_start else "#2d3436"
                 ax.text(x_text, y_text, label, color=text_color, fontsize=8, fontweight='bold', ha='center', va='center')
 
-        ax.set_xlim(-8.5, 8.5)
-        ax.set_ylim(-8.5, 8.5)
-        ax.set_title("Winding CAD Pro - Variable Pole Steps Blueprint", fontsize=12, fontweight='bold', pad=20, color='#2c3e50')
+        ax.set_xlim(-8.0, 8.0)
+        ax.set_ylim(-8.0, 8.0)
+        ax.set_title("Winding CAD Pro - Distinct Pole Lobes Blueprint", fontsize=12, fontweight='bold', pad=20, color='#2c3e50')
         return fig
 
 # ==========================================
@@ -252,7 +254,7 @@ def main():
             "Sub-Style": style
         })
         
-        st.subheader("🎨 المخطط الهندسي التنفيذي بمتغير خطوات الأقطاب:")
+        st.subheader("🎨 المخطط الهندسي التنفيذي بفصوص الأقطاب المستقلة:")
         fig = engine.generate_matplotlib_diagram()
         st.pyplot(fig)
         plt.close(fig)
